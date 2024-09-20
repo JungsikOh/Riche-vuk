@@ -1,7 +1,10 @@
 #include <iostream>
+
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
 #include "glm/glm.hpp"
+
+#include "Graphics/GfxCore.h"
 
 GLFWwindow* window;
 
@@ -14,6 +17,8 @@ int main()
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
 	window = glfwCreateWindow(1440, 720, "Hi", nullptr, nullptr);
+	GfxDevice device;
+	device.Initialize(window);
 
 	while (!glfwWindowShouldClose(window))
 	{

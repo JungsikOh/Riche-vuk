@@ -105,7 +105,7 @@
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:/dev/VulkanSDK/1.3.290.0/Include;$(SolutionDir)/ThirdParty/GLFW/include;$(SolutionDir)/ThirdParty/GLM;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:/dev/VulkanSDK/1.3.290.0/Include;$(SolutionDir)/ThirdParty/GLFW/include;$(SolutionDir)/ThirdParty/GLM;$(SolutionDir)/Jordan-Engine;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -131,7 +131,18 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Graphics\GfxSwapChain.cpp" />
+    <ClCompile Include="Graphics\GfxDescriptor.cpp" />
+    <ClCompile Include="Graphics\GfxQueue.cpp" />
+    <ClCompile Include="Graphics\GfxDevice.cpp" />
     <ClCompile Include="main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Graphics\GfxCore.h" />
+    <ClInclude Include="Graphics\GfxSwapChain.h" />
+    <ClInclude Include="Graphics\GfxDescriptor.h" />
+    <ClInclude Include="Graphics\GfxQueue.h" />
+    <ClInclude Include="Graphics\GfxDevice.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
