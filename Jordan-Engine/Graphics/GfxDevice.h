@@ -8,6 +8,7 @@
 #include <string>
 #include <set>
 #include <memory>
+#include <algorithm>
 #include <assert.h>
 
 #define GLFW_INCLUDE_VULKAN
@@ -71,6 +72,7 @@ public:
 
 	VkDebugUtilsMessengerEXT debugMessenger;
 
+	// TODO: Have to Get Queues
 	std::unique_ptr<GfxQueue> graphicsQueue = nullptr;
 	std::unique_ptr<GfxQueue> presentationQueue = nullptr;
 	std::unique_ptr<GfxQueue> computeQueue = nullptr;
@@ -100,6 +102,9 @@ private:
 	bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
 	bool CheckValidationLayerSupport(const std::vector<const char*>* checkVaildationLayers);
 	bool CheckDeviceSuitable(VkPhysicalDevice device);
+
+	// -- Choose Functions
+	VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& surfaceCapabilities);
 
 	// -- Debug Functions
 	bool EnableDebug();

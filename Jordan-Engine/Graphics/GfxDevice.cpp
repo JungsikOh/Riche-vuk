@@ -8,6 +8,7 @@ void GfxDevice::Initialize(GLFWwindow* newWindow)
 	CreateSurface();
 	GetPhysicalDevice();
 	CreateLogicalDevice();
+	CreateSwapchain();
 }
 
 void GfxDevice::Destroy()
@@ -15,7 +16,7 @@ void GfxDevice::Destroy()
 	vkDestroySwapchainKHR(logicalDevice, swapchain.swapchain, nullptr);
 	vkDestroySurfaceKHR(instance, swapchain.surface, nullptr);
 	vkDestroyDevice(logicalDevice, nullptr);
-	if(EnableDebug()) DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+	if (EnableDebug()) DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 	vkDestroyInstance(instance, nullptr);
 }
 
@@ -183,11 +184,81 @@ void GfxDevice::GetPhysicalDevice()
 
 void GfxDevice::CreateSurface()
 {
+	// https://vulkan-tutorial.com/Drawing_a_triangle/Presentation/Window_surface
 	VkResult result = glfwCreateWindowSurface(instance, window, nullptr, &swapchain.surface);
 	if (result != VK_SUCCESS)
 	{
 		assert(false && "Failed to Craete Window Surface");
 	}
+}
+
+void GfxDevice::CreateSwapchain()
+{
+	// Get swap chain details so we can pick best settings.
+	SwapchainDetails swapchainDetails = GetSwapchainDetails(physicalDevice);
+
+	// Find optimal surface values for our swap chain
+	// 1. choose surface format
+	VkSurfaceFormatKHR surfaceFormat = { VK_FORMAT_R8G8B8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
+	// 2. choose presentation mode
+	VkPresentModeKHR presentationMode = VK_PRESENT_MODE_MAILBOX_KHR;
+	// 3. choose swapchain image size
+	VkExtent2D extent = ChooseSwapExtent(swapchainDetails.surfaceCapabilities);
+
+	uint32_t imageCount = swapchainDetails.surfaceCapabilities.minImageCount + 1;
+
+	// if imageCount higher than max, then clamp down to max
+	// if 0, then limitless.
+	if (swapchainDetails.surfaceCapabilities.maxImageCount > 0 && swapchainDetails.surfaceCapabilities.maxImageCount < imageCount)
+	{
+		imageCount = swapchainDetails.surfaceCapabilities.maxImageCount;
+	}
+
+	VkSwapchainCreateInfoKHR swapchainCreateInfo = {};
+	swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	swapchainCreateInfo.surface = swapchain.surface;
+	swapchainCreateInfo.imageFormat = surfaceFormat.format;
+	swapchainCreateInfo.imageColorSpace = surfaceFormat.colorSpace;
+	swapchainCreateInfo.presentMode = presentationMode;
+	swapchainCreateInfo.imageExtent = extent;
+	swapchainCreateInfo.minImageCount = imageCount;
+	swapchainCreateInfo.imageArrayLayers = 1;
+	swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	swapchainCreateInfo.preTransform = swapchainDetails.surfaceCapabilities.currentTransform;
+	swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;		// How to handle blending images with external graphics (e.g. other windows)
+	swapchainCreateInfo.clipped = VK_TRUE;
+
+	QueueFamilyIndices indices = GetQueueFamilies(physicalDevice);
+
+	if (indices.graphicsFamily.value() != indices.presentationFamily.value())
+	{
+		uint32_t queueFamilyIndices[] = {
+			indices.graphicsFamily.value(),
+			indices.presentationFamily.value(),
+		};
+
+		swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+		swapchainCreateInfo.queueFamilyIndexCount = 2;
+		swapchainCreateInfo.pQueueFamilyIndices = queueFamilyIndices;
+	}
+	else
+	{
+		swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		swapchainCreateInfo.queueFamilyIndexCount = 0;
+		swapchainCreateInfo.pQueueFamilyIndices = nullptr;
+	}
+	// if old swapchain been destoryed and this one replaces it, then link old one to quickly hand over responsibilities
+	swapchainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
+
+	// Create swapchain
+	VkResult result = vkCreateSwapchainKHR(logicalDevice, &swapchainCreateInfo, nullptr, &swapchain.swapchain);
+	if (result != VK_SUCCESS)
+	{
+		assert(false && "Failed to Create swapchain!");
+	}
+
+	swapchain.format = surfaceFormat.format;
+	swapchain.extent = extent;
 }
 
 QueueFamilyIndices GfxDevice::GetQueueFamilies(VkPhysicalDevice device)
@@ -385,6 +456,33 @@ bool GfxDevice::CheckDeviceSuitable(VkPhysicalDevice device)
 	}
 
 	return indices.isVaild() && extensionSupported && swapchainValid && deviceFeatures.samplerAnisotropy;
+}
+
+VkExtent2D GfxDevice::ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& surfaceCapabilities)
+{
+	// If current extent is at numeric limits, then extent can vary. Otherwise, it is the size of the window.
+	if (surfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
+	{
+		return surfaceCapabilities.currentExtent;
+	}
+	else
+	{
+		// If value cay vary, need to set manually
+
+		int width, height;
+		glfwGetFramebufferSize(window, &width, &height);
+
+		// Create new extent using window size
+		VkExtent2D newExtent = {};
+		newExtent.width = static_cast<uint32_t>(width);
+		newExtent.height = static_cast<uint32_t>(height);
+
+		// Surface also defines max and min, so make sure within boundaries by clamping value
+		newExtent.width = std::clamp(newExtent.width, surfaceCapabilities.minImageExtent.width, surfaceCapabilities.maxImageExtent.width);
+		newExtent.height = std::clamp(newExtent.height, surfaceCapabilities.minImageExtent.height, surfaceCapabilities.maxImageExtent.height);
+
+		return newExtent;
+	}
 }
 
 bool GfxDevice::EnableDebug()
