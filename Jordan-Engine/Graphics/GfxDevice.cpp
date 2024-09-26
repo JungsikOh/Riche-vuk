@@ -6,7 +6,7 @@ void GfxDevice::Initialize(GLFWwindow* newWindow)
 
 	CreateInstance();
 	CreateSurface();
-	GetPhysicalDevice();
+	GetPhysicalDeviceFromInstance();
 	CreateLogicalDevice();
 	CreateSwapchain();
 }
@@ -153,7 +153,7 @@ void GfxDevice::CreateLogicalDevice()
 	}
 }
 
-void GfxDevice::GetPhysicalDevice()
+void GfxDevice::GetPhysicalDeviceFromInstance()
 {
 	uint32_t deviceCount = 0;
 	vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);

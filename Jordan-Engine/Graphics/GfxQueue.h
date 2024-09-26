@@ -14,7 +14,7 @@ public:
 	GfxQueue& operator=(const GfxQueue&) = delete;
 	GfxQueue& operator=(GfxQueue&&) = delete;
 
-	~GfxQueue() = default;
+	~GfxQueue();
 
 	VkQueue GetHandle() const;
 	uint32_t GetQueueFamilyIndex() const;

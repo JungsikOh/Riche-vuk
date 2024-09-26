@@ -1,19 +1,5 @@
 #pragma once
 
-#include <iostream>
-#include <array>
-#include <vector>
-#include <optional>
-#include <mutex>
-#include <string>
-#include <set>
-#include <memory>
-#include <algorithm>
-#include <assert.h>
-
-#define GLFW_INCLUDE_VULKAN
-#include "GLFW/glfw3.h"
-
 #include "GfxCore.h"
 
 struct QueueFamilyIndices
@@ -62,6 +48,13 @@ public:
 	void Initialize(GLFWwindow* newWindow);
 	void Destroy();
 
+	VkDevice GetDevice() const {
+		return logicalDevice;
+	}
+	VkPhysicalDevice GetPhysicalDevice() const {
+		return physicalDevice;
+	}
+
 	GLFWwindow* window = nullptr;
 
 	/// Vulkan Components
@@ -88,7 +81,7 @@ private:
 	// - Create Functions
 	void CreateInstance();
 	void CreateLogicalDevice();
-	void GetPhysicalDevice();
+	void GetPhysicalDeviceFromInstance();
 	void CreateSurface();
 	void CreateSwapchain();
 

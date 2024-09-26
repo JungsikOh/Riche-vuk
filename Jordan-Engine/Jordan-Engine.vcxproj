@@ -131,6 +131,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Graphics\GfxImage.cpp" />
     <ClCompile Include="Graphics\GfxSwapChain.cpp" />
     <ClCompile Include="Graphics\GfxDescriptor.cpp" />
     <ClCompile Include="Graphics\GfxQueue.cpp" />
@@ -138,6 +139,7 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Graphics\GfxImage.h" />
     <ClInclude Include="Graphics\GfxCore.h" />
     <ClInclude Include="Graphics\GfxSwapChain.h" />
     <ClInclude Include="Graphics\GfxDescriptor.h" />

@@ -25,6 +25,7 @@ int main()
 		glfwPollEvents();
 	}
 
+	device.Destroy();
 	// Destroy GLFW window and stop GLFW
 	glfwDestroyWindow(window);
 	glfwTerminate();

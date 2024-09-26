@@ -15,6 +15,10 @@ GfxQueue::GfxQueue(GfxQueue&& other) :
 	other.properties = {};
 }
 
+GfxQueue::~GfxQueue()
+{
+}
+
 VkQueue GfxQueue::GetHandle() const
 {
 	return handle;
