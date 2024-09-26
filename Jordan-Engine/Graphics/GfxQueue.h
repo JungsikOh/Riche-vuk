@@ -7,7 +7,7 @@ class GfxDevice;
 class GfxQueue
 {
 public:
-	GfxQueue(GfxDevice& device, uint32_t queueFamilyIndex, VkQueueFamilyProperties properties, uint32_t index);
+	GfxQueue(VkDevice newDevice, uint32_t queueFamilyIndex, VkQueueFamilyProperties properties, uint32_t index);
 	GfxQueue(const GfxQueue&) = default;
 	GfxQueue(GfxQueue&& other);
 
@@ -22,7 +22,7 @@ public:
 	//const VkQueueFamilyProperties GetProperties() const;
 
 protected:
-	GfxDevice& device;
+	VkDevice device;
 
 	VkQueue handle{ VK_NULL_HANDLE };
 

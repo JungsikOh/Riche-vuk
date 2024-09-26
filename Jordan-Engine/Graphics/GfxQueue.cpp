@@ -1,9 +1,9 @@
 #include "GfxQueue.h"
 
-GfxQueue::GfxQueue(GfxDevice& device, uint32_t queueFamilyIndex, VkQueueFamilyProperties properties, uint32_t index) :
-	device(device), queueFamilyIndex(queueFamilyIndex), queueIndex(index), properties(properties)
+GfxQueue::GfxQueue(VkDevice newDevice, uint32_t queueFamilyIndex, VkQueueFamilyProperties properties, uint32_t index) :
+	device(newDevice), queueFamilyIndex(queueFamilyIndex), queueIndex(index), properties(properties)
 {
-	vkGetDeviceQueue(device.logicalDevice, queueFamilyIndex, queueIndex, &handle);
+	vkGetDeviceQueue(device, queueFamilyIndex, queueIndex, &handle);
 }
 
 GfxQueue::GfxQueue(GfxQueue&& other) :
@@ -17,6 +17,7 @@ GfxQueue::GfxQueue(GfxQueue&& other) :
 
 GfxQueue::~GfxQueue()
 {
+	device = nullptr;
 }
 
 VkQueue GfxQueue::GetHandle() const

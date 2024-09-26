@@ -6,14 +6,16 @@ class GfxImage
 	friend class GfxDevice;
 
 public:
-	GfxImage(GfxDevice& device, VkImageCreateInfo createInfo, VkMemoryPropertyFlags memFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	GfxImage(VkDevice newDevice, VkPhysicalDevice newPhysicalDevice, 
+		VkImageCreateInfo createInfo, VkMemoryPropertyFlags memFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 	~GfxImage();
 
 	VkImage GetImage() const;
 	VkDeviceMemory GetImageMemory() const;
 
 private:
-	GfxDevice& device;
+	VkDevice device;
+	VkPhysicalDevice physicalDevice;
 
 	VkImage image;
 	VkDeviceMemory imageMemory;
