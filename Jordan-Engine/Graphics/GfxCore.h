@@ -15,9 +15,13 @@
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
 
+/* Graphics API Abstraction */
 #include "GfxDevice.h"
 #include "GfxQueue.h"
 #include "GfxImage.h"
+#include "GfxBuffer.h"
+#include "GfxDescriptor.h"
+#include "GfxDescriptorManager.h"
 
 const std::vector<const char*> deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
