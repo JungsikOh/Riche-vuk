@@ -38,7 +38,6 @@ struct GfxSwapchain
 };
 
 class GfxQueue;
-
 class GfxDevice
 {
 public:

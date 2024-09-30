@@ -11,7 +11,7 @@ public:
 	void Initialize();
 	void Destory();
 
-	DescriptorHandle SetDescriptorSet(GfxDescriptorBuilder& builder, VkDescriptorSetLayout& layout);
+	DescriptorHandle SetDescriptorSet(GfxDescriptorBuilder& builder);
 	VkDescriptorSet GetDescriptorSet(DescriptorHandle descriptorHandle) const;
 
 private:

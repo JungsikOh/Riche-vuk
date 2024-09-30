@@ -1,7 +1,26 @@
 #include "GfxImage.h"
 
-GfxImage::GfxImage(VkDevice newDevice, VkPhysicalDevice newPhysicalDevice, VkImageCreateInfo createInfo, VkMemoryPropertyFlags memFlags) :
-	device(newDevice), physicalDevice(newPhysicalDevice)
+GfxImage::GfxImage()
+{
+}
+
+GfxImage::~GfxImage()
+{
+}
+
+void GfxImage::Initialize(VkDevice newDevice, VkPhysicalDevice newPhysicalDevice)
+{
+	device = newDevice;
+	physicalDevice = physicalDevice;
+}
+
+void GfxImage::Destroy()
+{
+	vkDestroyImage(device, image, nullptr);
+	vkFreeMemory(device, imageMemory, nullptr);
+}
+
+void GfxImage::SetImage(VkImageCreateInfo createInfo, VkMemoryPropertyFlags memFlags)
 {
 	VkResult result = vkCreateImage(device, &createInfo, nullptr, &image);
 	if (result != VK_SUCCESS)
@@ -29,15 +48,24 @@ GfxImage::GfxImage(VkDevice newDevice, VkPhysicalDevice newPhysicalDevice, VkIma
 	vkBindImageMemory(device, image, imageMemory, 0);
 }
 
-GfxImage::~GfxImage()
+void GfxImage::SetImageView(VkImageViewCreateInfo createInfo)
 {
-	vkDestroyImage(device, image, nullptr);
-	vkFreeMemory(device, imageMemory, nullptr);
+	createInfo.image = image;
+	VkResult result = vkCreateImageView(device, &createInfo, nullptr, &imageView);
+	if (result != VK_SUCCESS)
+	{
+		assert(false && "Failed to Create VkImage");
+	}
 }
 
 VkImage GfxImage::GetImage() const
 {
 	return image;
+}
+
+VkImageView GfxImage::GetImageView() const
+{
+	return imageView;
 }
 
 VkDeviceMemory GfxImage::GetImageMemory() const

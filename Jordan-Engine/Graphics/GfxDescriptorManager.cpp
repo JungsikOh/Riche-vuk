@@ -1,11 +1,13 @@
 #include "GfxDescriptorManager.h"
 #include "GfxDescriptor.h"
 
-DescriptorHandle GfxDescriptorManager::SetDescriptorSet(GfxDescriptorBuilder& builder, VkDescriptorSetLayout& layout)
+DescriptorHandle GfxDescriptorManager::SetDescriptorSet(GfxDescriptorBuilder& builder)
 {
     ++handle;
 
+    VkDescriptorSetLayout layout;
     VkDescriptorSet set;
+
     builder.Build(set, layout);
 
     descriptorSetMap.insert({ handle, set });
