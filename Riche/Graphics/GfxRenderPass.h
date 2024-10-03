@@ -30,9 +30,9 @@ public:
 
 	void Initialize(GfxPipelineType type);
 
-	void AddColorAttachmentReference(uint32_t attachment, VkImageLayout layout);
-	void AddInputAttachmentReference(uint32_t attachment, VkImageLayout layout);
-	void SetDepthStencilAttachmentReference(uint32_t attachment, VkImageLayout layout);
+	GfxSubpass& AddColorAttachmentReference(uint32_t attachment, VkImageLayout layout);
+	GfxSubpass& AddInputAttachmentReference(uint32_t attachment, VkImageLayout layout);
+	GfxSubpass& SetDepthStencilAttachmentReference(uint32_t attachment, VkImageLayout layout);
 
 	std::vector<VkAttachmentReference>& GetColorAttachmentReferences();
 	std::vector<VkAttachmentReference>& GetInputAttachmentReferences();

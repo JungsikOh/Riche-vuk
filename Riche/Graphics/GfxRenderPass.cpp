@@ -5,28 +5,34 @@ void GfxSubpass::Initialize(GfxPipelineType type)
 	this->type = type;
 }
 
-void GfxSubpass::AddColorAttachmentReference(uint32_t attachment, VkImageLayout layout)
+GfxSubpass& GfxSubpass::AddColorAttachmentReference(uint32_t attachment, VkImageLayout layout)
 {
 	VkAttachmentReference ref = {};
 	ref.attachment = attachment;
 	ref.layout = layout;
 
 	colorAttachmentRefs.push_back(ref);
+
+	return *this;
 }
 
-void GfxSubpass::AddInputAttachmentReference(uint32_t attachment, VkImageLayout layout)
+GfxSubpass& GfxSubpass::AddInputAttachmentReference(uint32_t attachment, VkImageLayout layout)
 {
 	VkAttachmentReference ref = {};
 	ref.attachment = attachment;
 	ref.layout = layout;
 
 	inputAttachmentRefs.push_back(ref);
+
+	return *this;
 }
 
-void GfxSubpass::SetDepthStencilAttachmentReference(uint32_t attachment, VkImageLayout layout)
+GfxSubpass& GfxSubpass::SetDepthStencilAttachmentReference(uint32_t attachment, VkImageLayout layout)
 {
 	depthStencilAttachmentRef.attachment = attachment;
 	depthStencilAttachmentRef.layout = layout;
+
+	return *this;
 }
 
 std::vector<VkAttachmentReference>& GfxSubpass::GetColorAttachmentReferences()
@@ -73,7 +79,7 @@ void GfxRenderPass::Initialize(VkDevice newDevice, std::vector<GfxAttachmentDesc
 	}
 
 	uint32_t subpassIdx = 0;
-	uint32_t subpassCount = subpasses.size();
+	uint32_t subpassCount = static_cast<uint32_t>(subpasses.size());
 
 	std::vector<VkSubpassDependency> subpassDependencies;
 

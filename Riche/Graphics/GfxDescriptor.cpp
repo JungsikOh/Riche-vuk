@@ -277,7 +277,7 @@ bool GfxDescriptorBuilder::Build(VkDescriptorSet& set, VkDescriptorSetLayout& la
 	layoutInfo.pNext = nullptr;
 
 	layoutInfo.pBindings = bindings.data();
-	layoutInfo.bindingCount = bindings.size();
+	layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
 
 	layout = cache->CreateDescriptorLayout(&layoutInfo);
 
@@ -290,7 +290,7 @@ bool GfxDescriptorBuilder::Build(VkDescriptorSet& set, VkDescriptorSetLayout& la
 		w.dstSet = set;
 	}
 
-	vkUpdateDescriptorSets(alloc->device, writes.size(), writes.data(), 0, nullptr);
+	vkUpdateDescriptorSets(alloc->device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
 
 	return true;
 }
@@ -302,7 +302,7 @@ bool GfxDescriptorBuilder::Build(VkDescriptorSet& set)
 		w.dstSet = set;
 	}
 
-	vkUpdateDescriptorSets(alloc->device, writes.size(), writes.data(), 0, nullptr);
+	vkUpdateDescriptorSets(alloc->device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
 
 	return true;
 }
