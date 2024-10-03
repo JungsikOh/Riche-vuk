@@ -33,9 +33,6 @@
     <ClCompile Include="Graphics\GfxImage.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="Graphics\GfxDescriptorManager.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="Graphics\GfxBuffer.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
@@ -43,6 +40,9 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="Graphics\GfxPipeline.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Graphics\GfxFrameBuffer.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
@@ -65,9 +65,6 @@
     <ClInclude Include="Graphics\GfxImage.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="Graphics\GfxDescriptorManager.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="Graphics\GfxBuffer.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
@@ -75,6 +72,9 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="Graphics\GfxPipeline.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\GfxFrameBuffer.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

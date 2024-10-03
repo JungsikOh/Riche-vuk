@@ -191,3 +191,8 @@ std::vector<GfxAttachmentDesc>& GfxRenderPass::GetAttachments()
 {
 	return attachments;
 }
+
+VkDevice GfxRenderPass::GetDevice() const
+{
+	return device;
+}

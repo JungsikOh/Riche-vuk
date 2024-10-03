@@ -48,7 +48,7 @@ private:
 
 class GfxRenderPass
 {
-
+public:
 	GfxRenderPass() = default;
 	~GfxRenderPass() = default;
 
@@ -58,6 +58,8 @@ class GfxRenderPass
 	VkRenderPass GetRenderPass();
 	std::vector<GfxSubpass>& GetSubpasses();
 	std::vector<GfxAttachmentDesc>& GetAttachments();
+
+	VkDevice GetDevice() const;
 
 private:
 	VkDevice device;

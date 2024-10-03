@@ -17,6 +17,9 @@ public:
 	VkImageView GetImageView() const;
 	VkDeviceMemory GetImageMemory() const;
 
+	uint32_t GetWidth() const;
+	uint32_t GetHeight() const;
+
 private:
 	VkDevice device;
 	VkPhysicalDevice physicalDevice;
@@ -25,10 +28,13 @@ private:
 	VkImage image;
 	VkImageView imageView;
 	VkDeviceMemory imageMemory;
+
+	uint32_t width;
+	uint32_t height;
 };
 
-static VkImageCreateInfo ImageCreateInfo2D(uint32_t width, uint32_t height, uint32_t mipsCount = 1, uint32_t arrayLayersCount = 1,
-	VkFormat format, VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL, VkImageUsageFlags usage)
+static VkImageCreateInfo ImageCreateInfo2D(uint32_t width, uint32_t height, uint32_t mipsCount, uint32_t arrayLayersCount,
+	VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage)
 {
 	VkImageCreateInfo imageCreateInfo = {};
 	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;

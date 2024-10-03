@@ -1,13 +1,5 @@
 #include "GfxImage.h"
 
-GfxImage::GfxImage()
-{
-}
-
-GfxImage::~GfxImage()
-{
-}
-
 void GfxImage::Initialize(VkDevice newDevice, VkPhysicalDevice newPhysicalDevice)
 {
 	device = newDevice;
@@ -22,6 +14,9 @@ void GfxImage::Destroy()
 
 void GfxImage::SetImage(VkImageCreateInfo createInfo, VkMemoryPropertyFlags memFlags)
 {
+	width = createInfo.extent.width;
+	height = createInfo.extent.height;
+
 	VkResult result = vkCreateImage(device, &createInfo, nullptr, &image);
 	if (result != VK_SUCCESS)
 	{
@@ -71,4 +66,14 @@ VkImageView GfxImage::GetImageView() const
 VkDeviceMemory GfxImage::GetImageMemory() const
 {
 	return imageMemory;
+}
+
+uint32_t GfxImage::GetWidth() const
+{
+	return width;
+}
+
+uint32_t GfxImage::GetHeight() const
+{
+	return height;
 }
