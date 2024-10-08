@@ -10,6 +10,8 @@ public:
 	void Initialize(GfxRenderPass* newRenderPass, std::vector<GfxImage*>& newAttachments);
 	void Destroy();
 
+	VkFramebuffer GetVkFrameBuffer();
+
 private:
 	/*VkDevice device;*/	// 연결된 GfxRenderPass를 사용해 VkDevice 이용.
 

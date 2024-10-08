@@ -37,3 +37,8 @@ void GfxFrameBuffer::Destroy()
 
 	renderPass = nullptr;
 }
+
+VkFramebuffer GfxFrameBuffer::GetVkFrameBuffer()
+{
+	return framebuffer;
+}

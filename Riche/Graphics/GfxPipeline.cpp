@@ -5,6 +5,12 @@ void GfxGraphicsPipeline::Initialize(VkDevice newDevice)
 	device = newDevice;
 }
 
+void GfxGraphicsPipeline::Destroy()
+{
+	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+	vkDestroyPipeline(device, graphicsPipeline, nullptr);
+}
+
 GfxGraphicsPipeline& GfxGraphicsPipeline::SetVertexShader(const std::string& filename)
 {
 	vertextShader = filename;
@@ -156,6 +162,21 @@ GfxGraphicsPipeline& GfxGraphicsPipeline::CreatePipeline(std::vector<VkDescripto
 	}
 
 	return *this;
+}
+
+VkPipeline GfxGraphicsPipeline::GetVkPipeline()
+{
+	return graphicsPipeline;
+}
+
+VkPipelineLayout GfxGraphicsPipeline::GetVkPipelineLayout()
+{
+	return pipelineLayout;
+}
+
+GfxPipelineType GfxGraphicsPipeline::GetPipelineType()
+{
+	return GfxPipelineType::Graphics;
 }
 
 VkShaderModule GfxGraphicsPipeline::CreateShaderModule(const std::vector<char>& code)

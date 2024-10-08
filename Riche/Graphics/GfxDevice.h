@@ -65,10 +65,15 @@ public:
 	VkDebugUtilsMessengerEXT debugMessenger;
 
 	// TODO: Have to Get Queues
-	std::unique_ptr<GfxQueue> graphicsQueue = nullptr;
-	std::unique_ptr<GfxQueue> presentationQueue = nullptr;
-	std::unique_ptr<GfxQueue> computeQueue = nullptr;
-	std::unique_ptr<GfxQueue> transferQueue = nullptr;
+	//std::unique_ptr<GfxQueue> graphicsQueue = nullptr;
+	//std::unique_ptr<GfxQueue> presentationQueue = nullptr;
+	//std::unique_ptr<GfxQueue> computeQueue = nullptr;
+	//std::unique_ptr<GfxQueue> transferQueue = nullptr;
+
+	VkQueue grahpicsQueue;
+	VkQueue presentationQueue;
+	VkQueue computeQueue;
+	VkQueue transferQueue;
 
 	GfxSwapchain swapchain {};
 

@@ -8,6 +8,9 @@
 #include "GfxDescriptor.h"
 #include "GfxPipeline.h"
 #include "GfxRenderPass.h"
+#include "GfxFrameBuffer.h"
+#include "GfxCommandPool.h"
+#include "GfxCommandBuffer.h"
 
 const std::vector<const char*> deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME

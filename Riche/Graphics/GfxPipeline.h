@@ -13,6 +13,10 @@ class GfxPipeline
 public:
 	GfxPipeline() = default;
 	~GfxPipeline() = default;
+
+	virtual VkPipeline GetVkPipeline() = 0;
+	virtual VkPipelineLayout GetVkPipelineLayout() = 0;
+	virtual GfxPipelineType GetPipelineType() = 0;
 };
 
 class GfxGraphicsPipeline : public GfxPipeline
@@ -34,6 +38,10 @@ public:
 		std::vector<VkVertexInputAttributeDescription>& vertexInputAttributeDescs,
 		VkPipelineRasterizationStateCreateInfo& rasterizer, VkPipelineMultisampleStateCreateInfo& multisampling,
 		VkPipelineColorBlendAttachmentState& blendState, VkPipelineDepthStencilStateCreateInfo& depthStencilState);
+
+	VkPipeline GetVkPipeline();
+	VkPipelineLayout GetVkPipelineLayout();
+	GfxPipelineType GetPipelineType();
 
 private:
 	VkDevice device;

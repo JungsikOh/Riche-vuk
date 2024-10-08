@@ -135,6 +135,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Graphics\GfxCommandPool.cpp" />
+    <ClCompile Include="Graphics\GfxCommandBuffer.cpp" />
     <ClCompile Include="Graphics\GfxFrameBuffer.cpp" />
     <ClCompile Include="Graphics\GfxPipeline.cpp" />
     <ClCompile Include="Graphics\GfxRenderPass.cpp" />
@@ -147,6 +149,8 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Graphics\GfxCommandPool.h" />
+    <ClInclude Include="Graphics\GfxCommandBuffer.h" />
     <ClInclude Include="Graphics\GfxFrameBuffer.h" />
     <ClInclude Include="Graphics\GfxPipeline.h" />
     <ClInclude Include="Graphics\GfxRenderPass.h" />
