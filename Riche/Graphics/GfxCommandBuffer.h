@@ -29,11 +29,14 @@ public:
 	void CmdBindDescriptorSets(uint32_t firstSet, const std::vector<VkDescriptorSet>& descriptorSets);
 	void CmdBindPipelineDescriptorSet(const std::vector<VkDescriptorSet>& pipelineDescriptorSet);
 	void CmdBindVertexBuffers(const std::vector<GfxBuffer*> vertexBuffers = {});
-	void CmdSetViewport(const VkViewport viewports = {});
-	void CmdSetScissor(const VkRect2D scissors = {});
+	void CmdSetViewport();
+	void CmdSetScissor();
 	void CmdDraw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance);
 	void CmdNextSubpass();
 	void CmdEndRenderPass();
+	void End();
+
+
 	
 private:
 	VkDevice device;

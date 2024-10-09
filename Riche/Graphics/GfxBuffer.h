@@ -11,8 +11,9 @@ public:
 	void Destory();
 
 	void* GetMappedData() const;
-	VkBuffer GetBuffer() const;
+	VkBuffer GetVkBuffer() const;
 	VkDeviceMemory GetBufferMemory() const;
+	uint32_t GetOffset() const;
 
 	void* Map();
 	void Unmap();

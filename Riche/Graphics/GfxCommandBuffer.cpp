@@ -110,13 +110,54 @@ void GfxCommandBuffer::CmdBindPipelineDescriptorSet(const std::vector<VkDescript
 void GfxCommandBuffer::CmdBindVertexBuffers(const std::vector<GfxBuffer*> vertexBuffers = {})
 {
 	std::vector<VkBuffer> vertexVkBuffers;
-	std::vector<VkDeviceSize> temp;
+	std::vector<VkDeviceSize> offsets;
 
-	vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+	for (GfxBuffer* item : vertexBuffers)
+	{
+		vertexVkBuffers.push_back(item->GetVkBuffer());
+		offsets.push_back(item->GetOffset());
+	}
+
+	vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<uint32_t>(vertexVkBuffers.size()), vertexVkBuffers.data(), offsets.data());
 }
 
-void CmdSetViewport(const VkViewport viewports = {});
-void CmdSetScissor(const VkRect2D scissors = {});
-void CmdDraw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance);
-void CmdNextSubpass();
-void CmdEndRenderPass();
+void GfxCommandBuffer::CmdSetViewport()
+{
+	if (!currentPipeline) return;
+
+	vkCmdSetViewport(commandBuffer, 0, 1, &currentPipeline->GetVkViewport());
+}
+
+void GfxCommandBuffer::CmdSetScissor()
+{
+	if (!currentPipeline) return;
+
+	vkCmdSetScissor(commandBuffer, 0, 1, &currentPipeline->GetVkScissor());
+}
+
+void GfxCommandBuffer::CmdDraw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance)
+{
+	vkCmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
+}
+
+void GfxCommandBuffer::CmdNextSubpass()
+{
+	vkCmdNextSubpass(commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void GfxCommandBuffer::CmdEndRenderPass()
+{
+	vkCmdEndRenderPass(commandBuffer);
+	currentPipeline = nullptr;
+	currentRenderPass = nullptr;
+	currentFrameBuffer = nullptr;
+}
+
+void GfxCommandBuffer::End()
+{
+	VkResult result = vkEndCommandBuffer(commandBuffer);
+	if (result == VK_SUCCESS)
+	{
+		assert(false && "Failed to end command buffer!");
+	}
+}

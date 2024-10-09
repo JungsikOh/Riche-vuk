@@ -17,7 +17,7 @@ void* GfxBuffer::GetMappedData() const
 	return mappedPtr;
 }
 
-VkBuffer GfxBuffer::GetBuffer() const
+VkBuffer GfxBuffer::GetVkBuffer() const
 {
 	return buffer;
 }
@@ -25,6 +25,11 @@ VkBuffer GfxBuffer::GetBuffer() const
 VkDeviceMemory GfxBuffer::GetBufferMemory() const
 {
 	return bufferMemory;
+}
+
+uint32_t GfxBuffer::GetOffset() const
+{
+	return offset;
 }
 
 void* GfxBuffer::Map()

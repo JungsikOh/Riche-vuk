@@ -17,6 +17,8 @@ public:
 	virtual VkPipeline GetVkPipeline() = 0;
 	virtual VkPipelineLayout GetVkPipelineLayout() = 0;
 	virtual GfxPipelineType GetPipelineType() = 0;
+	virtual VkViewport GetVkViewport() = 0;
+	virtual VkRect2D GetVkScissor() = 0;
 };
 
 class GfxGraphicsPipeline : public GfxPipeline
@@ -42,6 +44,8 @@ public:
 	VkPipeline GetVkPipeline();
 	VkPipelineLayout GetVkPipelineLayout();
 	GfxPipelineType GetPipelineType();
+	VkViewport GetVkViewport();
+	VkRect2D GetVkScissor();
 
 private:
 	VkDevice device;

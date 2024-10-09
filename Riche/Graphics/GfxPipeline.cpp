@@ -179,6 +179,16 @@ GfxPipelineType GfxGraphicsPipeline::GetPipelineType()
 	return GfxPipelineType::Graphics;
 }
 
+VkViewport GfxGraphicsPipeline::GetVkViewport()
+{
+	return viewport;
+}
+
+VkRect2D GfxGraphicsPipeline::GetVkScissor()
+{
+	return scissor;
+}
+
 VkShaderModule GfxGraphicsPipeline::CreateShaderModule(const std::vector<char>& code)
 {
 	VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
