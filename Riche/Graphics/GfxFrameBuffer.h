@@ -1,8 +1,9 @@
 #pragma once
 #include "GfxCore.h"
 
-//class GfxRenderPass;
+class GfxRenderPass;
 class GfxImage;
+
 
 class GfxFrameBuffer
 {

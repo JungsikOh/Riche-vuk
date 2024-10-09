@@ -14,6 +14,12 @@ typedef enum class GfxSubpassContents
 	SECONDARY_COMMAND_BUFFERS = 1
 } GfxSubpassContents;
 
+class GfxPipeline;
+class GfxCommandPool;
+class GfxFrameBuffer;
+class GfxBuffer;
+class GfxRenderPass;
+
 class GfxCommandBuffer
 {
 public:
@@ -24,7 +30,7 @@ public:
 	void Destroy(GfxCommandPool* commandPool);
 
 	bool Begin();
-	void CmdBeginRenderPass(GfxRenderPass* renderPass, GfxFrameBuffer* framebuffer, GfxSubpassContents subpassContents = GfxSubpassContents::INLINE, int32_t offsetX = 0, int32_t offsetY = 0, uint32_t width, uint32_t height);
+	void CmdBeginRenderPass(uint32_t width, uint32_t height, GfxRenderPass* renderPass, GfxFrameBuffer* framebuffer, GfxSubpassContents subpassContents = GfxSubpassContents::INLINE, int32_t offsetX = 0, int32_t offsetY = 0);
 	void CmdBindPipeline(GfxPipeline* pipeline);
 	void CmdBindDescriptorSets(uint32_t firstSet, const std::vector<VkDescriptorSet>& descriptorSets);
 	void CmdBindPipelineDescriptorSet(const std::vector<VkDescriptorSet>& pipelineDescriptorSet);
@@ -46,6 +52,7 @@ private:
 
 	GfxRenderPass* currentRenderPass;
 	GfxPipeline* currentPipeline;
+	// TODO : ComputePipeline
 	GfxFrameBuffer* currentFrameBuffer;
 	uint32_t currentSubpass = 0;
 };

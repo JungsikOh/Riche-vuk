@@ -5,6 +5,7 @@
 #include "glm/glm.hpp"
 
 #include "Graphics/GfxCore.h"
+#include "Rendering/VulkanRenderer.h"
 
 GLFWwindow* window;
 
@@ -17,15 +18,14 @@ int main()
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
 	window = glfwCreateWindow(1440, 720, "Hi", nullptr, nullptr);
-	GfxDevice device;
-	device.Initialize(window);
+	VulkanRenderer renderer;
+	renderer.Initialize(window);
 
 	while (!glfwWindowShouldClose(window))
 	{
 		glfwPollEvents();
 	}
 
-	device.Destroy();
 	// Destroy GLFW window and stop GLFW
 	glfwDestroyWindow(window);
 	glfwTerminate();

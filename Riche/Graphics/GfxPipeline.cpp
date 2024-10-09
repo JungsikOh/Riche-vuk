@@ -1,29 +1,29 @@
 #include "GfxPipeline.h"
 
-void GfxGraphicsPipeline::Initialize(VkDevice newDevice)
+void GfxPipeline::Initialize(VkDevice newDevice)
 {
 	device = newDevice;
 }
 
-void GfxGraphicsPipeline::Destroy()
+void GfxPipeline::Destroy()
 {
 	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-	vkDestroyPipeline(device, graphicsPipeline, nullptr);
+	vkDestroyPipeline(device, pipeline, nullptr);
 }
 
-GfxGraphicsPipeline& GfxGraphicsPipeline::SetVertexShader(const std::string& filename)
+GfxPipeline& GfxPipeline::SetVertexShader(const std::string& filename)
 {
 	vertextShader = filename;
 	return *this;
 }
 
-GfxGraphicsPipeline& GfxGraphicsPipeline::SetFragmentShader(const std::string& filename)
+GfxPipeline& GfxPipeline::SetFragmentShader(const std::string& filename)
 {
 	fragmentShader = filename;
 	return *this;
 }
 
-GfxGraphicsPipeline& GfxGraphicsPipeline::SetViewport(VkViewport& newViewport)
+GfxPipeline& GfxPipeline::SetViewport(VkViewport& newViewport)
 {
 	viewport = newViewport;
 
@@ -33,7 +33,7 @@ GfxGraphicsPipeline& GfxGraphicsPipeline::SetViewport(VkViewport& newViewport)
 	return *this;
 }
 
-GfxGraphicsPipeline& GfxGraphicsPipeline::SetViewport(float width, float height)
+GfxPipeline& GfxPipeline::SetViewport(float width, float height)
 {
 	VkViewport newViewport = {};
 	newViewport.x = 0.0f;
@@ -49,7 +49,7 @@ GfxGraphicsPipeline& GfxGraphicsPipeline::SetViewport(float width, float height)
 	return *this;
 }
 
-GfxGraphicsPipeline& GfxGraphicsPipeline::AddInputBindingDescription(uint32_t binding, uint32_t stride)
+GfxPipeline& GfxPipeline::AddInputBindingDescription(uint32_t binding, uint32_t stride)
 {
 	VkVertexInputBindingDescription bindingDescription = {};
 	bindingDescription.binding = binding;										// Can bind multiple streams of data, this defines which one
@@ -61,7 +61,7 @@ GfxGraphicsPipeline& GfxGraphicsPipeline::AddInputBindingDescription(uint32_t bi
 	return *this;
 }
 
-GfxGraphicsPipeline& GfxGraphicsPipeline::CreatePipeline(std::vector<VkDescriptorSetLayout>& layouts, VkPushConstantRange pushConstantRange, VkRenderPass renderPass,
+GfxPipeline& GfxPipeline::CreatePipeline(std::vector<VkDescriptorSetLayout>& layouts, VkPushConstantRange pushConstantRange, VkRenderPass renderPass,
 	std::vector<VkVertexInputAttributeDescription>& vertexInputAttributeDescs,
 	VkPipelineRasterizationStateCreateInfo& rasterizer, VkPipelineMultisampleStateCreateInfo& multisampling, 
 	VkPipelineColorBlendAttachmentState& blendState, VkPipelineDepthStencilStateCreateInfo& depthStencilState)
@@ -155,7 +155,7 @@ GfxGraphicsPipeline& GfxGraphicsPipeline::CreatePipeline(std::vector<VkDescripto
 	pipelineCreateInfo.basePipelineIndex = -1;				// or index of pipeline being created to derive from (in case createing multiple at once)
 
 	// Create Grahpics Pipeline
-	result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &graphicsPipeline);
+	result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipeline);
 	if (result != VK_SUCCESS)
 	{
 		assert(false && "Failed to Create Graphics Pipeline!");
@@ -164,32 +164,32 @@ GfxGraphicsPipeline& GfxGraphicsPipeline::CreatePipeline(std::vector<VkDescripto
 	return *this;
 }
 
-VkPipeline GfxGraphicsPipeline::GetVkPipeline()
+VkPipeline GfxPipeline::GetVkPipeline()
 {
-	return graphicsPipeline;
+	return pipeline;
 }
 
-VkPipelineLayout GfxGraphicsPipeline::GetVkPipelineLayout()
+VkPipelineLayout GfxPipeline::GetVkPipelineLayout()
 {
 	return pipelineLayout;
 }
 
-GfxPipelineType GfxGraphicsPipeline::GetPipelineType()
+GfxPipelineType GfxPipeline::GetPipelineType()
 {
 	return GfxPipelineType::Graphics;
 }
 
-VkViewport GfxGraphicsPipeline::GetVkViewport()
+VkViewport& GfxPipeline::GetVkViewport()
 {
 	return viewport;
 }
 
-VkRect2D GfxGraphicsPipeline::GetVkScissor()
+VkRect2D& GfxPipeline::GetVkScissor()
 {
 	return scissor;
 }
 
-VkShaderModule GfxGraphicsPipeline::CreateShaderModule(const std::vector<char>& code)
+VkShaderModule GfxPipeline::CreateShaderModule(const std::vector<char>& code)
 {
 	VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
 	shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;

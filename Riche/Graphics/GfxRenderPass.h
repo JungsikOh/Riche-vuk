@@ -9,12 +9,6 @@
 // Attachment Reference: 특정 Subpass에서 어떤 Attachment가 사용될지를 지정하는 구조체.
 //						Attachment가 이미지의 속성을 설명하는 반면, Ref는 서브패스 내에서 이러한 Attachment가 어떻게 사용(읽기/쓰기)되는지를 지정.
 
-enum class GfxPipelineType : uint8_t
-{
-	Graphics,
-	Compute
-};
-
 struct GfxAttachmentDesc
 {
 	VkFormat format;

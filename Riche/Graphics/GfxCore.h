@@ -1,6 +1,7 @@
 #pragma once
 
 /* Graphics API Abstraction */
+#include "typedef.h"
 #include "GfxDevice.h"
 #include "GfxImage.h"
 #include "GfxBuffer.h"

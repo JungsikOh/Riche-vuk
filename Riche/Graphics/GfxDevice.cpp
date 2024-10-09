@@ -54,7 +54,7 @@ void GfxDevice::CreateInstance()
 
 		debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
 		// messageSeverity filed allows 어떤 심각도에 대해 debug를 보여줄 것인가. 즉, 심각도 수준을 선택
-		debugCreateInfo.messageSeverity = /*VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |*/ VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+		debugCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
 		// 어떤 유형의 디버그 메세지를 받을 것인지 설정. GENERAL_BIT / VALIDATION_BIT / PERFORMANCE_BIT
 		debugCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 		debugCreateInfo.pfnUserCallback = debugCallback; // 디버그 메시지를 호출할 Call back 함수 지정
@@ -470,7 +470,7 @@ bool GfxDevice::CheckDeviceSuitable(VkPhysicalDevice device)
 VkExtent2D GfxDevice::ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& surfaceCapabilities)
 {
 	// If current extent is at numeric limits, then extent can vary. Otherwise, it is the size of the window.
-	if (surfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
+	if (surfaceCapabilities.currentExtent.width != (std::numeric_limits<uint32_t>::max)())
 	{
 		return surfaceCapabilities.currentExtent;
 	}

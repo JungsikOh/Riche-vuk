@@ -2,6 +2,8 @@
 
 #include "GfxCore.h"
 
+class GfxCommandBuffer;
+
 class GfxCommandPool
 {
 public:

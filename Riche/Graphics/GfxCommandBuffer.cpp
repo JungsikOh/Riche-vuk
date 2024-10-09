@@ -1,7 +1,7 @@
 #include "GfxCommandBuffer.h"
 
 GfxCommandBuffer& GfxCommandBuffer::Initialize(VkDevice newDevice, 
-	GfxCommandPool* commandPool, GfxCommandBufferLevel bufferLevel = GfxCommandBufferLevel::PRIMARY)
+	GfxCommandPool* commandPool, GfxCommandBufferLevel bufferLevel)
 {
 	device = newDevice;
 
@@ -38,10 +38,13 @@ bool GfxCommandBuffer::Begin()
 	{
 		assert(false && "Failed to start recording a Command Buffer!");
 	}
+	return true;
 }
-void GfxCommandBuffer::CmdBeginRenderPass(GfxRenderPass* renderPass, GfxFrameBuffer* framebuffer, 
-	GfxSubpassContents subpassContents = GfxSubpassContents::INLINE, 
-	int32_t offsetX = 0, int32_t offsetY = 0, uint32_t width, uint32_t height)
+void GfxCommandBuffer::CmdBeginRenderPass(
+	uint32_t width, uint32_t height, 
+	GfxRenderPass* renderPass, GfxFrameBuffer* framebuffer,
+	GfxSubpassContents subpassContents /*= GfxSubpassContents::INLINE*/, 
+	int32_t offsetX /*= 0*/, int32_t offsetY /*= 0*/)
 {
 	currentRenderPass = renderPass;
 	currentFrameBuffer = framebuffer;
@@ -87,8 +90,9 @@ void GfxCommandBuffer::CmdBindPipeline(GfxPipeline* pipeline)
 {
 	currentPipeline = pipeline;
 
-	vkCmdBindPipeline(commandBuffer, currentPipeline->GetPipelineType() == GfxPipelineType::Graphics ?
-		VK_PIPELINE_BIND_POINT_GRAPHICS : VK_PIPELINE_BIND_POINT_COMPUTE, currentPipeline->GetVkPipeline());
+	VkPipelineBindPoint bindPoint = currentPipeline->GetPipelineType() == GfxPipelineType::Graphics ? VK_PIPELINE_BIND_POINT_GRAPHICS : VK_PIPELINE_BIND_POINT_COMPUTE;
+
+	vkCmdBindPipeline(commandBuffer, bindPoint, currentPipeline->GetVkPipeline());
 }
 
 void GfxCommandBuffer::CmdBindDescriptorSets(uint32_t firstSet, const std::vector<VkDescriptorSet>& descriptorSets)
@@ -107,7 +111,7 @@ void GfxCommandBuffer::CmdBindPipelineDescriptorSet(const std::vector<VkDescript
 		currentPipeline->GetVkPipelineLayout(), 0, static_cast<uint32_t>(pipelineDescriptorSet.size()), pipelineDescriptorSet.data(), 0, nullptr);
 }
 
-void GfxCommandBuffer::CmdBindVertexBuffers(const std::vector<GfxBuffer*> vertexBuffers = {})
+void GfxCommandBuffer::CmdBindVertexBuffers(const std::vector<GfxBuffer*> vertexBuffers)
 {
 	std::vector<VkBuffer> vertexVkBuffers;
 	std::vector<VkDeviceSize> offsets;

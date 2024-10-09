@@ -1,5 +1,6 @@
 #pragma once
 
+#include <combaseapi.h>
 #include "GfxCore.h"
 
 struct Vertex
@@ -14,29 +15,16 @@ public:
 	GfxPipeline() = default;
 	~GfxPipeline() = default;
 
-	virtual VkPipeline GetVkPipeline() = 0;
-	virtual VkPipelineLayout GetVkPipelineLayout() = 0;
-	virtual GfxPipelineType GetPipelineType() = 0;
-	virtual VkViewport GetVkViewport() = 0;
-	virtual VkRect2D GetVkScissor() = 0;
-};
-
-class GfxGraphicsPipeline : public GfxPipeline
-{
-public:
-	GfxGraphicsPipeline() = default;
-	~GfxGraphicsPipeline() = default;
-
 	void Initialize(VkDevice newDevice);
 	void Destroy();
 
-	GfxGraphicsPipeline& SetVertexShader(const std::string& filename);
-	GfxGraphicsPipeline& SetFragmentShader(const std::string& filename);
-	GfxGraphicsPipeline& SetViewport(VkViewport& newViewport);
-	GfxGraphicsPipeline& SetViewport(float width, float height);
-	GfxGraphicsPipeline& AddInputBindingDescription(uint32_t binding, uint32_t stride);
+	GfxPipeline& SetVertexShader(const std::string& filename);
+	GfxPipeline& SetFragmentShader(const std::string& filename);
+	GfxPipeline& SetViewport(VkViewport& newViewport);
+	GfxPipeline& SetViewport(float width, float height);
+	GfxPipeline& AddInputBindingDescription(uint32_t binding, uint32_t stride);
 
-	GfxGraphicsPipeline& CreatePipeline(std::vector<VkDescriptorSetLayout>& layouts, VkPushConstantRange pushConstantRange, VkRenderPass renderPass,
+	GfxPipeline& CreatePipeline(std::vector<VkDescriptorSetLayout>& layouts, VkPushConstantRange pushConstantRange, VkRenderPass renderPass,
 		std::vector<VkVertexInputAttributeDescription>& vertexInputAttributeDescs,
 		VkPipelineRasterizationStateCreateInfo& rasterizer, VkPipelineMultisampleStateCreateInfo& multisampling,
 		VkPipelineColorBlendAttachmentState& blendState, VkPipelineDepthStencilStateCreateInfo& depthStencilState);
@@ -44,13 +32,13 @@ public:
 	VkPipeline GetVkPipeline();
 	VkPipelineLayout GetVkPipelineLayout();
 	GfxPipelineType GetPipelineType();
-	VkViewport GetVkViewport();
-	VkRect2D GetVkScissor();
+	VkViewport& GetVkViewport();
+	VkRect2D& GetVkScissor();
 
 private:
 	VkDevice device;
 
-	VkPipeline graphicsPipeline;
+	VkPipeline pipeline;
 	VkPipelineCache pipelineCache;
 	VkPipelineLayout pipelineLayout;
 

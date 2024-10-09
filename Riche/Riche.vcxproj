@@ -146,6 +146,7 @@
     <ClCompile Include="Graphics\GfxDescriptor.cpp" />
     <ClCompile Include="Graphics\GfxDevice.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Rendering\VulkanRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Graphics\GfxCommandPool.h" />
@@ -159,7 +160,10 @@
     <ClInclude Include="Graphics\GfxSwapChain.h" />
     <ClInclude Include="Graphics\GfxDescriptor.h" />
     <ClInclude Include="Graphics\GfxDevice.h" />
+    <ClInclude Include="Graphics\typedef.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="Rendering\IRenderer.h" />
+    <ClInclude Include="Rendering\VulkanRenderer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
