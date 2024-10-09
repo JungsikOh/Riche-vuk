@@ -2,7 +2,6 @@
 
 /* Graphics API Abstraction */
 #include "GfxDevice.h"
-#include "GfxQueue.h"
 #include "GfxImage.h"
 #include "GfxBuffer.h"
 #include "GfxDescriptor.h"

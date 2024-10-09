@@ -151,6 +151,15 @@ void GfxDevice::CreateLogicalDevice()
 	{
 		throw std::runtime_error("Failed to create a Logical Device!");
 	}
+
+	graphicsQueueFamilyIndex = indices.graphicsFamily.value();
+	vkGetDeviceQueue(logicalDevice, graphicsQueueFamilyIndex, 0, &grahpicsQueue);
+	presentationQueueFamilyIndex = indices.presentationFamily.value();
+	vkGetDeviceQueue(logicalDevice, presentationQueueFamilyIndex, 0, &presentationQueue);
+	computeQueueFamilyIndex = indices.computeFamily.value();
+	vkGetDeviceQueue(logicalDevice, computeQueueFamilyIndex, 0, &computeQueue);
+	trasferQueueFamilyIndex = indices.transferFamily.value();
+	vkGetDeviceQueue(logicalDevice, trasferQueueFamilyIndex, 0, &transferQueue);
 }
 
 void GfxDevice::GetPhysicalDeviceFromInstance()
