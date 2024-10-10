@@ -11,6 +11,7 @@
 #include "GfxFrameBuffer.h"
 #include "GfxCommandPool.h"
 #include "GfxCommandBuffer.h"
+#include "GfxResourceManager.h"
 
 const std::vector<const char*> deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
@@ -48,7 +49,7 @@ static void CreateBuffer(VkDevice device, VkPhysicalDevice physicalDevice, VkDev
 	VkResult result = vkCreateBuffer(device, &bufferCreateInfo, nullptr, buffer);
 	if (result != VK_SUCCESS)
 	{
-		throw std::runtime_error("Failed to Create Vertex Buffer");
+		throw std::runtime_error("Failed to Create Buffer");
 	}
 
 	// GET BUFFER MEMORY REQUIRMENTS
@@ -66,11 +67,65 @@ static void CreateBuffer(VkDevice device, VkPhysicalDevice physicalDevice, VkDev
 	result = vkAllocateMemory(device, &memAllocInfo, nullptr, bufferMemory);
 	if (result != VK_SUCCESS)
 	{
-		throw std::runtime_error("Failed to alloc Vertex Buffer memory");
+		assert(false && "Failed to alloc Buffer memory");
 	}
 
 	// Bind memory to given vertex buffer
 	vkBindBufferMemory(device, *buffer, *bufferMemory, 0);
+}
+
+static void CopyBuffer(VkDevice device, VkQueue transferQueue, VkCommandPool transferCommandPool,
+	VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize bufferSize)
+{
+	// Create Buffer
+	// Command buffer to hold transfer commands
+	VkCommandBuffer transferCommandBuffer;
+
+	// Command Buffer details
+	VkCommandBufferAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandPool = transferCommandPool;
+	allocInfo.commandBufferCount = 1;
+
+	// Allocate command buffer and pool
+	VkResult result = vkAllocateCommandBuffers(device, &allocInfo, &transferCommandBuffer);
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to allocate command Buffer!");
+	}
+
+	// Information to begin the command buffer record
+	VkCommandBufferBeginInfo beginInfo = {};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;	// We're only using the command bufer once, so set up for one time submit. 
+
+	// Begine recording transfer commands
+	vkBeginCommandBuffer(transferCommandBuffer, &beginInfo);
+
+	// Region of data to copy from and to
+	VkBufferCopy bufferCopyRegion = {};
+	bufferCopyRegion.srcOffset = 0;
+	bufferCopyRegion.dstOffset = 0;
+	bufferCopyRegion.size = bufferSize;
+
+	vkCmdCopyBuffer(transferCommandBuffer, srcBuffer, dstBuffer, 1, &bufferCopyRegion);
+
+	// End commands
+	vkEndCommandBuffer(transferCommandBuffer);
+
+	// Queue submission information
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &transferCommandBuffer;
+
+	// Submit Transfer command to transfer queue and wait until it finishes
+	vkQueueSubmit(transferQueue, 1, &submitInfo, VK_NULL_HANDLE);
+	vkQueueWaitIdle(transferQueue); // 큐가 Idle 상태가 될 때까지 기다린다. 여기서 Idle 상태란, 대기 상태에 있는 것을 이야기한다.
+
+	// Free Temporary command buffer back to pool
+	vkFreeCommandBuffers(device, transferCommandPool, 1, &transferCommandBuffer);
 }
 
 static std::vector<char> readFile(const std::string& filename)

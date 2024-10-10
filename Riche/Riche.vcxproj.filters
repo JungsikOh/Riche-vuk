@@ -51,6 +51,9 @@
     <ClCompile Include="Rendering\VulkanRenderer.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="Graphics\GfxResourceManager.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Graphics\GfxDevice.h">
@@ -96,6 +99,12 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="Graphics\typedef.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Graphics\GfxResourceManager.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Rendering\Components.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

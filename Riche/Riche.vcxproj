@@ -135,6 +135,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Graphics\GfxResourceManager.cpp" />
     <ClCompile Include="Graphics\GfxCommandPool.cpp" />
     <ClCompile Include="Graphics\GfxCommandBuffer.cpp" />
     <ClCompile Include="Graphics\GfxFrameBuffer.cpp" />
@@ -149,6 +150,7 @@
     <ClCompile Include="Rendering\VulkanRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Graphics\GfxResourceManager.h" />
     <ClInclude Include="Graphics\GfxCommandPool.h" />
     <ClInclude Include="Graphics\GfxCommandBuffer.h" />
     <ClInclude Include="Graphics\GfxFrameBuffer.h" />
@@ -162,6 +164,7 @@
     <ClInclude Include="Graphics\GfxDevice.h" />
     <ClInclude Include="Graphics\typedef.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="Rendering\Components.h" />
     <ClInclude Include="Rendering\IRenderer.h" />
     <ClInclude Include="Rendering\VulkanRenderer.h" />
   </ItemGroup>

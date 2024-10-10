@@ -8,6 +8,7 @@ class GfxPipeline;
 class GfxFrameBuffer;
 class GfxRenderPass;
 class GfxSubpass;
+class GfxResourceManager;
 
 class VulkanRenderer : public IRenderer
 {
@@ -22,6 +23,8 @@ class VulkanRenderer : public IRenderer
 	std::shared_ptr<GfxFrameBuffer> m_pFrameBuffer;
 	std::shared_ptr<GfxRenderPass> m_pRenderPass;
 	std::vector<GfxSubpass> m_subpasses;
+
+	std::shared_ptr<GfxResourceManager> m_pResourceManager;
 
 
 public:
