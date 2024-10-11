@@ -137,3 +137,8 @@ VkResult GfxResourceManager::CreateIndexBuffer(uint32_t indexNum, VkDeviceMemory
 
 	return VK_SUCCESS;
 }
+
+VkResult GfxResourceManager::CreateImage(uint32_t width, uint32_t height, VkImage* pOutVkImage, VkFormat format, void* pInitImage)
+{
+	return VK_SUCCESS;
+}

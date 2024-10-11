@@ -10,10 +10,10 @@ public:
 	void Initialize(VkDevice newDevice, VkPhysicalDevice newPhysicalDevice);
 	void Destory();
 
-	void* GetMappedData() const;
-	VkBuffer GetVkBuffer() const;
-	VkDeviceMemory GetBufferMemory() const;
-	uint32_t GetOffset() const;
+	void* GetMappedData();
+	VkBuffer& GetVkBuffer();
+	VkDeviceMemory& GetBufferMemory();
+	uint32_t GetOffset();
 
 	void* Map();
 	void Unmap();

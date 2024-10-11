@@ -12,22 +12,22 @@ void GfxBuffer::Destory()
 	vkFreeMemory(device, bufferMemory, nullptr);
 }
 
-void* GfxBuffer::GetMappedData() const
+void* GfxBuffer::GetMappedData()
 {
 	return mappedPtr;
 }
 
-VkBuffer GfxBuffer::GetVkBuffer() const
+VkBuffer& GfxBuffer::GetVkBuffer()
 {
 	return buffer;
 }
 
-VkDeviceMemory GfxBuffer::GetBufferMemory() const
+VkDeviceMemory& GfxBuffer::GetBufferMemory()
 {
 	return bufferMemory;
 }
 
-uint32_t GfxBuffer::GetOffset() const
+uint32_t GfxBuffer::GetOffset()
 {
 	return offset;
 }

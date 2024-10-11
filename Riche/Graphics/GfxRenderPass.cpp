@@ -55,6 +55,15 @@ GfxPipelineType GfxSubpass::GetPipelineType()
 	return type;
 }
 
+GfxRenderPass::GfxRenderPass()
+{
+}
+
+GfxRenderPass::~GfxRenderPass()
+{
+	Destroy();
+}
+
 void GfxRenderPass::Initialize(VkDevice newDevice, std::vector<GfxAttachmentDesc>& newAttachments, std::vector<GfxSubpass>& newSubpasses)
 {
 	this->device = newDevice;

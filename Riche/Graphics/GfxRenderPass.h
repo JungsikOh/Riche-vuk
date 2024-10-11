@@ -49,8 +49,8 @@ private:
 class GfxRenderPass
 {
 public:
-	GfxRenderPass() = default;
-	~GfxRenderPass() = default;
+	GfxRenderPass();
+	~GfxRenderPass();
 
 	void Initialize(VkDevice newDevice, std::vector<GfxAttachmentDesc>& newAttachments, std::vector<GfxSubpass>& newSupbasses);
 	void Destroy();

@@ -8,7 +8,7 @@ class GfxImage;
 class GfxFrameBuffer
 {
 public:
-	void Initialize(GfxRenderPass* newRenderPass, std::vector<GfxImage*>& newAttachments);
+	void Initialize(uint32_t newWidth, uint32_t newHeight, GfxRenderPass* newRenderPass, std::vector<VkImageView>& newAttachments);
 	void Destroy();
 
 	VkFramebuffer GetVkFrameBuffer();
@@ -18,7 +18,7 @@ private:
 
 	VkFramebuffer framebuffer = VK_NULL_HANDLE;
 	GfxRenderPass* renderPass;
-	std::vector<GfxImage*> attachments;
+	std::vector<VkImageView> attachments;
 
 	uint32_t width;
 	uint32_t height;

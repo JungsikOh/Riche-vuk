@@ -5,8 +5,9 @@
 
 struct Vertex
 {
-	glm::vec3 pos;
-	glm::vec2 tex;
+	glm::vec3 pos;	// Vertex pos (x, y, z)
+	glm::vec3 col;	// Vertex colour (r, g, b)
+	glm::vec2 tex;	// Texture Coords (u, v)
 };
 
 class GfxPipeline

@@ -1,27 +1,20 @@
 #include "GfxFrameBuffer.h"
 
-void GfxFrameBuffer::Initialize(GfxRenderPass* newRenderPass, std::vector<GfxImage*>& newAttachments)
+void GfxFrameBuffer::Initialize(uint32_t newWidth, uint32_t newHeight, GfxRenderPass* newRenderPass, std::vector<VkImageView>& newAttachments)
 {
+	width = newWidth;
+	height = newHeight;
 	renderPass = newRenderPass;
 	attachments = newAttachments;
-
-	std::vector<VkImageView> imageViewList(attachments.size());
-	for (auto view : attachments)
-	{
-		imageViewList.push_back(view->GetImageView());
-	}
 
 	VkFramebufferCreateInfo framebufferCreateInfo = {};
 	framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 	framebufferCreateInfo.renderPass = renderPass->GetRenderPass();								// Render pass layout the framebuffer will be used with
-	framebufferCreateInfo.attachmentCount = static_cast<uint32_t>(imageViewList.size());
-	framebufferCreateInfo.pAttachments = imageViewList.data();									// List of attachments (1:1 with render pass)
-	framebufferCreateInfo.width = attachments[0]->GetWidth();									// framebuffer width
-	framebufferCreateInfo.height = attachments[0]->GetHeight();									// framebuffer height
+	framebufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+	framebufferCreateInfo.pAttachments = attachments.data();									// List of attachments (1:1 with render pass)
+	framebufferCreateInfo.width = width;									// framebuffer width
+	framebufferCreateInfo.height = height;									// framebuffer height
 	framebufferCreateInfo.layers = 1;															// framebuffer layers
-
-	width = framebufferCreateInfo.width;
-	height = framebufferCreateInfo.height;
 
 	VkResult result = vkCreateFramebuffer(renderPass->GetDevice(), &framebufferCreateInfo, nullptr, &framebuffer);
 	if (result != VK_SUCCESS)

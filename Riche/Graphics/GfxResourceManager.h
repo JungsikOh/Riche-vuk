@@ -27,5 +27,6 @@ public:
 	void Initialize(GfxDevice* pDevice);
 	VkResult CreateVertexBuffer(uint32_t sizePerVertex, uint32_t vertexNum, VkDeviceMemory* pOutVertexBufferMemory, VkBuffer* pOutBuffer, void* pInitData);
 	VkResult CreateIndexBuffer(uint32_t indexNum, VkDeviceMemory* pOutIndexBufferMemory, VkBuffer* pOutBuffer, void* pInitData);
+	VkResult CreateImage(uint32_t width, uint32_t height, VkImage* pOutVkImage, VkFormat format, void* pInitImage);
 };
 
