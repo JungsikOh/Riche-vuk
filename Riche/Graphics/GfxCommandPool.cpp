@@ -57,7 +57,7 @@ const uint32_t GfxCommandPool::GetQueueFamily()
     return queueFamilyIndex;
 }
 
-VkCommandPool GfxCommandPool::GetVkCommandPool()
+VkCommandPool& GfxCommandPool::GetVkCommandPool()
 {
     return commandPool;
 }

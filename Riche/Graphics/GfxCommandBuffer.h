@@ -26,7 +26,7 @@ public:
 	GfxCommandBuffer() = default;
 	~GfxCommandBuffer() = default;
 
-	GfxCommandBuffer& Initialize(VkDevice newDevice, GfxCommandPool* commandPool, GfxCommandBufferLevel bufferLevel = GfxCommandBufferLevel::PRIMARY);
+	GfxCommandBuffer& Initialize(VkDevice newDevice, GfxCommandPool* commandPool, uint32_t bufferSize = 1, GfxCommandBufferLevel bufferLevel = GfxCommandBufferLevel::PRIMARY);
 	void Destroy(GfxCommandPool* commandPool);
 
 	bool Begin();

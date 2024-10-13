@@ -1,7 +1,7 @@
 #include "GfxCommandBuffer.h"
 
 GfxCommandBuffer& GfxCommandBuffer::Initialize(VkDevice newDevice, 
-	GfxCommandPool* commandPool, GfxCommandBufferLevel bufferLevel)
+	GfxCommandPool* commandPool, uint32_t bufferSize, GfxCommandBufferLevel bufferLevel)
 {
 	device = newDevice;
 
@@ -10,7 +10,7 @@ GfxCommandBuffer& GfxCommandBuffer::Initialize(VkDevice newDevice,
 	cbAllocInfo.commandPool = commandPool->GetVkCommandPool();			// 해당 큐 패밀리의 큐에서만 커맨드 큐 동작이 실행가능하다.
 	cbAllocInfo.level = bufferLevel == GfxCommandBufferLevel::PRIMARY ? VK_COMMAND_BUFFER_LEVEL_PRIMARY : VK_COMMAND_BUFFER_LEVEL_SECONDARY;				// VK_COMMAND_BUFFER_LEVEL_PRIMARY		: buffer you submit directly to queue. cant be called by other buffers
 	// VK_COMMAND_BUFFER_LEVEL_SECONDARY	: buffer can't be called directly. Can be called from other buffers via 'vkCmdExecuteCommands' when recording commands in primary buffer.
-	cbAllocInfo.commandBufferCount = 1;
+	cbAllocInfo.commandBufferCount = bufferSize;
 
 	// Allocate command buffers and place handles in array of buffers
 	VkResult result = vkAllocateCommandBuffers(device, &cbAllocInfo, &commandBuffer);

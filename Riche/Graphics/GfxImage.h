@@ -13,9 +13,9 @@ public:
 	void SetImage(VkImageCreateInfo createInfo, VkMemoryPropertyFlags memFlags);
 	void SetImageView(VkImageViewCreateInfo createInfo);
 
-	VkImage GetImage() const;
-	VkImageView GetImageView() const;
-	VkDeviceMemory GetImageMemory() const;
+	VkImage& GetImage();
+	VkImageView& GetImageView();
+	VkDeviceMemory& GetImageMemory();
 
 	uint32_t GetWidth() const;
 	uint32_t GetHeight() const;

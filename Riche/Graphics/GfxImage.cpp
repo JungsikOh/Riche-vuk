@@ -53,17 +53,17 @@ void GfxImage::SetImageView(VkImageViewCreateInfo createInfo)
 	}
 }
 
-VkImage GfxImage::GetImage() const
+VkImage& GfxImage::GetImage()
 {
 	return image;
 }
 
-VkImageView GfxImage::GetImageView() const
+VkImageView& GfxImage::GetImageView()
 {
 	return imageView;
 }
 
-VkDeviceMemory GfxImage::GetImageMemory() const
+VkDeviceMemory& GfxImage::GetImageMemory()
 {
 	return imageMemory;
 }

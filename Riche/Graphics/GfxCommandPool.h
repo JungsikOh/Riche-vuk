@@ -17,7 +17,7 @@ public:
 	bool Free(GfxCommandBuffer* commandBuffer);
 
 	const uint32_t GetQueueFamily();
-	VkCommandPool GetVkCommandPool();
+	VkCommandPool& GetVkCommandPool();
 
 private:
 	VkDevice device;

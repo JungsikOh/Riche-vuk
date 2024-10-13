@@ -10,6 +10,7 @@ class GfxFrameBuffer;
 class GfxRenderPass;
 class GfxSubpass;
 class GfxResourceManager;
+class GfxImage;
 
 class VulkanRenderer : public IRenderer
 {
@@ -20,14 +21,17 @@ class VulkanRenderer : public IRenderer
 	// Gfx
 	std::shared_ptr<GfxDevice> m_pDevice;
 
-	std::shared_ptr<GfxCommandPool> m_pCommandPool;
-	std::shared_ptr<GfxCommandBuffer> m_pCommandBuffer;
+	std::shared_ptr<GfxCommandPool> m_pGraphicsCommandPool;
+	std::vector<std::shared_ptr<GfxCommandBuffer>> m_pCommandBuffers;
+
+	// Swapchain
+	std::vector<std::shared_ptr<GfxImage>> m_pSwapchainDepthStencilImages;
+	std::vector<std::shared_ptr<GfxFrameBuffer>> m_pSwapchainFrameBuffers;
 
 	std::shared_ptr<GfxPipeline> m_pGraphicsPipeline;
 
 	std::vector<GfxSubpass> m_subpasses;
 	std::shared_ptr<GfxRenderPass> m_pRenderPass;
-	std::shared_ptr<GfxFrameBuffer> m_pFrameBuffer; // Swapchain framebuffer
 
 	std::shared_ptr<GfxResourceManager> m_pResourceManager;
 	
