@@ -3,6 +3,9 @@
 #include "IRenderer.h"
 #include "Components.h"
 #include "Graphics/GfxCore.h"
+#include "DescriptorManager.h"
+
+class DescriptorManager;
 
 class GfxDevice;
 class GfxPipeline;
@@ -38,14 +41,24 @@ class VulkanRenderer : public IRenderer
 	// Descriptor
 	std::shared_ptr<GfxDescriptorLayoutCache> m_pDescriptorLayoutCache;
 	std::shared_ptr<GfxDescriptorAllocator> m_pDescriptorAllocator;
-	GfxDescriptorBuilder m_descriptorBuilder;
+
+	std::vector<GfxDescriptorBuilder> m_inputDescriptorBuilder;
+	GfxDescriptorBuilder m_uboDescriptorBuilder;
+
+	DescriptorManager m_descriptorManager;
 
 	Mesh firstMesh = {};
+	std::shared_ptr<GfxBuffer> m_pUboViewProjBuffer;
+
+	struct UboViewProjection {
+		glm::mat4 projection;
+		glm::mat4 view;
+	} uboViewProjection;
 
 
 public:
-	VulkanRenderer() = default;
-	~VulkanRenderer() = default;
+	VulkanRenderer();
+	~VulkanRenderer();
 
 	// Derived from IRenderer
 	virtual BOOL	__stdcall Initialize(GLFWwindow* window);
@@ -53,6 +66,8 @@ public:
 	//virtual void	__stdcall EndRender() = 0;
 	//virtual void	__stdcall Present() = 0;
 	///*virtual BOOL	__stdcall UpdateWindowSize(DWORD dwBackBufferWidth, DWORD dwBackBufferHeight) = 0;*/
+
+	void FillCommandBuffer();
 
 	//virtual void* __stdcall CreateTiledTexture(UINT TexWidth, UINT TexHeight, DWORD r, DWORD g, DWORD b) = 0;
 	//virtual void* __stdcall CreateDynamicTexture(UINT TexWidth, UINT TexHeight) = 0;
@@ -76,3 +91,21 @@ private:
 	void CreateGraphicsPipeline();
 };
 
+static std::wstring ToWideString(std::string const& in) {
+	std::wstring out{};
+	out.reserve(in.length());
+	const char* ptr = in.data();
+	const char* const end = in.data() + in.length();
+
+	mbstate_t state{};
+	wchar_t wc;
+	while (size_t len = mbrtowc(&wc, ptr, end - ptr, &state)) {
+		if (len == static_cast<size_t>(-1)) // bad encoding
+			return std::wstring{};
+		if (len == static_cast<size_t>(-2))
+			break;
+		out.push_back(wc);
+		ptr += len;
+	}
+	return out;
+}

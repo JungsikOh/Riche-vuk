@@ -61,10 +61,48 @@ GfxPipeline& GfxPipeline::AddInputBindingDescription(uint32_t binding, uint32_t 
 	return *this;
 }
 
-GfxPipeline& GfxPipeline::CreatePipeline(std::vector<VkDescriptorSetLayout>& layouts, VkPushConstantRange pushConstantRange, VkRenderPass renderPass,
-	std::vector<VkVertexInputAttributeDescription>& vertexInputAttributeDescs,
-	VkPipelineRasterizationStateCreateInfo& rasterizer, VkPipelineMultisampleStateCreateInfo& multisampling, 
-	VkPipelineColorBlendAttachmentState& blendState, VkPipelineDepthStencilStateCreateInfo& depthStencilState)
+GfxPipeline& GfxPipeline::SetVertexInputState(std::vector<VkVertexInputAttributeDescription> newVertexInputAttributeDescs)
+{
+	// -- VERTEX INPUT --
+	vertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertexInputCreateInfo.vertexBindingDescriptionCount = 1;
+	vertexInputCreateInfo.pVertexBindingDescriptions = bindingDescriptions.data();					// List of Vertex binding descriptions (data spacing / stride information)
+	vertexInputCreateInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(newVertexInputAttributeDescs.size());
+	vertexInputCreateInfo.pVertexAttributeDescriptions = newVertexInputAttributeDescs.data();		// List of Vertex Attribute Descripitions ( data format and where to bind from)
+
+	return *this;
+}
+
+GfxPipeline& GfxPipeline::SetRasterizationState(VkPipelineRasterizationStateCreateInfo newRasterizer)
+{
+	rasterizationState = newRasterizer;
+	return *this;
+}
+
+GfxPipeline& GfxPipeline::SetMultiSampleState(VkPipelineMultisampleStateCreateInfo newMultisampling)
+{
+	multisampleState = newMultisampling;
+	return *this;
+}
+
+GfxPipeline& GfxPipeline::SetColorBlendAttachmentState(VkPipelineColorBlendAttachmentState newBlendState)
+{
+	VkPipelineColorBlendStateCreateInfo colourBlendingCreateInfo = {};
+	colourBlendingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	colourBlendingCreateInfo.logicOpEnable = VK_FALSE;							// Alternative to calculations is to use logical operations
+	colourBlendingCreateInfo.attachmentCount = 1;
+	colourBlendingCreateInfo.pAttachments = &newBlendState;
+	
+	return *this;
+}
+
+GfxPipeline& GfxPipeline::SetDepthStencilState(VkPipelineDepthStencilStateCreateInfo newDepthStencilState)
+{
+	depthStencilState = newDepthStencilState;
+	return *this;
+}
+
+GfxPipeline& GfxPipeline::CreatePipeline(std::vector<VkDescriptorSetLayout>& layouts, VkPushConstantRange pushConstantRange, VkRenderPass renderPass)
 {
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
 	pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -104,14 +142,6 @@ GfxPipeline& GfxPipeline::CreatePipeline(std::vector<VkDescriptorSetLayout>& lay
 	// Graphics pipeline creation info requires array of shader stage creates
 	VkPipelineShaderStageCreateInfo shaderStages[] = { vertexShaderCreateInfo, fragmentShaderCreateInfo };
 
-	// -- VERTEX INPUT --
-	VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo = {};
-	vertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputCreateInfo.vertexBindingDescriptionCount = 1;
-	vertexInputCreateInfo.pVertexBindingDescriptions = bindingDescriptions.data();					// List of Vertex binding descriptions (data spacing / stride information)
-	vertexInputCreateInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexInputAttributeDescs.size());
-	vertexInputCreateInfo.pVertexAttributeDescriptions = vertexInputAttributeDescs.data();		// List of Vertex Attribute Descripitions ( data format and where to bind from)
-
 	// -- INPUT ASSEMBLY --
 	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
 	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -127,13 +157,6 @@ GfxPipeline& GfxPipeline::CreatePipeline(std::vector<VkDescriptorSetLayout>& lay
 	viewportStateCreateInfo.scissorCount = 1;
 	viewportStateCreateInfo.pScissors = &scissor;
 
-	// -- BLEND STATE CREATE INFO --
-	VkPipelineColorBlendStateCreateInfo colourBlendingCreateInfo = {};
-	colourBlendingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-	colourBlendingCreateInfo.logicOpEnable = VK_FALSE;							// Alternative to calculations is to use logical operations
-	colourBlendingCreateInfo.attachmentCount = 1;
-	colourBlendingCreateInfo.pAttachments = &blendState;
-
 	VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
 	pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	pipelineCreateInfo.stageCount = 2;										// Number of shader stages
@@ -142,8 +165,8 @@ GfxPipeline& GfxPipeline::CreatePipeline(std::vector<VkDescriptorSetLayout>& lay
 	pipelineCreateInfo.pInputAssemblyState = &inputAssembly;
 	pipelineCreateInfo.pViewportState = &viewportStateCreateInfo;
 	pipelineCreateInfo.pDynamicState = nullptr;
-	pipelineCreateInfo.pRasterizationState = &rasterizer;
-	pipelineCreateInfo.pMultisampleState = &multisampling;
+	pipelineCreateInfo.pRasterizationState = &rasterizationState;
+	pipelineCreateInfo.pMultisampleState = &multisampleState;
 	pipelineCreateInfo.pColorBlendState = &colourBlendingCreateInfo;
 	pipelineCreateInfo.pDepthStencilState = &depthStencilState;
 	pipelineCreateInfo.layout = pipelineLayout;								// Pipeline Laytout pipeline should use

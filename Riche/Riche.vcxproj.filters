@@ -54,6 +54,9 @@
     <ClCompile Include="Graphics\GfxResourceManager.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="Rendering\DescriptorManager.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Graphics\GfxDevice.h">
@@ -105,6 +108,9 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="Rendering\Components.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Rendering\DescriptorManager.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

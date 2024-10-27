@@ -24,11 +24,13 @@ public:
 	GfxPipeline& SetViewport(VkViewport& newViewport);
 	GfxPipeline& SetViewport(float width, float height);
 	GfxPipeline& AddInputBindingDescription(uint32_t binding, uint32_t stride);
+	GfxPipeline& SetVertexInputState(std::vector<VkVertexInputAttributeDescription> newVertexInputAttributeDescs);
+	GfxPipeline& SetRasterizationState(VkPipelineRasterizationStateCreateInfo newRasterizer);
+	GfxPipeline& SetMultiSampleState(VkPipelineMultisampleStateCreateInfo newMultisampling);
+	GfxPipeline& SetColorBlendAttachmentState(VkPipelineColorBlendAttachmentState newBlendState);
+	GfxPipeline& SetDepthStencilState(VkPipelineDepthStencilStateCreateInfo newDepthStencilState);
 
-	GfxPipeline& CreatePipeline(std::vector<VkDescriptorSetLayout>& layouts, VkPushConstantRange pushConstantRange, VkRenderPass renderPass,
-		std::vector<VkVertexInputAttributeDescription>& vertexInputAttributeDescs,
-		VkPipelineRasterizationStateCreateInfo& rasterizer, VkPipelineMultisampleStateCreateInfo& multisampling,
-		VkPipelineColorBlendAttachmentState& blendState, VkPipelineDepthStencilStateCreateInfo& depthStencilState);
+	GfxPipeline& CreatePipeline(std::vector<VkDescriptorSetLayout>& layouts, VkPushConstantRange pushConstantRange, VkRenderPass renderPass);
 
 	VkPipeline GetVkPipeline();
 	VkPipelineLayout GetVkPipelineLayout();
@@ -49,6 +51,11 @@ private:
 
 	// - Vertex Input
 	std::vector<VkVertexInputBindingDescription> bindingDescriptions;
+	VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo;
+	VkPipelineRasterizationStateCreateInfo rasterizationState;
+	VkPipelineMultisampleStateCreateInfo multisampleState;
+	VkPipelineColorBlendStateCreateInfo colourBlendingCreateInfo;
+	VkPipelineDepthStencilStateCreateInfo depthStencilState;
 
 	// Viewport & Scissor
 	VkViewport viewport;
@@ -69,6 +76,12 @@ inline std::vector<VkVertexInputAttributeDescription> InputAttributeVertexDesc()
 	attributeDescription.location = 0;								// Location in shader where data will be read from
 	attributeDescription.format = VK_FORMAT_R32G32B32_SFLOAT;		// Format the data will take (also helps define size of data)
 	attributeDescription.offset = offsetof(Vertex, pos);			// Where this attribute is defined in the data for a single vertex
+	attributeDescriptions.push_back(attributeDescription);
+	// Position Attribute
+	attributeDescription.binding = 0;								// Which binding the data is at (should be same as above)
+	attributeDescription.location = 0;								// Location in shader where data will be read from
+	attributeDescription.format = VK_FORMAT_R32G32B32_SFLOAT;		// Format the data will take (also helps define size of data)
+	attributeDescription.offset = offsetof(Vertex, col);			// Where this attribute is defined in the data for a single vertex
 	attributeDescriptions.push_back(attributeDescription);
 	// Texture Attribute
 	attributeDescription.binding = 0;

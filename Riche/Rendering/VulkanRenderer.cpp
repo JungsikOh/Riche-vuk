@@ -1,5 +1,13 @@
 #include "VulkanRenderer.h"
 
+VulkanRenderer::VulkanRenderer()
+{
+}
+
+VulkanRenderer::~VulkanRenderer()
+{
+}
+
 BOOL __stdcall VulkanRenderer::Initialize(GLFWwindow* window)
 {
 	m_pDevice = std::make_shared<GfxDevice>();
@@ -8,6 +16,8 @@ BOOL __stdcall VulkanRenderer::Initialize(GLFWwindow* window)
 	// TODO : ResourceManager, DescriptorManger Init
 	m_pResourceManager = std::make_shared<GfxResourceManager>();
 	m_pResourceManager->Initialize(m_pDevice.get());
+
+	m_descriptorManager.Initialize(m_pDevice.get());
 
 	// Get swap chain images(first count, then values)
 	uint32_t swapChainImageCount;
@@ -75,7 +85,21 @@ BOOL __stdcall VulkanRenderer::Initialize(GLFWwindow* window)
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, nullptr);
 		m_pResourceManager->CreateImageView(m_pSwapchainDepthStencilImages[i]->GetImage(), &m_pSwapchainDepthStencilImages[i]->GetImageView(), VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_ASPECT_DEPTH_BIT);
 	}
-		
+
+	m_pUboViewProjBuffer = std::make_shared<GfxBuffer>();
+	m_pUboViewProjBuffer->Initialize(m_pDevice->logicalDevice, m_pDevice->physicalDevice);
+	CreateBuffer(m_pDevice->logicalDevice, m_pDevice->physicalDevice, sizeof(UboViewProjection),
+		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		&m_pUboViewProjBuffer->GetVkBuffer(), &m_pUboViewProjBuffer->GetBufferMemory());
+
+	m_uboDescriptorBuilder = m_uboDescriptorBuilder.Begin(m_pDescriptorLayoutCache.get(), m_pDescriptorAllocator.get());
+	VkDescriptorBufferInfo uboViewProjectionBufferInfo = {};
+	uboViewProjectionBufferInfo.buffer = m_pUboViewProjBuffer->GetVkBuffer();	// Buffer to get data from
+	uboViewProjectionBufferInfo.offset = 0;					// Position of start of data
+	uboViewProjectionBufferInfo.range = sizeof(UboViewProjection);			// size of data
+	m_uboDescriptorBuilder.BindBuffer(0, &uboViewProjectionBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT);
+	m_descriptorManager.AddDescriptorSet(&m_uboDescriptorBuilder, ToWideString("ViewProjection"));
+
 	// Render Pass
 	CreateSubpass();
 	CreateRenderPass();
@@ -176,7 +200,23 @@ void VulkanRenderer::CreateGraphicsPipeline()
 	m_pGraphicsPipeline = std::make_shared<GfxPipeline>();
 	m_pGraphicsPipeline->Initialize(m_pDevice->logicalDevice);
 
-	//m_pGraphicsPipeline->SetVertexShader("../Resources/Shaders/basic_vert.spv");
-	//m_pGraphicsPipeline->SetFragmentShader("../Resources/Shaders/basic_frag.spv");
-	//m_pGraphicsPipeline->AddInputBindingDescription(0, static_cast<uint32_t>(sizeof(Vertex)));
+	VkViewport graphicsViewport;
+	graphicsViewport.width = m_pDevice->swapchain.extent.width;
+	graphicsViewport.height = m_pDevice->swapchain.extent.height;
+	graphicsViewport.minDepth = 0.0f;
+	graphicsViewport.maxDepth = 1.0f;
+	graphicsViewport.x = 0.0f;
+	graphicsViewport.y = 0.0f;
+
+	m_pGraphicsPipeline->SetViewport(graphicsViewport);
+
+	m_pGraphicsPipeline->SetVertexShader("../Resources/Shaders/basic_vert.spv");
+	m_pGraphicsPipeline->SetFragmentShader("../Resources/Shaders/basic_frag.spv");
+	m_pGraphicsPipeline->AddInputBindingDescription(0, static_cast<uint32_t>(sizeof(Vertex)));
+	m_pGraphicsPipeline->SetVertexInputState(InputAttributeVertexDesc());
+	m_pGraphicsPipeline->SetRasterizationState(CullCCWRasterizerCreateInfo());
+	m_pGraphicsPipeline->SetMultiSampleState(NoneMultiSamplingCreateInfo());
+	m_pGraphicsPipeline->SetDepthStencilState(DefaultDepthStencilStateCreateInfo());
+
+	// m_pGraphicsPipeline->CreatePipeline()
 }
