@@ -2,13 +2,18 @@
 
 #define COMPONENTS
 
-class GfxBuffer;
+struct BasicVertex
+{
+    glm::vec3 pos;	// Vertex pos (x, y, z)
+    glm::vec3 col;	// Vertex colour (r, g, b)
+    glm::vec2 tex;	// Texture Coords (u, v)
+};
 
 struct COMPONENTS Mesh 
 {
-	std::shared_ptr<GfxBuffer> pVertexBuffer = nullptr;
-	std::shared_ptr<GfxBuffer> pIndexBuffer = nullptr;
-	std::shared_ptr<GfxBuffer> pInstanceBuffer = nullptr;
+	VkBuffer _VertexBuffer = nullptr;
+    VkBuffer _IndexBuffer = nullptr;
+    VkBuffer _InstanceBuffer = nullptr;
 
     // Only vb
     uint32_t vertexCount = 0;

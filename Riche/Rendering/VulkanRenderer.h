@@ -1,111 +1,216 @@
 #pragma once
 
+#include <vulkan/vulkan.hpp>
+
 #include "IRenderer.h"
 #include "Components.h"
-#include "Graphics/GfxCore.h"
-#include "DescriptorManager.h"
+#include "Swapchain.h"
+
+#include "VkUtils/DescriptorManager.h"
+#include "VkUtils/DescriptorBuilder.h"
+#include "VkUtils/QueueFamilyIndices.h"
 
 class DescriptorManager;
+class DescriptorBuilder;
 
-class GfxDevice;
-class GfxPipeline;
-class GfxFrameBuffer;
-class GfxRenderPass;
-class GfxSubpass;
-class GfxResourceManager;
-class GfxImage;
-
-class VulkanRenderer : public IRenderer
+class VulkanRenderer
 {
-	static const UINT MAX_DRAW_COUNT_PER_FRAME = 4096;
-	static const UINT MAX_DESCRIPTOR_COUNT = 4096;
-	static const UINT MAX_RENDER_THREAD_COUNT = 8;
-	
-	// Gfx
-	std::shared_ptr<GfxDevice> m_pDevice;
+public:
+	VulkanRenderer() = default;
+	~VulkanRenderer() = default;
 
-	std::shared_ptr<GfxCommandPool> m_pGraphicsCommandPool;
-	std::vector<std::shared_ptr<GfxCommandBuffer>> m_pCommandBuffers;
+	int Initialize(GLFWwindow* newWindow);
 
-	// Swapchain
-	std::vector<std::shared_ptr<GfxImage>> m_pSwapchainDepthStencilImages;
-	std::vector<std::shared_ptr<GfxFrameBuffer>> m_pSwapchainFrameBuffers;
+	void UpdateModel(int modelId, glm::mat4 newModel);
+	void CreateMeshModel(std::string modelFile);
 
-	std::shared_ptr<GfxPipeline> m_pGraphicsPipeline;
+	void Draw();
+	void Cleanup();
 
-	std::vector<GfxSubpass> m_subpasses;
-	std::shared_ptr<GfxRenderPass> m_pRenderPass;
+private:
+	GLFWwindow* window;
+	int currentFrame = 0;
+	bool enableValidationLayers;
 
-	std::shared_ptr<GfxResourceManager> m_pResourceManager;
-	
-	// Descriptor
-	std::shared_ptr<GfxDescriptorLayoutCache> m_pDescriptorLayoutCache;
-	std::shared_ptr<GfxDescriptorAllocator> m_pDescriptorAllocator;
+	// Scene Objects
+	std::vector<Mesh> meshes;
 
-	std::vector<GfxDescriptorBuilder> m_inputDescriptorBuilder;
-	GfxDescriptorBuilder m_uboDescriptorBuilder;
-
-	DescriptorManager m_descriptorManager;
-
-	Mesh firstMesh = {};
-	std::shared_ptr<GfxBuffer> m_pUboViewProjBuffer;
-
+	// Scene Settings
 	struct UboViewProjection {
 		glm::mat4 projection;
 		glm::mat4 view;
 	} uboViewProjection;
 
+	// Vulkan Components
+	// - Main
+	VkInstance instance;
+	struct {
+		VkDevice logicalDevice;
+		VkPhysicalDevice physicalDevice;
+	} mainDevice;
+	VkDebugUtilsMessengerEXT debugMessenger;
 
-public:
-	VulkanRenderer();
-	~VulkanRenderer();
+	VkQueue m_TransferQueue;
+	VkQueue m_ComputeQueue;
+	VkQueue m_GraphicsQueue;
+	VkQueue m_PresentationQueue;
+	VkUtils::QueueFamilyIndices m_QueueFamilyIndices;
 
-	// Derived from IRenderer
-	virtual BOOL	__stdcall Initialize(GLFWwindow* window);
-	virtual void	__stdcall BeginRender();
-	//virtual void	__stdcall EndRender() = 0;
-	//virtual void	__stdcall Present() = 0;
-	///*virtual BOOL	__stdcall UpdateWindowSize(DWORD dwBackBufferWidth, DWORD dwBackBufferHeight) = 0;*/
+	std::shared_ptr<VkUtils::DescriptorAllocator> m_pDescriptorAllocator = nullptr;
+	std::shared_ptr<VkUtils::DescriptorLayoutCache> m_pLayoutCache = nullptr;
 
-	void FillCommandBuffer();
+	VkUtils::DescriptorManager m_DescriptorManager;
 
-	//virtual void* __stdcall CreateTiledTexture(UINT TexWidth, UINT TexHeight, DWORD r, DWORD g, DWORD b) = 0;
-	//virtual void* __stdcall CreateDynamicTexture(UINT TexWidth, UINT TexHeight) = 0;
-	//virtual void* __stdcall CreateTextureFromFile(const WCHAR* wchFileName) = 0;
-	//virtual void	__stdcall DeleteTexture(void* pTexHandle) = 0;
 
-	//virtual void	__stdcall UpdateTextureWithImage(void* pTexHandle, const BYTE* pSrcBits, UINT SrcWidth, UINT SrcHeight) = 0;
+	//
+	// Swapcain features
+	//
+	VkSurfaceKHR m_SwapchainSurface;
+	VkSwapchainKHR m_Swapchain;
 
-	//virtual void	__stdcall SetCameraPos(float x, float y, float z) = 0;
-	//virtual void	__stdcall MoveCamera(float x, float y, float z) = 0;
-	//virtual void	__stdcall GetCameraPos(float* pfOutX, float* pfOutY, float* pfOutZ) = 0;
-	//virtual void	__stdcall SetCamera(const glm::vec4 pCamPos, const glm::vec4 pCamDir, const glm::vec4 pCamUp) = 0;
-	//virtual DWORD	__stdcall GetCommandListCount() = 0;
+	std::vector<SwapChainImage> m_SwapChainImages;
+	std::vector<SwapChainImage> m_SwapchainDepthStencilImages;
+	std::vector<VkDeviceMemory> m_SwapchainDepthStencilImageMemories;
+	std::vector<VkFramebuffer> m_SwapChainFramebuffers;
+
+	std::vector<VkDescriptorSet> m_OffScreenDescriptorSets;
+	VkDescriptorSetLayout m_OffScreenSetLayout;
+
+	VkRenderPass m_OffScreenRenderPass;
+	VkRenderPass m_BasicRenderPass;
+
+	std::vector<VkCommandBuffer> commandBuffers;
+
+	VkImage m_ColourBufferImage;
+	VkDeviceMemory m_ColourBufferImageMemory;
+	VkImageView m_ColourBufferImageView;
+
+	VkImage m_DepthBufferImage;
+	VkDeviceMemory m_DepthBufferImageMemory;
+	VkImageView m_DepthBufferImageView;
+
+	//std::vector<VkImage> depthBufferImage;
+	//std::vector<VkDeviceMemory> depthBufferImageMemory;
+	//std::vector<VkImageView>depthBufferImageView;
+
+	VkSampler textureSampler;
+
+	// - Descriptors
+	VkDescriptorSetLayout descriptorSetLayout;
+	VkDescriptorSetLayout samplerSetLayout;
+	VkDescriptorSetLayout inputDescriptorSetLayout;
+	VkPushConstantRange pushConstantRange;
+
+	VkDescriptorPool descriptorPool;
+	VkDescriptorPool samplerDescriptorPool;
+	VkDescriptorPool inputDescriptorPool;
+	std::vector<VkDescriptorSet> descriptorSets;
+	std::vector<VkDescriptorSet> samplerDescriptorSets;
+	std::vector<VkDescriptorSet> inputDescriptorSets;
+
+	std::vector<VkBuffer> vpUniformBuffer;
+	std::vector<VkDeviceMemory> vpUniformBufferMemory;
+
+	std::vector<VkBuffer> modelDUniformBuffer;
+	std::vector<VkDeviceMemory> modelDUniformBufferMemory;
+
+
+	//VkDeviceSize minUniformBufferOffset;
+	//size_t modelUniformAligment;
+	//Model* modelTransferSpace;
+
+	std::vector<VkImage> textureImages;
+	std::vector<VkDeviceMemory> textureImageMemory;
+	std::vector<VkImageView> textureImageViews;
+
+	// - Pipeline
+	VkPipeline graphicsPipeline;
+	VkPipelineLayout pipelineLayout;
+
+	VkPipeline secondPipeline;
+	VkPipelineLayout secondPipelineLayout;
+
+	VkRenderPass renderPass;
+
+	// - Pools
+	VkCommandPool graphicsCommandPool;
+
+	// - Utility
+	VkFormat swapChainImageFormat;
+	VkExtent2D swapChainExtent;
+
+	// - Synchronisation
+	std::vector<VkSemaphore> imageAvailable;
+	std::vector<VkSemaphore> renderFinished;
+	std::vector<VkFence> drawFences;
 
 private:
-	void RenderBasicObject();
-
-	void CreateSubpass();
+	// Vulkan Functions
+	// - Create Functions
+	void CreateInstance();
+	void CreateLogicalDevice();
+	void SetupDebugMessnger();
+	//
+	// For Swapchains
+	//
+	void CreateSurface();
+	void CreateSwapChain();
 	void CreateRenderPass();
-	void CreateFrameBuffer();
-	void CreateGraphicsPipeline();
+	void CreateBasicRenderPass();
+	void CreateOffScreenRenderPass();
+	void CreateOffScrrenDescriptorSet();
+	void CreateDescriptorSetLayout();
+	void CreatePushConstantRange();
+	void CreateOffScreenPipeline();
+	void CreateCommandPool();
+	void CreateCommandBuffers();
+	void CreateSynchronisation();
+	void CreateTextureSampler();
+
+	void CreateUniformBuffers();
+	void CreateDescriptorPool();
+	void CreateDescriptorSets();
+	void CreateInputDescriptorSets();
+
+	void UpdateUniformBuffers(uint32_t imageIndex);
+
+	// - Record Functions
+	void RecordCommands(uint32_t currentImage);
+
+	// - Get Functions
+	void GetPhysicalDevice();
+
+	// - Allocate Functions
+	void AllocateDynamicBufferTransferSpace();
+
+	// - Set Functions
+	void PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
+
+	// - Support Functions
+	// -- Checker Functions
+	bool CheckInstanceExtensionSupport(std::vector<const char*>* checkExtensions);
+	bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
+	bool CheckValidationLayerSupport(const std::vector<const char*>* checkVaildationLayers);
+	bool CheckDeviceSuitable(VkPhysicalDevice device);
+
+	// -- Getter Functions
+	SwapChainDetails GetSwapChainDetails(VkPhysicalDevice device);
+
+	// -- Choose Functions
+	VkSurfaceFormatKHR ChooseBestSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats);
+	VkPresentModeKHR ChooseBestPresentationMode(const std::vector<VkPresentModeKHR> presentationModes);
+	VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& surfaceCapabilities);
+	VkFormat ChooseSupportedFormat(const std::vector<VkFormat>& formats, VkImageTiling tiling, VkFormatFeatureFlags featureFlags);
+
+	// -- Create Functions
+	VkImage CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags useFlags,
+		VkMemoryPropertyFlags propFlags, VkDeviceMemory* imageMemory);
+
+	int CreateTextureImage(std::string filename);
+	int CreateTexture(std::string filename);
+	int CreateTextureDescriptor(VkImageView textureImage);
+
+	// -- Loader Functions
+	stbi_uc* LoadTextureFile(std::string filename, int* width, int* height, VkDeviceSize* imageSize);
 };
 
-static std::wstring ToWideString(std::string const& in) {
-	std::wstring out{};
-	out.reserve(in.length());
-	const char* ptr = in.data();
-	const char* const end = in.data() + in.length();
-
-	mbstate_t state{};
-	wchar_t wc;
-	while (size_t len = mbrtowc(&wc, ptr, end - ptr, &state)) {
-		if (len == static_cast<size_t>(-1)) // bad encoding
-			return std::wstring{};
-		if (len == static_cast<size_t>(-2))
-			break;
-		out.push_back(wc);
-		ptr += len;
-	}
-	return out;
-}
