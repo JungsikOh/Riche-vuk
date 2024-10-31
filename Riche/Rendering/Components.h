@@ -2,6 +2,17 @@
 
 #define COMPONENTS
 
+struct Model 
+{
+    glm::mat4 model;
+};
+
+struct ViewProjection
+{
+    glm::mat4 view;
+    glm::mat4 projection;
+};
+
 struct BasicVertex
 {
     glm::vec3 pos;	// Vertex pos (x, y, z)
@@ -9,27 +20,8 @@ struct BasicVertex
     glm::vec2 tex;	// Texture Coords (u, v)
 };
 
-struct COMPONENTS Mesh 
+struct COMPONENTS Transform
 {
-	VkBuffer _VertexBuffer = nullptr;
-    VkBuffer _IndexBuffer = nullptr;
-    VkBuffer _InstanceBuffer = nullptr;
-
-    // Only vb
-    uint32_t vertexCount = 0;
-    uint32_t startVertexLoc = 0; // Index of the first vertex
-
-    // vb / ib
-    uint32_t indexCount = 0;
-    // the location of the first index read by the GPU from ib
-    uint32_t startIndexLoc = 0;
-    // A value added to each index before reading a vertex from the vb
-    uint32_t baseVertexLoc = 0;
-
-    // only instancing
-    uint32_t instanceCount = 1;
-    // A value added to each idx before reading per-instance data from a vb
-    uint32_t startInstanceLoc = 0;
-
-    VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    glm::mat4 startTransform;
+    glm::mat4 currentTransform;
 };

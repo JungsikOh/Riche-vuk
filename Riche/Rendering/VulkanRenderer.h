@@ -1,14 +1,14 @@
 #pragma once
-
-#include <vulkan/vulkan.hpp>
-
-#include "IRenderer.h"
 #include "Components.h"
 #include "Swapchain.h"
+#include "Mesh.h"
 
 #include "VkUtils/DescriptorManager.h"
 #include "VkUtils/DescriptorBuilder.h"
+#include "VkUtils/ResourceManager.h"
 #include "VkUtils/QueueFamilyIndices.h"
+
+class Mesh;
 
 class DescriptorManager;
 class DescriptorBuilder;
@@ -22,7 +22,7 @@ public:
 	int Initialize(GLFWwindow* newWindow);
 
 	void UpdateModel(int modelId, glm::mat4 newModel);
-	void CreateMeshModel(std::string modelFile);
+	void UpdateKeyInput();
 
 	void Draw();
 	void Cleanup();
@@ -33,13 +33,15 @@ private:
 	bool enableValidationLayers;
 
 	// Scene Objects
-	std::vector<Mesh> meshes;
+	Mesh mesh;
 
 	// Scene Settings
 	struct UboViewProjection {
 		glm::mat4 projection;
 		glm::mat4 view;
 	} uboViewProjection;
+
+	Model model;
 
 	// Vulkan Components
 	// - Main
@@ -60,6 +62,7 @@ private:
 	std::shared_ptr<VkUtils::DescriptorLayoutCache> m_pLayoutCache = nullptr;
 
 	VkUtils::DescriptorManager m_DescriptorManager;
+	VkUtils::ResourceManager m_ResoucreManager;
 
 
 	//
@@ -77,9 +80,17 @@ private:
 	VkDescriptorSetLayout m_OffScreenSetLayout;
 
 	VkRenderPass m_OffScreenRenderPass;
-	VkRenderPass m_BasicRenderPass;
+	VkPipeline m_OffScreenPipeline;
+	VkPipelineLayout m_OffScreenPipelineLayout;
+	std::vector<VkCommandBuffer> m_SwapchainCommandBuffers;
 
-	std::vector<VkCommandBuffer> commandBuffers;
+	//
+	// Basic Render Features
+	//
+	VkRenderPass m_BasicRenderPass;
+	VkPipeline m_BasicPipeline;
+	VkPipelineLayout m_BasicPipelineLayout;
+	VkCommandBuffer m_BasicCommandBuffer;
 
 	VkImage m_ColourBufferImage;
 	VkDeviceMemory m_ColourBufferImageMemory;
@@ -89,51 +100,22 @@ private:
 	VkDeviceMemory m_DepthBufferImageMemory;
 	VkImageView m_DepthBufferImageView;
 
-	//std::vector<VkImage> depthBufferImage;
-	//std::vector<VkDeviceMemory> depthBufferImageMemory;
-	//std::vector<VkImageView>depthBufferImageView;
+	VkFramebuffer m_BasicFramebuffer;
 
-	VkSampler textureSampler;
+	ViewProjection m_ViewProjectionCPU;
+	VkBuffer m_ViewProjectionUBO;
+	VkDeviceMemory m_ViewProjectionUBOMemory;
 
 	// - Descriptors
-	VkDescriptorSetLayout descriptorSetLayout;
-	VkDescriptorSetLayout samplerSetLayout;
-	VkDescriptorSetLayout inputDescriptorSetLayout;
 	VkPushConstantRange pushConstantRange;
-
-	VkDescriptorPool descriptorPool;
-	VkDescriptorPool samplerDescriptorPool;
-	VkDescriptorPool inputDescriptorPool;
-	std::vector<VkDescriptorSet> descriptorSets;
-	std::vector<VkDescriptorSet> samplerDescriptorSets;
-	std::vector<VkDescriptorSet> inputDescriptorSets;
-
-	std::vector<VkBuffer> vpUniformBuffer;
-	std::vector<VkDeviceMemory> vpUniformBufferMemory;
-
-	std::vector<VkBuffer> modelDUniformBuffer;
-	std::vector<VkDeviceMemory> modelDUniformBufferMemory;
-
 
 	//VkDeviceSize minUniformBufferOffset;
 	//size_t modelUniformAligment;
 	//Model* modelTransferSpace;
 
-	std::vector<VkImage> textureImages;
-	std::vector<VkDeviceMemory> textureImageMemory;
-	std::vector<VkImageView> textureImageViews;
-
-	// - Pipeline
-	VkPipeline graphicsPipeline;
-	VkPipelineLayout pipelineLayout;
-
-	VkPipeline secondPipeline;
-	VkPipelineLayout secondPipelineLayout;
-
-	VkRenderPass renderPass;
-
 	// - Pools
-	VkCommandPool graphicsCommandPool;
+	VkCommandPool m_GraphicsCommandPool;
+	VkCommandPool m_ComputeCommandPool;
 
 	// - Utility
 	VkFormat swapChainImageFormat;
@@ -150,32 +132,39 @@ private:
 	void CreateInstance();
 	void CreateLogicalDevice();
 	void SetupDebugMessnger();
+	void CreateRenderPass();
 	//
 	// For Swapchains
 	//
 	void CreateSurface();
 	void CreateSwapChain();
-	void CreateRenderPass();
-	void CreateBasicRenderPass();
+	void CreateSwapchainFrameBuffers();
 	void CreateOffScreenRenderPass();
 	void CreateOffScrrenDescriptorSet();
+	void CreateOffScreenPipeline();
+
+	void CreateBasicFramebuffer();
+	void CreateBasicRenderPass();
+	void CreateBasicPipeline();
+
 	void CreateDescriptorSetLayout();
 	void CreatePushConstantRange();
-	void CreateOffScreenPipeline();
+	
 	void CreateCommandPool();
+	void CraeteSwapchainCommandPool();
+
 	void CreateCommandBuffers();
 	void CreateSynchronisation();
-	void CreateTextureSampler();
 
 	void CreateUniformBuffers();
-	void CreateDescriptorPool();
 	void CreateDescriptorSets();
-	void CreateInputDescriptorSets();
 
 	void UpdateUniformBuffers(uint32_t imageIndex);
 
 	// - Record Functions
 	void RecordCommands(uint32_t currentImage);
+	void FillOffScreenCommands(uint32_t currentImage);
+	void FillBasicCommands();
 
 	// - Get Functions
 	void GetPhysicalDevice();
@@ -202,15 +191,5 @@ private:
 	VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& surfaceCapabilities);
 	VkFormat ChooseSupportedFormat(const std::vector<VkFormat>& formats, VkImageTiling tiling, VkFormatFeatureFlags featureFlags);
 
-	// -- Create Functions
-	VkImage CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags useFlags,
-		VkMemoryPropertyFlags propFlags, VkDeviceMemory* imageMemory);
-
-	int CreateTextureImage(std::string filename);
-	int CreateTexture(std::string filename);
-	int CreateTextureDescriptor(VkImageView textureImage);
-
-	// -- Loader Functions
-	stbi_uc* LoadTextureFile(std::string filename, int* width, int* height, VkDeviceSize* imageSize);
 };
 

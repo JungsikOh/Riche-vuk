@@ -1,7 +1,5 @@
 #include "ResourceManager.h"
 
-#include "Rendering/Core.h"
-
 namespace VkUtils
 {
 	void ResourceManager::CreateFence()
