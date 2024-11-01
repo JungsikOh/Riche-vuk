@@ -1,4 +1,5 @@
 #pragma once
+#include "Camera.h"
 #include "Components.h"
 #include "Swapchain.h"
 #include "Mesh.h"
@@ -19,7 +20,7 @@ public:
 	VulkanRenderer() = default;
 	~VulkanRenderer() = default;
 
-	int Initialize(GLFWwindow* newWindow);
+	int Initialize(GLFWwindow* newWindow, Camera* newCamera);
 
 	void UpdateModel(int modelId, glm::mat4 newModel);
 	void UpdateKeyInput();
@@ -29,6 +30,7 @@ public:
 
 private:
 	GLFWwindow* window;
+	Camera* camera;
 	int currentFrame = 0;
 	bool enableValidationLayers;
 

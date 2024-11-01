@@ -1,7 +1,11 @@
 #include "Rendering/VulkanRenderer.h"
+#include "Rendering/Camera.h"
 
 GLFWwindow* window;
 VulkanRenderer vulkanRenderer;
+Camera g_camera;
+
+float deltaTime = 0.0f;
 
 double lastX = 0.0, lastY = 0.0;  // 이전 프레임의 마우스 좌표
 bool firstMouse = true;  // 초기 마우스 위치 확인을 위한 플래그
@@ -9,20 +13,14 @@ bool rightButtonPressed = false;
 
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-	// 키가 눌렸을 때
-	if (action == GLFW_PRESS) {
-		std::cout << "Key Pressed: " << key << std::endl;
-	}
-	// 키가 릴리즈될 때
-	else if (action == GLFW_RELEASE) {
-		std::cout << "Key Released: " << key << std::endl;
-	}
+	g_camera.OnKeyInput(deltaTime, key);
 }
 
 void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 	if (button == GLFW_MOUSE_BUTTON_RIGHT) { // 마우스 오른쪽 버튼일 경우
 		if (action == GLFW_PRESS) { // 누를 때
 			rightButtonPressed = true;
+			firstMouse = true;  // 마우스를 누를 때마다 초기화
 			std::cout << "Right Mouse Button Pressed" << std::endl;
 		}
 		else if (action == GLFW_RELEASE) { // 뗄 때
@@ -53,6 +51,7 @@ void CursorPositionCallback(GLFWwindow* window, double xpos, double ypos)
 
 		// DeltaX와 DeltaY 출력
 		std::cout << "DeltaX: " << deltaX << ", DeltaY: " << deltaY << std::endl;
+		g_camera.OnMouseInput(deltaX, deltaY);
 	}
 }
 
@@ -73,14 +72,24 @@ int main()
 	// Create Window
 	InitWindow("Test Widnow", 1048, 624);
 
+	CameraParameters cameraParams = {};
+	cameraParams.speed = 50.0f;
+	cameraParams.sensitivity = 0.2f;
+	cameraParams.position = glm::vec3(0.0f, 0.0f, 2.0f);
+	cameraParams.lootAt = glm::vec3(0.0f, 0.0f, -1.0f);
+	cameraParams.fov = 45.0f;
+	cameraParams.aspectRatio = 1048.0f / 624.0f;
+	cameraParams.nearPlane = 0.5f;
+	cameraParams.farPlane = 100.0f;
+	g_camera.Initialize(cameraParams);
+
 	// Create Vulkan Renderer Instance
-	if (vulkanRenderer.Initialize(window) == EXIT_FAILURE)
+	if (vulkanRenderer.Initialize(window, &g_camera) == EXIT_FAILURE)
 	{
 		return EXIT_FAILURE;
 	}
-
+	
 	float angle = 0.0f;
-	float deltaTime = 0.0f;
 	float lastTime = 0.0f;
 
 	glfwSetKeyCallback(window, KeyCallback);

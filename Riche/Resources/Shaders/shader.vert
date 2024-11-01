@@ -7,8 +7,8 @@ layout(location = 1) in vec3 col;
 layout(location = 2) in vec2 tex;
 
 layout(set = 0, binding = 0) uniform UboViewProjection {
-	mat4 projection;
 	mat4 view;
+	mat4 projection;
 } uboViewProjection;
 
 // NOT IN USE, LEFT FOR REFERENCE

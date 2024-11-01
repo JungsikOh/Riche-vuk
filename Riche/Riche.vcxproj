@@ -135,6 +135,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Rendering\Camera.cpp" />
     <ClCompile Include="Rendering\Mesh.cpp" />
     <ClCompile Include="VkUtils\DescriptorBuilder.cpp" />
     <ClCompile Include="main.cpp" />
@@ -143,6 +144,7 @@
     <ClCompile Include="VkUtils\ResourceManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Rendering\Camera.h" />
     <ClInclude Include="Rendering\Mesh.h" />
     <ClInclude Include="Rendering\Core.h" />
     <ClInclude Include="Rendering\Swapchain.h" />

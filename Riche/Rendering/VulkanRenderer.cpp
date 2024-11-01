@@ -29,9 +29,10 @@ namespace
 	}
 };
 
-int VulkanRenderer::Initialize(GLFWwindow* newWindow)
+int VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* newCamera)
 {
 	window = newWindow;
+	camera = newCamera;
 
 	try {
 		CreateInstance();
@@ -55,9 +56,8 @@ int VulkanRenderer::Initialize(GLFWwindow* newWindow)
 		//AllocateDynamicBufferTransferSpace();
 		CreateSynchronisation();
 
-		m_ViewProjectionCPU.view = glm::lookAt(glm::vec3(2.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -2.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-		m_ViewProjectionCPU.projection = glm::perspective(glm::radians(45.0f), (float)swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
-		m_ViewProjectionCPU.projection[1][1] *= -1;	// opengl is Y-Up but, vulkan is Y-Down. 다만, 최종출력이 Y-Down일 뿐이다.
+		m_ViewProjectionCPU.view = camera->View();
+		m_ViewProjectionCPU.projection = camera->Proj();
 
 		CreateUniformBuffers();
 		CreateBasicFramebuffer();
@@ -73,17 +73,19 @@ int VulkanRenderer::Initialize(GLFWwindow* newWindow)
 		// Vulkan의 viewport좌표계와 projection 행렬은 Y-Down
 		// Clip Space와 NDC 공간도 기본적으로 Y-Down이다.
 		std::vector<BasicVertex> meshVertices = {
-			{ { -0.4, 0.4, 0.0 },{ 0.0f, 1.0f, 0.0f },{ 1.0f, 1.0f } },	// 0
-		{ { -0.4, -0.4, 0.0 },{ 1.0f, 0.0f, 0.0f },{ 1.0f, 0.0f } },	    // 1
-		{ { 0.4, -0.4, 0.0 },{ 0.0f, 0.0f, 1.0f },{ 0.0f, 0.0f } },    // 2
-		{ { 0.4, 0.4, 0.0 },{ 1.0f, 0.0f, 0.0f },{ 0.0f, 1.0f } },   // 3
+			{ { 1.0, -1.7, 0.0 },{ 1.0f, 0.0f, 0.0f }, {1.0f, 1.0f} },	// 0
+			{ { 1.0, 0.4, 0.0 },{ 0.0f, 1.0f, 0.0f }, {1.0f, 0.0f} },	    // 1
+			{ { -0.4, 0.4, 0.0 },{ 0.0f, 0.0f, 1.0f }, {0.0f, 0.0f} },    // 2
+			{ { -0.4, -0.4, 0.0 },{ 1.0f, 1.0f, 0.0f }, {0.0f, 1.0f} },   // 3
 		};
+		model.model = glm::mat4(1.0f);
 
 		// Index Data
 		std::vector<uint32_t> meshIndices = {
 			0, 1, 2,
 			2, 3, 0
 		};
+
 		mesh.Initialize(mainDevice.logicalDevice, (uint32_t)meshVertices.size(), (uint32_t)meshIndices.size());
 		m_ResoucreManager.CreateVertexBuffer((uint32_t)sizeof(BasicVertex), (uint32_t)meshVertices.size(), &mesh.GetVkVertexDeviceMemory(), &mesh.GetVkVertexBuffer(), meshVertices.data());
 		m_ResoucreManager.CreateIndexBuffer((uint32_t)meshIndices.size(), &mesh.GetVkIndexDeviceMemory(), &mesh.GetVkIndexBuffer(), meshIndices.data());
@@ -99,6 +101,9 @@ int VulkanRenderer::Initialize(GLFWwindow* newWindow)
 void VulkanRenderer::UpdateModel(int modelId, glm::mat4 newModel)
 {
 	model.model = newModel;
+	camera->Update();
+	m_ViewProjectionCPU.view = camera->View();
+	m_ViewProjectionCPU.projection = camera->Proj();
 }
 
 void VulkanRenderer::Draw()
