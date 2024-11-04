@@ -23,13 +23,12 @@ namespace VkUtils
 
 		void WaitForFenceValue();
 
-		void Cleanup();
-
 	public:
 		ResourceManager();
 		~ResourceManager();
 
 		void Initialize(VkDevice device, VkPhysicalDevice physicalDevice, VkQueue queue, QueueFamilyIndices indices);
+		void Cleanup();
 
 		VkResult CreateVertexBuffer(uint32_t sizePerVertex, uint32_t vertexNum, VkDeviceMemory* pOutVertexBufferMemory, VkBuffer* pOutBuffer, void* pInitData);
 		VkResult CreateIndexBuffer(uint32_t indexNum, VkDeviceMemory* pOutIndexBufferMemory, VkBuffer* pOutBuffer, void* pInitData);

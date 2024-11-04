@@ -23,8 +23,6 @@ void Camera::Update()
 	m_UpVector = glm::cross(m_RightVector, m_LookVector);
 	SetViewMat(m_Position, m_LookVector, m_UpVector);
 	SetProjMat(m_Fov, m_AspectRatio, m_NearPlane, m_FarPlane);
-
-	std::cout << m_Position.x << ", " << m_Position.y << ", " << m_Position.z << std::endl;
 }
 
 void Camera::Tick(float dt, float dx, float dy, int key, int button)

@@ -69,6 +69,8 @@ int VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* newCamera)
 		CreateBasicPipeline();
 		CreateOffScreenPipeline();
 
+		CreateBasicSemaphores();
+
 		// Create a mesh
 		// Vulkan의 viewport좌표계와 projection 행렬은 Y-Down
 		// Clip Space와 NDC 공간도 기본적으로 Y-Down이다.
@@ -119,32 +121,37 @@ void VulkanRenderer::Draw()
 	uint32_t imageIndex;	// swapchain의 이미지 버퍼에서 index 값을 갖고온다.
 	vkAcquireNextImageKHR(mainDevice.logicalDevice, m_Swapchain, (std::numeric_limits<uint32_t>::max)(), imageAvailable[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
-	RecordCommands(imageIndex);
+	vkWaitForFences(mainDevice.logicalDevice, 1, &m_BasicFence, VK_TRUE, (std::numeric_limits<uint32_t>::max)());
+	vkResetFences(mainDevice.logicalDevice, 1, &m_BasicFence);
+
+	FillBasicCommands();
 	UpdateUniformBuffers(imageIndex);
 
-	//// RenderPass 1.
-	//VkSubmitInfo basicSubmitInfo = {};
-	//basicSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	//basicSubmitInfo.waitSemaphoreCount = 0;									// Number of semaphores to wait on
-	//basicSubmitInfo.pWaitSemaphores = VK_NULL_HANDLE;
+	// RenderPass 1.
+	VkSubmitInfo basicSubmitInfo = {};
+	basicSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	basicSubmitInfo.waitSemaphoreCount = 1;									// Number of semaphores to wait on
+	basicSubmitInfo.pWaitSemaphores = &imageAvailable[currentFrame];
 
-	//VkPipelineStageFlags basicWaitStages[] = {
-	//	VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-	//};
-	//basicSubmitInfo.pWaitDstStageMask = basicWaitStages;									// Stages to check semaphores at
-	//basicSubmitInfo.commandBufferCount = 1;											// Number of command buffers to submit
-	//basicSubmitInfo.pCommandBuffers = &m_BasicCommandBuffer;					// Command buffer to submit
-	//basicSubmitInfo.signalSemaphoreCount = 0;										// Number of semaphores to signal
-	//basicSubmitInfo.pSignalSemaphores = VK_NULL_HANDLE;				// Semaphores to signal when command buffer finishes
-	//// Command buffer가 실행을 완료하면, Signaled 상태가 될 semaphore 배열.
+	VkPipelineStageFlags basicWaitStages[] = {
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+	};
+	basicSubmitInfo.pWaitDstStageMask = basicWaitStages;									// Stages to check semaphores at
+	basicSubmitInfo.commandBufferCount = 1;											// Number of command buffers to submit
+	basicSubmitInfo.pCommandBuffers = &m_BasicCommandBuffer;					// Command buffer to submit
+	basicSubmitInfo.signalSemaphoreCount = 1;										// Number of semaphores to signal
+	basicSubmitInfo.pSignalSemaphores = &m_BasicRenderAvailable;				// Semaphores to signal when command buffer finishes
+	// Command buffer가 실행을 완료하면, Signaled 상태가 될 semaphore 배열.
 
-	//VkResult result = vkQueueSubmit(m_GraphicsQueue, 1, &basicSubmitInfo, VK_NULL_HANDLE);
-	//if (result != VK_SUCCESS)
-	//{
-	//	throw std::runtime_error("Failed to submit Command Buffer to Queue");
-	//}
+	VkResult result = vkQueueSubmit(m_GraphicsQueue, 1, &basicSubmitInfo, m_BasicFence);
+	if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error("Failed to submit Command Buffer to Queue");
+	}
 
-	//// vkQueueWaitIdle(m_GraphicsQueue);
+	RecordCommands(imageIndex);
 
 	// 2. Submit command buffer to queue for execution, making sure it waits for the image to be signalled as available before drawing
 	// and signals when it has finished rendering (wait a fence)
@@ -152,7 +159,7 @@ void VulkanRenderer::Draw()
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submitInfo.waitSemaphoreCount = 1;									// Number of semaphores to wait on
-	submitInfo.pWaitSemaphores = &imageAvailable[currentFrame];			// List of semaphores to wait on, Command buffer가 실행하기전 대기해야하는 semaphores
+	submitInfo.pWaitSemaphores = &m_BasicRenderAvailable;			// List of semaphores to wait on, Command buffer가 실행하기전 대기해야하는 semaphores
 	// 즉, 이 semphore가 signaled 상태가 될 때까지 대기하고, 그 후에 Command buffer를 실행한다.
 	VkPipelineStageFlags waitStages[] = {
 		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
@@ -165,7 +172,7 @@ void VulkanRenderer::Draw()
 	// Command buffer가 실행을 완료하면, Signaled 상태가 될 semaphore 배열.
 
 // Submit command buffer to queue
-	VkResult result = vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, drawFences[currentFrame]);
+	result = vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, drawFences[currentFrame]);
 	if (result != VK_SUCCESS)
 	{
 		throw std::runtime_error("Failed to submit Command Buffer to Queue");
@@ -196,8 +203,10 @@ void VulkanRenderer::Cleanup()
 	// Wait Until no actions being run on device before destroying
 	vkDeviceWaitIdle(mainDevice.logicalDevice);
 
+	mesh.Cleanup();
+	vkDestroySampler(mainDevice.logicalDevice, textureSampler, nullptr);
 	//_aligned_free(modelTransferSpace);
-	m_ResoucreManager.~ResourceManager();
+	m_ResoucreManager.Cleanup();
 
 	vkDestroyImageView(mainDevice.logicalDevice, m_ColourBufferImageView, nullptr);
 	vkDestroyImage(mainDevice.logicalDevice, m_ColourBufferImage, nullptr);
@@ -207,21 +216,24 @@ void VulkanRenderer::Cleanup()
 	vkDestroyImage(mainDevice.logicalDevice, m_DepthBufferImage, nullptr);
 	vkFreeMemory(mainDevice.logicalDevice, m_DepthBufferImageMemory, nullptr);
 
-	//for (size_t i = 0; i < modelDUniformBuffer.size(); ++i)
-	//{
-	//	vkDestroyBuffer(mainDevice.logicalDevice, modelDUniformBuffer[i], nullptr);
-	//	vkFreeMemory(mainDevice.logicalDevice, modelDUniformBufferMemory[i], nullptr);
-	//}
+	vkDestroyFramebuffer(mainDevice.logicalDevice, m_BasicFramebuffer, nullptr);
+	vkDestroyDescriptorSetLayout(mainDevice.logicalDevice, m_OffScreenSetLayout, nullptr);
 
 	vkDestroyBuffer(mainDevice.logicalDevice, m_ViewProjectionUBO, nullptr);
 	vkFreeMemory(mainDevice.logicalDevice, m_ViewProjectionUBOMemory, nullptr);
+
+	vkDestroySemaphore(mainDevice.logicalDevice, m_BasicRenderAvailable, nullptr);
+	vkDestroyFence(mainDevice.logicalDevice, m_BasicFence, nullptr);
+	vkFreeCommandBuffers(mainDevice.logicalDevice, m_GraphicsCommandPool , 1, &m_BasicCommandBuffer);
 
 	for (size_t i = 0; i < MAX_FRAME_DRAWS; ++i)
 	{
 		vkDestroySemaphore(mainDevice.logicalDevice, imageAvailable[i], nullptr);
 		vkDestroySemaphore(mainDevice.logicalDevice, renderFinished[i], nullptr);
 		vkDestroyFence(mainDevice.logicalDevice, drawFences[i], nullptr);
+		vkFreeCommandBuffers(mainDevice.logicalDevice, m_GraphicsCommandPool, 1, &m_SwapchainCommandBuffers[i]);
 	}
+	vkDestroyCommandPool(mainDevice.logicalDevice, m_GraphicsCommandPool, nullptr);
 
 	//vkFreeCommandBuffers(mainDevice.logicalDevice, graphicsCommandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
 	for (auto framebuffer : m_SwapChainFramebuffers)
@@ -235,11 +247,21 @@ void VulkanRenderer::Cleanup()
 	vkDestroyPipeline(mainDevice.logicalDevice, m_BasicPipeline, nullptr);
 	vkDestroyPipelineLayout(mainDevice.logicalDevice, m_BasicPipelineLayout, nullptr);
 	vkDestroyRenderPass(mainDevice.logicalDevice, m_BasicRenderPass, nullptr);
+
+	m_pLayoutCache->Cleanup();
+	m_pDescriptorAllocator->Cleanup();
+
 	for (auto image : m_SwapChainImages)
 	{
 		// VkImageView는 VkImage를 직접 참조해서 뷰를 생성한 것이므로, 호출해서 파괴해야한다.
 		// 반면, VkImage는 스왑체인이 생성될 때 할당된 메모리 내에서 관리되므로 파괴할 필요가 없다.
 		vkDestroyImageView(mainDevice.logicalDevice, image.imageView, nullptr);
+	}
+	for(int i = 0; i < m_SwapchainDepthStencilImages.size(); ++i) 
+	{
+		vkDestroyImageView(mainDevice.logicalDevice, m_SwapchainDepthStencilImages[i].imageView, nullptr);
+		vkDestroyImage(mainDevice.logicalDevice, m_SwapchainDepthStencilImages[i].image, nullptr);
+		vkFreeMemory(mainDevice.logicalDevice, m_SwapchainDepthStencilImageMemories[i], nullptr);
 	}
 	vkDestroySwapchainKHR(mainDevice.logicalDevice, m_Swapchain, nullptr);
 	vkDestroySurfaceKHR(instance, m_SwapchainSurface, nullptr);
@@ -826,6 +848,19 @@ void VulkanRenderer::CreateBasicPipeline()
 	vkDestroyShaderModule(mainDevice.logicalDevice, fragmentShaderModule, nullptr);
 }
 
+void VulkanRenderer::CreateBasicSemaphores()
+{
+	// Semaphore creataion information
+	VkSemaphoreCreateInfo semaphoreCreateInfo = {};
+	semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+	VkFenceCreateInfo fenceCreateInfo = {};
+	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+	VK_CHECK(vkCreateFence(mainDevice.logicalDevice, &fenceCreateInfo, nullptr, &m_BasicFence));
+	VK_CHECK(vkCreateSemaphore(mainDevice.logicalDevice, &semaphoreCreateInfo, nullptr, &m_BasicRenderAvailable));
+}
+
 void VulkanRenderer::CreateOffScreenRenderPass()
 {
 	// Array of Subpasses
@@ -924,8 +959,6 @@ void VulkanRenderer::CreateOffScreenRenderPass()
 
 void VulkanRenderer::CreateOffScrrenDescriptorSet()
 {
-	VkSampler textureSampler;
-
 	// Sampler Creation Info
 	VkSamplerCreateInfo samplerCreateInfo = {};
 	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -1250,7 +1283,6 @@ void VulkanRenderer::UpdateUniformBuffers(uint32_t imageIndex)
 
 void VulkanRenderer::RecordCommands(uint32_t currentImage)
 {
-	// FillBasicCommands();
 	FillOffScreenCommands(currentImage);
 }
 
@@ -1280,60 +1312,60 @@ void VulkanRenderer::FillOffScreenCommands(uint32_t currentImage)
 	// Start recording commands to command buffer!
 	VK_CHECK(vkBeginCommandBuffer(m_SwapchainCommandBuffers[currentImage], &bufferBeginInfo));
 
-	// Information about how to begin a render pass (only needed for graphical applications)
-	VkRenderPassBeginInfo baiscRenderPassBeginInfo = {};
-	baiscRenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-	baiscRenderPassBeginInfo.renderPass = m_BasicRenderPass;								// Render Pass to begin
-	baiscRenderPassBeginInfo.renderArea.offset = { 0, 0 };							// Start point of render pass in pixels
-	baiscRenderPassBeginInfo.renderArea.extent = swapChainExtent;					// Size of region to run render pass on (starting at offset)
+	//// Information about how to begin a render pass (only needed for graphical applications)
+	//VkRenderPassBeginInfo baiscRenderPassBeginInfo = {};
+	//baiscRenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	//baiscRenderPassBeginInfo.renderPass = m_BasicRenderPass;								// Render Pass to begin
+	//baiscRenderPassBeginInfo.renderArea.offset = { 0, 0 };							// Start point of render pass in pixels
+	//baiscRenderPassBeginInfo.renderArea.extent = swapChainExtent;					// Size of region to run render pass on (starting at offset)
 
-	std::array<VkClearValue, 2> basicClearValues = {};
-	basicClearValues[0].color = { 0.0f, 1.0f, 1.0f, 1.0f };
-	basicClearValues[1].depthStencil.depth = 1.0f;
+	//std::array<VkClearValue, 2> basicClearValues = {};
+	//basicClearValues[0].color = { 0.0f, 1.0f, 1.0f, 1.0f };
+	//basicClearValues[1].depthStencil.depth = 1.0f;
 
-	baiscRenderPassBeginInfo.pClearValues = basicClearValues.data();								// List of clear values
-	baiscRenderPassBeginInfo.clearValueCount = static_cast<uint32_t>(basicClearValues.size());
+	//baiscRenderPassBeginInfo.pClearValues = basicClearValues.data();								// List of clear values
+	//baiscRenderPassBeginInfo.clearValueCount = static_cast<uint32_t>(basicClearValues.size());
 
-	baiscRenderPassBeginInfo.framebuffer = m_BasicFramebuffer;
+	//baiscRenderPassBeginInfo.framebuffer = m_BasicFramebuffer;
 
-	//Begin Render Pass
-	vkCmdBeginRenderPass(m_SwapchainCommandBuffers[currentImage], &baiscRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE); // 렌더 패스의 내용을 직접 명령 버퍼에 기록하는 것을 의미
+	////Begin Render Pass
+	//vkCmdBeginRenderPass(m_SwapchainCommandBuffers[currentImage], &baiscRenderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE); // 렌더 패스의 내용을 직접 명령 버퍼에 기록하는 것을 의미
 
-	// Bind Pipeline to be used in render pass
-	vkCmdBindPipeline(m_SwapchainCommandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_BasicPipeline);
-	// "Push" Constants to given shader stage directly (no buffer)
-	vkCmdPushConstants(
-		m_SwapchainCommandBuffers[currentImage],
-		m_BasicPipelineLayout,
-		VK_SHADER_STAGE_VERTEX_BIT,
-		0,										// Offset of push constants to update
-		static_cast<uint32_t>(sizeof(Model)),	// Size of data being pushed
-		&model);					// Actual data being pushed (can be array)
+	//// Bind Pipeline to be used in render pass
+	//vkCmdBindPipeline(m_SwapchainCommandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_BasicPipeline);
+	//// "Push" Constants to given shader stage directly (no buffer)
+	//vkCmdPushConstants(
+	//	m_SwapchainCommandBuffers[currentImage],
+	//	m_BasicPipelineLayout,
+	//	VK_SHADER_STAGE_VERTEX_BIT,
+	//	0,										// Offset of push constants to update
+	//	static_cast<uint32_t>(sizeof(Model)),	// Size of data being pushed
+	//	&model);					// Actual data being pushed (can be array)
 
-	VkDeviceSize offsets[] = { 0 };									// Offsets into buffers being bound
-	vkCmdBindVertexBuffers(m_SwapchainCommandBuffers[currentImage], 0, 1, &mesh.GetVkVertexBuffer(), offsets);
+	//VkDeviceSize offsets[] = { 0 };									// Offsets into buffers being bound
+	//vkCmdBindVertexBuffers(m_SwapchainCommandBuffers[currentImage], 0, 1, &mesh.GetVkVertexBuffer(), offsets);
 
-	// Bind mesh index buffer, with 0 offset and using the uint32 type
-	vkCmdBindIndexBuffer(m_SwapchainCommandBuffers[currentImage], mesh.GetVkIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+	//// Bind mesh index buffer, with 0 offset and using the uint32 type
+	//vkCmdBindIndexBuffer(m_SwapchainCommandBuffers[currentImage], mesh.GetVkIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-	//// Dynamic Offset Amount
-	//uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAligment * j);
-	// Bind Descriptor Sets
-	vkCmdBindDescriptorSets(m_SwapchainCommandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS,
-		m_BasicPipelineLayout, 0, 1, &m_DescriptorManager.GetVkDescriptorSet(ToWideString("ViewProjection")), 0, nullptr);
+	////// Dynamic Offset Amount
+	////uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAligment * j);
+	//// Bind Descriptor Sets
+	//vkCmdBindDescriptorSets(m_SwapchainCommandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS,
+	//	m_BasicPipelineLayout, 0, 1, &m_DescriptorManager.GetVkDescriptorSet(ToWideString("ViewProjection")), 0, nullptr);
 
-	// Execute pipeline
-	//vkCmdDraw(commandBuffers[i], static_cast<uint32_t>(firstMesh.GetVertexCount()), 1, 0, 0);
-	vkCmdDrawIndexed(m_SwapchainCommandBuffers[currentImage], mesh.GetIndexCount(), 1, 0, 0, 0);
+	//// Execute pipeline
+	////vkCmdDraw(commandBuffers[i], static_cast<uint32_t>(firstMesh.GetVertexCount()), 1, 0, 0);
+	//vkCmdDrawIndexed(m_SwapchainCommandBuffers[currentImage], mesh.GetIndexCount(), 1, 0, 0, 0);
 
 
-	// End Render Pass
-	vkCmdEndRenderPass(m_SwapchainCommandBuffers[currentImage]);
+	//// End Render Pass
+	//vkCmdEndRenderPass(m_SwapchainCommandBuffers[currentImage]);
 
-	VkUtils::CmdImageBarrier(m_SwapchainCommandBuffers[currentImage], m_ColourBufferImage, 
-		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
-	VkUtils::CmdImageBarrier(m_SwapchainCommandBuffers[currentImage], m_DepthBufferImage, 
-		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+	//VkUtils::CmdImageBarrier(m_SwapchainCommandBuffers[currentImage], m_ColourBufferImage, 
+	//	VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+	//VkUtils::CmdImageBarrier(m_SwapchainCommandBuffers[currentImage], m_DepthBufferImage, 
+	//	VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
 
 	//Begin Render Pass
 	vkCmdBeginRenderPass(m_SwapchainCommandBuffers[currentImage], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE); // 렌더 패스의 내용을 직접 명령 버퍼에 기록하는 것을 의미
@@ -1412,10 +1444,13 @@ void VulkanRenderer::FillBasicCommands()
 	//vkCmdDraw(commandBuffers[i], static_cast<uint32_t>(firstMesh.GetVertexCount()), 1, 0, 0);
 	vkCmdDrawIndexed(m_BasicCommandBuffer, mesh.GetIndexCount(), 1, 0, 0, 0);
 
-
-
 	// End Render Pass
 	vkCmdEndRenderPass(m_BasicCommandBuffer);
+
+	VkUtils::CmdImageBarrier(m_BasicCommandBuffer, m_ColourBufferImage,
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+	VkUtils::CmdImageBarrier(m_BasicCommandBuffer, m_DepthBufferImage,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
 
 	// Stop recording commands to command buffer!
 	VK_CHECK(vkEndCommandBuffer(m_BasicCommandBuffer));

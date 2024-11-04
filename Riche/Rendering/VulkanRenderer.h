@@ -108,6 +108,9 @@ private:
 	VkBuffer m_ViewProjectionUBO;
 	VkDeviceMemory m_ViewProjectionUBOMemory;
 
+	VkSemaphore m_BasicRenderAvailable;
+	VkFence m_BasicFence;
+
 	// - Descriptors
 	VkPushConstantRange pushConstantRange;
 
@@ -127,6 +130,8 @@ private:
 	std::vector<VkSemaphore> imageAvailable;
 	std::vector<VkSemaphore> renderFinished;
 	std::vector<VkFence> drawFences;
+
+	VkSampler textureSampler;
 
 private:
 	// Vulkan Functions
@@ -148,6 +153,7 @@ private:
 	void CreateBasicFramebuffer();
 	void CreateBasicRenderPass();
 	void CreateBasicPipeline();
+	void CreateBasicSemaphores();
 
 	void CreateDescriptorSetLayout();
 	void CreatePushConstantRange();
