@@ -20,4 +20,6 @@
 
 #include "imgui.h"
 #include "imgui_impl_vulkan.h"
-#include "imgui_impl_glfw.h"  // GLFW를 사용할 경우
+#include "imgui_impl_glfw.h"  // if use GLFW.
+
+#include "entt/entt.hpp"
