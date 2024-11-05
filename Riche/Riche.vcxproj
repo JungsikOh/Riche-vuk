@@ -103,10 +103,17 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
+<<<<<<< HEAD
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>C:/dev/VulkanSDK/1.3.290.0/Include;$(SolutionDir)/ThirdParty/GLFW/include;$(SolutionDir)/ThirdParty/GLM;$(SolutionDir)/Riche%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+=======
+      <PreprocessorDefinitions>_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>C:/dev/VulkanSDK/1.3.290.0/Include;$(SolutionDir)/ThirdParty/GLFW/include;$(SolutionDir)/ThirdParty/GLM;$(SolutionDir)/ThirdParty/imgui;$(SolutionDir)/ThirdParty;$(SolutionDir)/Riche;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+>>>>>>> origin/second
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
@@ -135,6 +142,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+<<<<<<< HEAD
     <ClCompile Include="Graphics\GfxResourceManager.cpp" />
     <ClCompile Include="Graphics\GfxCommandPool.cpp" />
     <ClCompile Include="Graphics\GfxCommandBuffer.cpp" />
@@ -169,6 +177,33 @@
     <ClInclude Include="Rendering\DescriptorManager.h" />
     <ClInclude Include="Rendering\IRenderer.h" />
     <ClInclude Include="Rendering\VulkanRenderer.h" />
+=======
+    <ClCompile Include="Editor\Editor.cpp" />
+    <ClCompile Include="Rendering\Camera.cpp" />
+    <ClCompile Include="Rendering\Mesh.cpp" />
+    <ClCompile Include="VkUtils\DescriptorBuilder.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="VkUtils\DescriptorManager.cpp" />
+    <ClCompile Include="Rendering\VulkanRenderer.cpp" />
+    <ClCompile Include="VkUtils\ResourceManager.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Editor\Editor.h" />
+    <ClInclude Include="Rendering\Camera.h" />
+    <ClInclude Include="Rendering\Mesh.h" />
+    <ClInclude Include="Rendering\Core.h" />
+    <ClInclude Include="Rendering\Swapchain.h" />
+    <ClInclude Include="Utils\BoundingBox.h" />
+    <ClInclude Include="Utils\StringUtil.h" />
+    <ClInclude Include="VkUtils\DescriptorBuilder.h" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="Rendering\Components.h" />
+    <ClInclude Include="VkUtils\DescriptorManager.h" />
+    <ClInclude Include="Rendering\VulkanRenderer.h" />
+    <ClInclude Include="VkUtils\ResourceManager.h" />
+    <ClInclude Include="VkUtils\QueueFamilyIndices.h" />
+    <ClInclude Include="VkUtils\ShaderModule.h" />
+>>>>>>> origin/second
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
