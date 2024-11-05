@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Utils/BoundingBox.h"
+
 #define COMPONENTS
 
 struct Model 
@@ -24,4 +26,12 @@ struct COMPONENTS Transform
 {
     glm::mat4 startTransform;
     glm::mat4 currentTransform;
+};
+
+struct COMPONENTS BoundingBox
+{
+    AABB originalBox;
+    AABB currentBoxBox;
+
+    bool isCameraVisible = true;
 };

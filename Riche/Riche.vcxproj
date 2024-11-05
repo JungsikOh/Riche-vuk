@@ -106,7 +106,7 @@
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:/dev/VulkanSDK/1.3.290.0/Include;$(SolutionDir)/ThirdParty/GLFW/include;$(SolutionDir)/ThirdParty/GLM;$(SolutionDir)/Riche%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:/dev/VulkanSDK/1.3.290.0/Include;$(SolutionDir)/ThirdParty/GLFW/include;$(SolutionDir)/ThirdParty/GLM;$(SolutionDir)/ThirdParty/imgui;$(SolutionDir)/Riche;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
@@ -150,6 +150,7 @@
     <ClInclude Include="Rendering\Mesh.h" />
     <ClInclude Include="Rendering\Core.h" />
     <ClInclude Include="Rendering\Swapchain.h" />
+    <ClInclude Include="Utils\BoundingBox.h" />
     <ClInclude Include="Utils\StringUtil.h" />
     <ClInclude Include="VkUtils\DescriptorBuilder.h" />
     <ClInclude Include="pch.h" />
