@@ -9,6 +9,8 @@ class Mesh
     VkBuffer m_InstanceBuffer = nullptr;
     VkDeviceMemory m_InstanceBufferMemory;
 
+    glm::mat4 m_Model;
+
 public:
     // Only vb
     uint32_t vertexCount = 0;
@@ -41,6 +43,8 @@ public:
     VkDeviceMemory& GetVkIndexDeviceMemory();
 
     uint32_t GetIndexCount();
+
+    glm::mat4& GetModel();
 
 };
 

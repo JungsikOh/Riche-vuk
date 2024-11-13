@@ -4,10 +4,14 @@
 #include "Swapchain.h"
 #include "Mesh.h"
 
+#include "Editor/Editor.h"
+
 #include "VkUtils/DescriptorManager.h"
 #include "VkUtils/DescriptorBuilder.h"
 #include "VkUtils/ResourceManager.h"
 #include "VkUtils/QueueFamilyIndices.h"
+
+static const int OBJECT_COUNT = 10;
 
 class Mesh;
 
@@ -34,8 +38,10 @@ private:
 	int currentFrame = 0;
 	bool enableValidationLayers;
 
+	Editor editor;
+
 	// Scene Objects
-	Mesh mesh;
+	std::vector<Mesh> meshes;
 
 	// Scene Settings
 	struct UboViewProjection {
@@ -108,8 +114,21 @@ private:
 	VkBuffer m_ViewProjectionUBO;
 	VkDeviceMemory m_ViewProjectionUBOMemory;
 
+	// -- For Compute shader
+	VkPipeline m_ViewCullingComputePipeline;
+	VkPipelineLayout m_ViewCullingComputePipelineLayout;
+
+	VkBuffer m_InDirectDrawBuffer;
+	VkDeviceMemory m_InDirectDrawBufferMemory;
+	VkBuffer m_BoundingBoxes;
+	VkDeviceMemory m_BoundingBoxesMemory;
+	VkBuffer m_CameraBoudingBox;
+	VkDeviceMemory m_CameraBoudingBoxMemory;
+
 	VkSemaphore m_BasicRenderAvailable;
 	VkFence m_BasicFence;
+
+	entt::registry m_Registry;
 
 	// - Descriptors
 	VkPushConstantRange pushConstantRange;
@@ -154,6 +173,9 @@ private:
 	void CreateBasicRenderPass();
 	void CreateBasicPipeline();
 	void CreateBasicSemaphores();
+
+	void CreateInDirectDrawBuffer();
+	void CreateComputePipeline();
 
 	void CreateDescriptorSetLayout();
 	void CreatePushConstantRange();

@@ -32,6 +32,4 @@ struct COMPONENTS BoundingBox
 {
     AABB originalBox;
     AABB currentBoxBox;
-
-    bool isCameraVisible = true;
 };

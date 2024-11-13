@@ -39,3 +39,8 @@ uint32_t Mesh::GetIndexCount()
 {
 	return indexCount;
 }
+
+glm::mat4& Mesh::GetModel()
+{
+	return m_Model;
+}

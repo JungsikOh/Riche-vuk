@@ -16,7 +16,9 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 	g_camera.OnKeyInput(deltaTime, key);
 }
 
-void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
+{
+
 	if (button == GLFW_MOUSE_BUTTON_RIGHT) { // 마우스 오른쪽 버튼일 경우
 		if (action == GLFW_PRESS) { // 누를 때
 			rightButtonPressed = true;
@@ -72,8 +74,12 @@ int main()
 	// Create Window
 	InitWindow("Test Widnow", 1048, 624);
 
+	glfwSetKeyCallback(window, KeyCallback);
+	glfwSetMouseButtonCallback(window, MouseButtonCallback);
+	glfwSetCursorPosCallback(window, CursorPositionCallback);
+
 	CameraParameters cameraParams = {};
-	cameraParams.speed = 50.0f;
+	cameraParams.speed = 30.0f;
 	cameraParams.sensitivity = 0.2f;
 	cameraParams.position = glm::vec3(0.0f, 0.0f, 2.0f);
 	cameraParams.lootAt = glm::vec3(0.0f, 0.0f, -1.0f);
@@ -91,10 +97,6 @@ int main()
 	
 	float angle = 0.0f;
 	float lastTime = 0.0f;
-
-	glfwSetKeyCallback(window, KeyCallback);
-	glfwSetMouseButtonCallback(window, MouseButtonCallback);
-	glfwSetCursorPosCallback(window, CursorPositionCallback);
 
 	// Loop until closed
 	while (!glfwWindowShouldClose(window))
