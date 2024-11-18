@@ -61,18 +61,6 @@ int VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* newCamera)
 		m_ViewProjectionCPU.view = camera->View();
 		m_ViewProjectionCPU.projection = camera->Proj();
 
-		CreateUniformBuffers();
-		CreateBasicFramebuffer();
-		CreateSwapchainFrameBuffers();
-
-		CreateDescriptorSets();
-		CreateOffScrrenDescriptorSet();
-
-		CreateBasicPipeline();
-		CreateOffScreenPipeline();
-
-		CreateBasicSemaphores();
-
 		std::vector<BasicVertex> allMeshVertices;
 		std::vector<uint32_t> allIndices;
 
@@ -81,34 +69,61 @@ int VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* newCamera)
 			// Create a mesh
 			// Vulkan의 viewport좌표계와 projection 행렬은 Y-Down
 			// Clip Space와 NDC 공간도 기본적으로 Y-Down이다.
+			// 정육면체의 정점 정의 (각 면을 개별적으로 정의)
 			std::vector<BasicVertex> meshVertices = {
 				// Front face
-				{ { -0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f } },
-				{ {  0.5f, -0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 0.0f } },
+				{ { -0.5f, -0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f } },
+				{ {  0.5f, -0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 0.0f } },
 				{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f } },
-				{ { -0.5f,  0.5f,  0.5f }, { 1.0f, 1.0f, 0.0f }, { 0.0f, 1.0f } },
+				{ { -0.5f,  0.5f,  0.5f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f } },
+
 				// Back face
-				{ { -0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 1.0f }, { 0.0f, 0.0f } },
-				{ {  0.5f, -0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f }, { 1.0f, 0.0f } },
-				{ {  0.5f,  0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f }, { 1.0f, 1.0f } },
+				{ { -0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f } },
+				{ {  0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f } },
+				{ {  0.5f,  0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f } },
+				{ { -0.5f,  0.5f, -0.5f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f } },
+
+				// Left face
+				{ { -0.5f, -0.5f, -0.5f }, { -1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f } },
+				{ { -0.5f, -0.5f,  0.5f }, { -1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f } },
+				{ { -0.5f,  0.5f,  0.5f }, { -1.0f, 0.0f, 0.0f }, { 1.0f, 1.0f } },
+				{ { -0.5f,  0.5f, -0.5f }, { -1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f } },
+
+				// Right face
+				{ { 0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f } },
+				{ { 0.5f, -0.5f,  0.5f }, { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f } },
+				{ { 0.5f,  0.5f,  0.5f }, { 1.0f, 0.0f, 0.0f }, { 1.0f, 1.0f } },
+				{ { 0.5f,  0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f } },
+
+				// Top face
+				{ { -0.5f,  0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f } },
+				{ {  0.5f,  0.5f,  0.5f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 0.0f } },
+				{ {  0.5f,  0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 1.0f } },
 				{ { -0.5f,  0.5f, -0.5f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f } },
+
+				// Bottom face
+				{ { -0.5f, -0.5f,  0.5f }, { 0.0f, -1.0f, 0.0f }, { 0.0f, 0.0f } },
+				{ {  0.5f, -0.5f,  0.5f }, { 0.0f, -1.0f, 0.0f }, { 1.0f, 0.0f } },
+				{ {  0.5f, -0.5f, -0.5f }, { 0.0f, -1.0f, 0.0f }, { 1.0f, 1.0f } },
+				{ { -0.5f, -0.5f, -0.5f }, { 0.0f, -1.0f, 0.0f }, { 0.0f, 1.0f } }
 			};
 
-			// 정육면체 인덱스 정의
+			// 정육면체의 인덱스 정의
 			std::vector<uint32_t> meshIndices = {
-				// Front face
-				0, 1, 2, 2, 3, 0,
-				// Back face
-				4, 5, 6, 6, 7, 4,
-				// Left face
-				4, 0, 3, 3, 7, 4,
-				// Right face
-				1, 5, 6, 6, 2, 1,
-				// Top face
-				3, 2, 6, 6, 7, 3,
-				// Bottom face
-				4, 5, 1, 1, 0, 4
+				// Front face (CCW)
+				0, 3, 2, 2, 1, 0,
+				// Back face (CCW)
+				4, 7, 6, 6, 5, 4,
+				// Left face (CCW)
+				8, 11, 10, 10, 9, 8,
+				// Right face (CCW)
+				12, 15, 14, 14, 13, 12,
+				// Top face (CCW)
+				16, 19, 18, 18, 17, 16,
+				// Bottom face (CCW)
+				20, 23, 22, 22, 21, 20
 			};
+
 
 			std::random_device rd;
 			std::mt19937 gen(rd());
@@ -121,9 +136,10 @@ int VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* newCamera)
 
 			// 모델 행렬에 변환 적용
 			mesh.GetModel() = glm::translate(glm::mat4(1.0f), glm::vec3(randomX, randomY, randomZ));
-			mesh.Initialize(mainDevice.logicalDevice, (uint32_t)meshVertices.size(), (uint32_t)meshIndices.size());
-			m_ResoucreManager.CreateVertexBuffer((uint32_t)sizeof(BasicVertex), (uint32_t)meshVertices.size(), &mesh.GetVkVertexDeviceMemory(), &mesh.GetVkVertexBuffer(), meshVertices.data());
-			m_ResoucreManager.CreateIndexBuffer((uint32_t)meshIndices.size(), &mesh.GetVkIndexDeviceMemory(), &mesh.GetVkIndexBuffer(), meshIndices.data());
+			m_ModelList.push_back(glm::translate(glm::mat4(1.0f), glm::vec3(randomX, randomY, randomZ)));
+
+			mesh.Initialize(meshVertices, meshIndices);
+			AddDataToMiniBatch(g_MiniBatches, m_ResoucreManager, mesh);
 
 			std::vector<glm::vec3> positions;
 			for (const BasicVertex& vertex : meshVertices)
@@ -141,6 +157,20 @@ int VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* newCamera)
 
 			meshes.push_back(mesh);
 		}
+		FlushMiniBatch(g_MiniBatches, m_ResoucreManager);
+
+		CreateUniformBuffers();
+		CreateBasicFramebuffer();
+		CreateSwapchainFrameBuffers();
+
+		CreateDescriptorSets();
+		CreateOffScrrenDescriptorSet();
+
+		CreateBasicPipeline();
+		CreateOffScreenPipeline();
+
+		CreateBasicSemaphores();
+
 		CreateInDirectDrawBuffer();
 		CreateComputePipeline();
 		editor.Initialize(window, instance, mainDevice.logicalDevice, mainDevice.physicalDevice, m_QueueFamilyIndices, m_GraphicsQueue);
@@ -283,7 +313,7 @@ void VulkanRenderer::Cleanup()
 
 	vkDestroySemaphore(mainDevice.logicalDevice, m_BasicRenderAvailable, nullptr);
 	vkDestroyFence(mainDevice.logicalDevice, m_BasicFence, nullptr);
-	vkFreeCommandBuffers(mainDevice.logicalDevice, m_GraphicsCommandPool , 1, &m_BasicCommandBuffer);
+	vkFreeCommandBuffers(mainDevice.logicalDevice, m_GraphicsCommandPool, 1, &m_BasicCommandBuffer);
 
 	for (size_t i = 0; i < MAX_FRAME_DRAWS; ++i)
 	{
@@ -316,7 +346,7 @@ void VulkanRenderer::Cleanup()
 		// 반면, VkImage는 스왑체인이 생성될 때 할당된 메모리 내에서 관리되므로 파괴할 필요가 없다.
 		vkDestroyImageView(mainDevice.logicalDevice, image.imageView, nullptr);
 	}
-	for(int i = 0; i < m_SwapchainDepthStencilImages.size(); ++i) 
+	for (int i = 0; i < m_SwapchainDepthStencilImages.size(); ++i)
 	{
 		vkDestroyImageView(mainDevice.logicalDevice, m_SwapchainDepthStencilImages[i].imageView, nullptr);
 		vkDestroyImage(mainDevice.logicalDevice, m_SwapchainDepthStencilImages[i].image, nullptr);
@@ -328,7 +358,7 @@ void VulkanRenderer::Cleanup()
 	if (enableValidationLayers)
 	{
 		DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
-	}
+}
 	vkDestroyInstance(instance, nullptr);
 }
 
@@ -445,6 +475,8 @@ void VulkanRenderer::CreateLogicalDevice()
 	VkPhysicalDeviceFeatures deviceFeatures = {};
 	deviceFeatures.depthBiasClamp = VK_FALSE;								// Rasterizer에서 해당 기능을 지원할 것인지에 대한 여부
 	deviceFeatures.samplerAnisotropy = VK_TRUE;
+	deviceFeatures.multiDrawIndirect = VK_TRUE;
+	deviceFeatures.drawIndirectFirstInstance = VK_TRUE;
 
 	deviceCreateInfo.pEnabledFeatures = &deviceFeatures;					// Physical device features logical device will use
 
@@ -859,12 +891,15 @@ void VulkanRenderer::CreateBasicPipeline()
 	colourBlendingCreateInfo.pAttachments = &colourState;
 
 	// -- PIPELINE LAYOUT (It's like Root signature in D3D12) --
+	VkDescriptorSetLayout setLayouts[2] = { m_DescriptorManager.GetVkDescriptorSetLayout(ToWideString("ViewProjection")),
+		m_DescriptorManager.GetVkDescriptorSetLayout(ToWideString("Model")) };
+
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
 	pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutCreateInfo.setLayoutCount = 1;
-	pipelineLayoutCreateInfo.pSetLayouts = &m_DescriptorManager.GetVkDescriptorSetLayout(ToWideString("ViewProjection"));
-	pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
-	pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
+	pipelineLayoutCreateInfo.setLayoutCount = 2;
+	pipelineLayoutCreateInfo.pSetLayouts = setLayouts;
+	pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
+	pipelineLayoutCreateInfo.pPushConstantRanges = VK_NULL_HANDLE;
 
 
 	VK_CHECK(vkCreatePipelineLayout(mainDevice.logicalDevice, &pipelineLayoutCreateInfo, nullptr, &m_BasicPipelineLayout));
@@ -929,18 +964,12 @@ void VulkanRenderer::CreateInDirectDrawBuffer()
 	auto entityView = m_Registry.view<Mesh, AABB>();
 	for (auto entity : entityView)
 	{
-		auto [_mesh, _aabb]  = entityView.get<Mesh, AABB>(entity);
-		VkDrawIndexedIndirectCommand command = {};
-		command.indexCount = _mesh.indexCount;
-		command.instanceCount = 1;
-		command.firstInstance = 0;
-		command.vertexOffset = 0;
-		indirectCommands.push_back(command);
+		auto [_mesh, _aabb] = entityView.get<Mesh, AABB>(entity);
 
 		aabbs.push_back(_aabb);
 	}
 
-	VkDeviceSize indirectBufferSize = sizeof(VkDrawIndirectCommand) * indirectCommands.size(); // * object count
+	VkDeviceSize indirectBufferSize = sizeof(VkDrawIndexedIndirectCommand) * g_MiniBatches.back().m_DrawIndexedCommands.size(); // * object count
 	VkDeviceSize aabbBufferSize = sizeof(AABB) * aabbs.size();
 	VkDeviceSize cameraPlaneSize = sizeof(FrustumPlane) * cameraFrustumPlanes.size();
 
@@ -950,7 +979,7 @@ void VulkanRenderer::CreateInDirectDrawBuffer()
 
 	void* pData = nullptr;
 	vkMapMemory(mainDevice.logicalDevice, m_InDirectDrawBufferMemory, 0, indirectBufferSize, 0, &pData);
-	memcpy(pData, indirectCommands.data(), indirectBufferSize);
+	memcpy(pData, g_MiniBatches.back().m_DrawIndexedCommands.data(), indirectBufferSize);
 	vkUnmapMemory(mainDevice.logicalDevice, m_InDirectDrawBufferMemory);
 
 	VkUtils::CreateBuffer(mainDevice.logicalDevice, mainDevice.physicalDevice, aabbBufferSize,
@@ -1400,6 +1429,13 @@ void VulkanRenderer::CreateUniformBuffers()
 	VkUtils::CreateBuffer(mainDevice.logicalDevice, mainDevice.physicalDevice, vpBufferSize,
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		&m_ViewProjectionUBO, &m_ViewProjectionUBOMemory);
+
+	VkDeviceSize modelBufferSize = sizeof(glm::mat4) * m_ModelList.size();
+	VkUtils::CreateBuffer(mainDevice.logicalDevice, mainDevice.physicalDevice, modelBufferSize,
+		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		&m_ModelListUBO, &m_ModelListUBOMemory);
+
+
 }
 
 void VulkanRenderer::CreateDescriptorSets()
@@ -1414,6 +1450,15 @@ void VulkanRenderer::CreateDescriptorSets()
 	VkUtils::DescriptorBuilder vpBuilder = VkUtils::DescriptorBuilder::Begin(m_pLayoutCache.get(), m_pDescriptorAllocator.get());
 	vpBuilder.BindBuffer(0, &uboViewProjectionBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT);
 	m_DescriptorManager.AddDescriptorSet(&vpBuilder, ToWideString("ViewProjection"));
+
+	VkDescriptorBufferInfo modelUBOInfo = {};
+	modelUBOInfo.buffer = m_ModelListUBO;			// Buffer to get data from
+	modelUBOInfo.offset = 0;								// Position of start of data
+	modelUBOInfo.range = sizeof(glm::mat4) * m_ModelList.size();			// size of data
+
+	VkUtils::DescriptorBuilder modelBulder = VkUtils::DescriptorBuilder::Begin(m_pLayoutCache.get(), m_pDescriptorAllocator.get());
+	modelBulder.BindBuffer(0, &modelUBOInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT);
+	m_DescriptorManager.AddDescriptorSet(&modelBulder, ToWideString("Model"));
 }
 
 void VulkanRenderer::UpdateUniformBuffers(uint32_t imageIndex)
@@ -1423,6 +1468,11 @@ void VulkanRenderer::UpdateUniformBuffers(uint32_t imageIndex)
 	vkMapMemory(mainDevice.logicalDevice, m_ViewProjectionUBOMemory, 0, sizeof(ViewProjection), 0, &pData);
 	memcpy(pData, &m_ViewProjectionCPU, sizeof(ViewProjection));
 	vkUnmapMemory(mainDevice.logicalDevice, m_ViewProjectionUBOMemory);
+
+	pData = nullptr;
+	vkMapMemory(mainDevice.logicalDevice, m_ModelListUBOMemory, 0, sizeof(glm::mat4) * m_ModelList.size(), 0, &pData);
+	memcpy(pData, m_ModelList.data(), sizeof(glm::mat4) * m_ModelList.size());
+	vkUnmapMemory(mainDevice.logicalDevice, m_ModelListUBOMemory);
 
 	std::array<FrustumPlane, 6> cameraFrustumPlanes = CalculateFrustumPlanes(camera->ViewProj());
 	VkDeviceSize cameraPlaneSize = sizeof(FrustumPlane) * cameraFrustumPlanes.size();
@@ -1525,48 +1575,87 @@ void VulkanRenderer::FillBasicCommands()
 		throw std::runtime_error("Failed to start recording a Command Buffer!");
 	}
 
-	vkCmdBindPipeline(m_BasicCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_ViewCullingComputePipeline);
-	vkCmdBindDescriptorSets(m_BasicCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-		m_ViewCullingComputePipelineLayout, 0, 1, &m_DescriptorManager.GetVkDescriptorSet(ToWideString("ViewFrustumCulling_COMPUTE")), 0, nullptr);
+	//vkCmdBindPipeline(m_BasicCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_ViewCullingComputePipeline);
+	//vkCmdBindDescriptorSets(m_BasicCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+	//	m_ViewCullingComputePipelineLayout, 0, 1, &m_DescriptorManager.GetVkDescriptorSet(ToWideString("ViewFrustumCulling_COMPUTE")), 0, nullptr);
 
-	vkCmdDispatch(m_BasicCommandBuffer, OBJECT_COUNT, 1, 1);
+	//vkCmdDispatch(m_BasicCommandBuffer, OBJECT_COUNT, 1, 1);
 
 	//Begin Render Pass
 	vkCmdBeginRenderPass(m_BasicCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE); // 렌더 패스의 내용을 직접 명령 버퍼에 기록하는 것을 의미
 
 	// Bind Pipeline to be used in render pass
 	vkCmdBindPipeline(m_BasicCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_BasicPipeline);
-	
-	auto entityView = m_Registry.view<Mesh>();
-	for (auto entity : entityView)
+
+	//auto entityView = m_Registry.view<Mesh>();
+	//for (auto entity : entityView)
+	//{
+	//	auto _mesh = entityView.get<Mesh>(entity);
+	//	// "Push" Constants to given shader stage directly (no buffer)
+	//	vkCmdPushConstants(
+	//		m_BasicCommandBuffer,
+	//		m_BasicPipelineLayout,
+	//		VK_SHADER_STAGE_VERTEX_BIT,
+	//		0,										// Offset of push constants to update
+	//		static_cast<uint32_t>(sizeof(Model)),	// Size of data being pushed
+	//		&_mesh.GetModel());					// Actual data being pushed (can be array)
+
+	//	//VkDeviceSize offsets[] = { 0 };									// Offsets into buffers being bound
+	//	//vkCmdBindVertexBuffers(m_BasicCommandBuffer, 0, 1, &_mesh.GetVkVertexBuffer(), offsets);
+
+	//	//// Bind mesh index buffer, with 0 offset and using the uint32 type
+	//	//vkCmdBindIndexBuffer(m_BasicCommandBuffer, _mesh.GetVkIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+	//	//// Dynamic Offset Amount
+	//	//uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAligment * j);
+	//	// Bind Descriptor Sets
+	//	vkCmdBindDescriptorSets(m_BasicCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+	//		m_BasicPipelineLayout, 0, 1, &m_DescriptorManager.GetVkDescriptorSet(ToWideString("ViewProjection")), 0, nullptr);
+
+	//	// Execute pipeline
+	//	//vkCmdDraw(commandBuffers[i], static_cast<uint32_t>(firstMesh.GetVertexCount()), 1, 0, 0);
+	//	//vkCmdDrawIndexed(m_BasicCommandBuffer, _mesh.GetIndexCount(), 1, 0, 0, 0);
+	//	//vkCmdDrawIndirect(m_BasicCommandBuffer, m_InDirectDrawBuffer, 0, 1, sizeof(VkDrawIndirectCommand));
+	//	vkCmdDrawIndexedIndirect(m_BasicCommandBuffer, m_InDirectDrawBuffer, 0, 1, sizeof(VkDrawIndirectCommand));
+	//}
+
+	//
+	// mini-batch system
+	//
+	for (auto miniBatch : g_MiniBatches)
 	{
-		auto _mesh = entityView.get<Mesh>(entity);
-		// "Push" Constants to given shader stage directly (no buffer)
-		vkCmdPushConstants(
-			m_BasicCommandBuffer,
-			m_BasicPipelineLayout,
-			VK_SHADER_STAGE_VERTEX_BIT,
-			0,										// Offset of push constants to update
-			static_cast<uint32_t>(sizeof(Model)),	// Size of data being pushed
-			&_mesh.GetModel());					// Actual data being pushed (can be array)
+		//glm::mat4 model = glm::mat4(1.0f);
+		//vkCmdPushConstants(
+		//	m_BasicCommandBuffer,
+		//	m_BasicPipelineLayout,
+		//	VK_SHADER_STAGE_VERTEX_BIT,
+		//	0,										// Offset of push constants to update
+		//	static_cast<uint32_t>(sizeof(Model)),	// Size of data being pushed
+		//	&model);					// Actual data being pushed (can be array)
 
-		VkDeviceSize offsets[] = { 0 };									// Offsets into buffers being bound
-		vkCmdBindVertexBuffers(m_BasicCommandBuffer, 0, 1, &_mesh.GetVkVertexBuffer(), offsets);
+		// Bind the vertex buffer with the correct offset
+		VkDeviceSize vertexOffset = 0; // Always bind at offset 0 since indirect commands handle offsets
+		vkCmdBindVertexBuffers(m_BasicCommandBuffer, 0, 1, &miniBatch.m_VertexBuffer, &vertexOffset);
 
-		// Bind mesh index buffer, with 0 offset and using the uint32 type
-		vkCmdBindIndexBuffer(m_BasicCommandBuffer, _mesh.GetVkIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+		// Bind the index buffer with the correct offset
+		vkCmdBindIndexBuffer(m_BasicCommandBuffer, miniBatch.m_IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-		//// Dynamic Offset Amount
-		//uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAligment * j);
-		// Bind Descriptor Sets
 		vkCmdBindDescriptorSets(m_BasicCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
 			m_BasicPipelineLayout, 0, 1, &m_DescriptorManager.GetVkDescriptorSet(ToWideString("ViewProjection")), 0, nullptr);
 
-		// Execute pipeline
-		//vkCmdDraw(commandBuffers[i], static_cast<uint32_t>(firstMesh.GetVertexCount()), 1, 0, 0);
-		//vkCmdDrawIndexed(m_BasicCommandBuffer, _mesh.GetIndexCount(), 1, 0, 0, 0);
-		//vkCmdDrawIndirect(m_BasicCommandBuffer, m_InDirectDrawBuffer, 0, 1, sizeof(VkDrawIndirectCommand));
-		vkCmdDrawIndexedIndirect(m_BasicCommandBuffer, m_InDirectDrawBuffer, 0, 1, sizeof(VkDrawIndirectCommand));
+		vkCmdBindDescriptorSets(m_BasicCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			m_BasicPipelineLayout, 1, 1, &m_DescriptorManager.GetVkDescriptorSet(ToWideString("Model")), 0, nullptr);
+
+		uint32_t drawCount = static_cast<uint32_t>(miniBatch.m_DrawIndexedCommands.size());
+		VkDeviceSize indirectBufferSize = drawCount * sizeof(VkDrawIndexedIndirectCommand);
+
+		vkCmdDrawIndexedIndirect(
+			m_BasicCommandBuffer,
+			m_InDirectDrawBuffer,
+			0, // offset
+			drawCount, // drawCount
+			sizeof(VkDrawIndexedIndirectCommand) // stride
+		);
 	}
 
 	// End Render Pass

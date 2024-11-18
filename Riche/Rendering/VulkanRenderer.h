@@ -3,6 +3,7 @@
 #include "Components.h"
 #include "Swapchain.h"
 #include "Mesh.h"
+#include "BatchSystem.h"
 
 #include "Editor/Editor.h"
 
@@ -11,7 +12,9 @@
 #include "VkUtils/ResourceManager.h"
 #include "VkUtils/QueueFamilyIndices.h"
 
-static const int OBJECT_COUNT = 10;
+static const int OBJECT_COUNT = 5;
+
+static std::vector<MiniBatch> g_MiniBatches;
 
 class Mesh;
 
@@ -113,6 +116,10 @@ private:
 	ViewProjection m_ViewProjectionCPU;
 	VkBuffer m_ViewProjectionUBO;
 	VkDeviceMemory m_ViewProjectionUBOMemory;
+
+	std::vector<glm::mat4> m_ModelList;
+	VkBuffer m_ModelListUBO;
+	VkDeviceMemory m_ModelListUBOMemory;
 
 	// -- For Compute shader
 	VkPipeline m_ViewCullingComputePipeline;

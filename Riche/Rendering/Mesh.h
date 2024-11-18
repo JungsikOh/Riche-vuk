@@ -1,20 +1,19 @@
 #pragma once
+
+#include "Components.h"
+
 class Mesh
 {
-    VkDevice m_Device;
-    VkBuffer m_VertexBuffer = nullptr;
-    VkDeviceMemory m_VertexBufferMemory;
-    VkBuffer m_IndexBuffer = nullptr;
-    VkDeviceMemory m_IndexBufferMemory;
-    VkBuffer m_InstanceBuffer = nullptr;
-    VkDeviceMemory m_InstanceBufferMemory;
 
     glm::mat4 m_Model;
 
 public:
+    std::vector<BasicVertex> vertices;
+    std::vector<uint32_t> indices;
+
     // Only vb
     uint32_t vertexCount = 0;
-    uint32_t startVertexLoc = 0; // Index of the first vertex
+    uint32_t startVertexLoc = 0; // Index of the first vertex, It' like offset
 
     // vb / ib
     uint32_t indexCount = 0;
@@ -34,13 +33,8 @@ public:
     Mesh() = default;
     ~Mesh() = default;
 
-    void Initialize(VkDevice device, uint32_t vertexSize, uint32_t indexSize);
+    void Initialize(std::vector<BasicVertex> _vertices, std::vector<uint32_t> _indices);
     void Cleanup();
-
-    VkBuffer& GetVkVertexBuffer();
-    VkDeviceMemory& GetVkVertexDeviceMemory();
-    VkBuffer& GetVkIndexBuffer();
-    VkDeviceMemory& GetVkIndexDeviceMemory();
 
     uint32_t GetIndexCount();
 

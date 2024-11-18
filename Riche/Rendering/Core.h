@@ -1,15 +1,18 @@
 #pragma once
 
 const int MAX_FRAME_DRAWS = 3;
-const std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+const std::vector<const char*> deviceExtensions = {
+	VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+"VK_KHR_shader_draw_parameters",
+};
 
 inline bool VK_CHECK(VkResult result)
 {
-    if (result != VK_SUCCESS)
-    {
-        throw std::exception();
-    }
-    return true;
+	if (result != VK_SUCCESS)
+	{
+		throw std::exception();
+	}
+	return true;
 }
 
 inline VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(

@@ -54,6 +54,6 @@ void main() {
     if (IsAABBInFrustum(aabbs[idx])) {
         drawIndexedCommands[idx].instanceCount = 1;
     } else {
-        drawIndexedCommands[idx].instanceCount = 0;
+        drawIndexedCommands[idx].instanceCount = 1;
     }
 }

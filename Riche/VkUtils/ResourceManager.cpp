@@ -95,9 +95,49 @@ namespace VkUtils
 		return VK_SUCCESS;
 	}
 
-	VkResult ResourceManager::CreateIndexBuffer(uint32_t indexNum, VkDeviceMemory* pOutIndexBufferMemory, VkBuffer* pOutBuffer, void* pInitData)
+	VkResult ResourceManager::CreateVertexBuffer(uint32_t vertexDataSize, VkDeviceMemory* pOutVertexBufferMemory, VkBuffer* pOutBuffer, void* pInitData)
 	{
-		VkDeviceSize bufferSize = sizeof(uint32_t) * indexNum;
+		// Get size of buffer needed for vertices
+		VkDeviceSize bufferSize = vertexDataSize;
+
+		VkBuffer pVertexBuffer;
+		VkDeviceMemory pVertexBufferMemory;
+
+		// Temporaray buffer to "stage" vertex data befroe transferring to GPU
+		VkBuffer stagingBuffer;
+		VkDeviceMemory stagingBufferMemory;
+
+		// Create Buffer, Allocate Memory and Bind to it
+		CreateBuffer(m_Device, m_PhysicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffer, &stagingBufferMemory);
+
+		// MAP MEMORY TO VERTEX BUFFER
+		void* pData = nullptr;																				// 1. Create pointer to a point in normal memory
+		vkMapMemory(m_Device, stagingBufferMemory, 0, bufferSize, 0, &pData);				// 2. "Map" the vertex buffer memory to that point
+		memcpy(pData, pInitData, (size_t)bufferSize);														// 3. Copy memory from vertices vector to that point
+		vkUnmapMemory(m_Device, stagingBufferMemory);															// 4. "UnMap" the vertex buffer memory
+
+		// Create Buffer win TRANSFER_DST_BIT to mark as recipient of transfer data
+		// Buffer Memory is to be DEVICE_LOCAL_BIT meaning memory is on the GPU and only accessible by it and not CPU (host) 
+		CreateBuffer(m_Device, m_PhysicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &pVertexBuffer, &pVertexBufferMemory);
+
+		// Copy staging buffer to vertex buffer on GPU
+		CopyBuffer(m_Device, m_TransferQueue, m_TransferCommandPool, stagingBuffer, pVertexBuffer, bufferSize);
+
+		*pOutBuffer = pVertexBuffer;
+		*pOutVertexBufferMemory = pVertexBufferMemory;
+
+		// Clean up staging buffer
+		vkDestroyBuffer(m_Device, stagingBuffer, nullptr);
+		vkFreeMemory(m_Device, stagingBufferMemory, nullptr);
+
+		return VK_SUCCESS;
+	}
+
+	VkResult ResourceManager::CreateIndexBuffer(uint32_t indexDataSize, VkDeviceMemory* pOutIndexBufferMemory, VkBuffer* pOutBuffer, void* pInitData)
+	{
+		VkDeviceSize bufferSize = indexDataSize;
 
 		VkBuffer pIndexBuffer;
 		VkDeviceMemory pIndexBufferMemory;

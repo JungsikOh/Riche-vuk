@@ -161,6 +161,7 @@
     <ClInclude Include="..\ThirdParty\imgui\imstb_textedit.h" />
     <ClInclude Include="..\ThirdParty\imgui\imstb_truetype.h" />
     <ClInclude Include="Editor\Editor.h" />
+    <ClInclude Include="Rendering\BatchSystem.h" />
     <ClInclude Include="Rendering\Camera.h" />
     <ClInclude Include="Rendering\Mesh.h" />
     <ClInclude Include="Rendering\Core.h" />
