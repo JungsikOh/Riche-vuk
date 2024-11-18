@@ -11,6 +11,12 @@ static size_t accumulatedVertexSize = 0;
 static size_t accumulatedIndexSize = 0;
 static uint32_t meshIndex = 0;
 
+struct DrawIndexedIndirectCPU
+{
+    VkDrawIndexedIndirectCommand drawIndexedCommand;
+    uint32_t padding[3];
+};
+
 struct MiniBatch
 {
     VkBuffer m_VertexBuffer = nullptr;

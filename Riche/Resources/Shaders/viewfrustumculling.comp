@@ -1,45 +1,48 @@
 #version 450
-
 layout(local_size_x = 1) in;
 
 // AABB 구조체
-struct AABB {
-    vec4 min;
-    vec4 max;
+struct BoundingSphere {
+    vec3 center;
+    float radius;
 };
 
 // Indirect Draw 명령
 struct IndircetDrawIndexedCommand {
-    uint indexCount;
-    uint instanceCount;
-    uint firstInstance;
-    uint vertexOffset;
+    uint    indexCount;
+    uint    instanceCount;
+    uint    firstIndex;
+    int     vertexOffset;
+    uint    firstInstance;
 };
 
 layout(set = 0, binding = 0) buffer DrawIndexedCommands {
     IndircetDrawIndexedCommand drawIndexedCommands[];
 };
 
-layout(set = 0, binding = 1) buffer AABBBuffer {
-    AABB aabbs[];
+layout(set = 0, binding = 1) uniform BoundingSphereBuffer {
+    BoundingSphere boundingSphereList[5];
 };
 
 layout(set = 0, binding = 2) uniform FrustumPlanes {
     vec4 planes[6];  // View Frustum의 6개 평면
 };
 
-// AABB와 Frustum 간 충돌 검사
-bool IsAABBInFrustum(AABB aabb) 
+layout(set = 0, binding = 3) uniform UboViewProjection {
+	mat4 view;
+	mat4 projection;
+} uboViewProjection;
+
+bool IsSphereInFrustum(BoundingSphere sphere) 
 {
+    vec4 newCenter = uboViewProjection.view * vec4(sphere.center, 1.0);
+
     for (int i = 0; i < 6; ++i) 
     {
-        vec3 positiveVertex = aabb.min.xyz;
-        if (planes[i].x >= 0) positiveVertex.x = aabb.max.x;
-        if (planes[i].y >= 0) positiveVertex.y = aabb.max.y;
-        if (planes[i].z >= 0) positiveVertex.z = aabb.max.z;
-
-        // AABB가 평면 외부에 있는 경우
-        if (dot(planes[i].xyz, positiveVertex) + planes[i].w < 0) 
+        // 평면과 구의 중심 사이의 거리 계산
+        float distance = dot(planes[i].xyz, sphere.center) + planes[i].w;
+        // 구의 반지름이 거리보다 작으면 Frustum 밖에 있는 것
+        if (distance < -sphere.radius) 
         {
             return false;
         }
@@ -47,13 +50,18 @@ bool IsAABBInFrustum(AABB aabb)
     return true;
 }
 
+
+
 void main() {
     uint idx = gl_GlobalInvocationID.x;
     
     // 각 AABB를 Frustum에 대해 검사하고, 포함된 경우 Indirect Draw 명령을 설정
-    if (IsAABBInFrustum(aabbs[idx])) {
+    if (IsSphereInFrustum(boundingSphereList[idx])) 
+    {
         drawIndexedCommands[idx].instanceCount = 1;
-    } else {
-        drawIndexedCommands[idx].instanceCount = 1;
+    }
+    else 
+    {
+        drawIndexedCommands[idx].instanceCount = 0;
     }
 }

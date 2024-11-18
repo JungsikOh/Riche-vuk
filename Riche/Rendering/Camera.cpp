@@ -100,7 +100,7 @@ void Camera::SetProjMat(float fov, float aspect, float zn, float zf)
 
 void Camera::SetViewMat(glm::vec3 pos, glm::vec3 lookAt, glm::vec3 up)
 {
-	m_ViewMat = glm::lookAt(pos, pos+ lookAt, up);
+	m_ViewMat = glm::lookAt(pos, pos + lookAt, up);
 }
 
 void Camera::MoveFoward(float dt)
@@ -139,6 +139,6 @@ void Camera::RotateYaw(int64_t dx)
 	glm::mat4 rotate = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 1.0f, 0.0f));
 
 	m_RightVector = glm::normalize(glm::vec3(rotate * glm::vec4(m_RightVector, 0.0f)));
-	m_UpVector = glm::normalize(glm::vec3(rotate * glm::vec4(m_UpVector, 0.0f)));
 	m_LookVector = glm::normalize(glm::vec3(rotate * glm::vec4(m_LookVector, 0.0f)));
+	m_UpVector = glm::normalize(glm::cross(m_RightVector, m_LookVector));
 }

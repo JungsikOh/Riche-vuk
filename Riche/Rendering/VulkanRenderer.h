@@ -15,6 +15,8 @@
 static const int OBJECT_COUNT = 5;
 
 static std::vector<MiniBatch> g_MiniBatches;
+static std::vector<AABB> aabbList;
+static std::vector<BoundingSphere> bsList;
 
 class Mesh;
 

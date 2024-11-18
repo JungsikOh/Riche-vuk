@@ -144,12 +144,15 @@ int VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* newCamera)
 			std::vector<glm::vec3> positions;
 			for (const BasicVertex& vertex : meshVertices)
 			{
-				positions.push_back(vertex.pos);
+				positions.push_back(m_ModelList.back() * glm::vec4(vertex.pos, 1.0f));
 			}
 
 			AABB aabb = ComputeAABB(positions);
-			aabb.min = mesh.GetModel() * aabb.min;
-			aabb.max = mesh.GetModel() * aabb.max;
+			aabb = TransformAABB(aabb, camera->View() * m_ModelList.back());
+			aabbList.push_back(aabb);
+
+			BoundingSphere bs = ComputeBoundingSphere(positions);
+			bsList.push_back(bs);
 
 			entt::entity entity = m_Registry.create();
 			m_Registry.emplace<Mesh>(entity, mesh);
@@ -957,7 +960,7 @@ void VulkanRenderer::CreateBasicSemaphores()
 
 void VulkanRenderer::CreateInDirectDrawBuffer()
 {
-	std::vector<VkDrawIndexedIndirectCommand> indirectCommands;
+	std::vector<DrawIndexedIndirectCPU> indirectCommands;
 	std::vector<AABB> aabbs;
 	std::array<FrustumPlane, 6> cameraFrustumPlanes = CalculateFrustumPlanes(camera->ViewProj());
 
@@ -969,8 +972,14 @@ void VulkanRenderer::CreateInDirectDrawBuffer()
 		aabbs.push_back(_aabb);
 	}
 
+	for (uint32_t i = 0; i < g_MiniBatches.back().m_DrawIndexedCommands.size(); ++i)
+	{
+		DrawIndexedIndirectCPU temp;
+		temp.drawIndexedCommand = g_MiniBatches.back().m_DrawIndexedCommands[i];
+	}
+
 	VkDeviceSize indirectBufferSize = sizeof(VkDrawIndexedIndirectCommand) * g_MiniBatches.back().m_DrawIndexedCommands.size(); // * object count
-	VkDeviceSize aabbBufferSize = sizeof(AABB) * aabbs.size();
+	VkDeviceSize aabbBufferSize = sizeof(BoundingSphere) * bsList.size();
 	VkDeviceSize cameraPlaneSize = sizeof(FrustumPlane) * cameraFrustumPlanes.size();
 
 	VkUtils::CreateBuffer(mainDevice.logicalDevice, mainDevice.physicalDevice, indirectBufferSize,
@@ -983,12 +992,12 @@ void VulkanRenderer::CreateInDirectDrawBuffer()
 	vkUnmapMemory(mainDevice.logicalDevice, m_InDirectDrawBufferMemory);
 
 	VkUtils::CreateBuffer(mainDevice.logicalDevice, mainDevice.physicalDevice, aabbBufferSize,
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &m_BoundingBoxes, &m_BoundingBoxesMemory);
 
 	pData = nullptr;
 	vkMapMemory(mainDevice.logicalDevice, m_BoundingBoxesMemory, 0, aabbBufferSize, 0, &pData);
-	memcpy(pData, aabbs.data(), aabbBufferSize);
+	memcpy(pData, bsList.data(), aabbBufferSize);
 	vkUnmapMemory(mainDevice.logicalDevice, m_BoundingBoxesMemory);
 
 	VkUtils::CreateBuffer(mainDevice.logicalDevice, mainDevice.physicalDevice, cameraPlaneSize,
@@ -1015,10 +1024,17 @@ void VulkanRenderer::CreateInDirectDrawBuffer()
 	cameraBoundingBoxInfo.offset = 0;								// Position of start of data
 	cameraBoundingBoxInfo.range = cameraPlaneSize;			// size of data
 
+	VkDescriptorBufferInfo uboViewProjectionBufferInfo = {};
+	uboViewProjectionBufferInfo.buffer = m_ViewProjectionUBO;			// Buffer to get data from
+	uboViewProjectionBufferInfo.offset = 0;								// Position of start of data
+	uboViewProjectionBufferInfo.range = sizeof(ViewProjection);			// size of data
+
+
 	VkUtils::DescriptorBuilder indirect = VkUtils::DescriptorBuilder::Begin(m_pLayoutCache.get(), m_pDescriptorAllocator.get());
 	indirect.BindBuffer(0, &indirectBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
-	indirect.BindBuffer(1, &aabbIndirectInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
+	indirect.BindBuffer(1, &aabbIndirectInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 	indirect.BindBuffer(2, &cameraBoundingBoxInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
+	indirect.BindBuffer(3, &uboViewProjectionBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 	m_DescriptorManager.AddDescriptorSet(&indirect, ToWideString("ViewFrustumCulling_COMPUTE"));
 }
 
@@ -1575,11 +1591,11 @@ void VulkanRenderer::FillBasicCommands()
 		throw std::runtime_error("Failed to start recording a Command Buffer!");
 	}
 
-	//vkCmdBindPipeline(m_BasicCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_ViewCullingComputePipeline);
-	//vkCmdBindDescriptorSets(m_BasicCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-	//	m_ViewCullingComputePipelineLayout, 0, 1, &m_DescriptorManager.GetVkDescriptorSet(ToWideString("ViewFrustumCulling_COMPUTE")), 0, nullptr);
+	vkCmdBindPipeline(m_BasicCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_ViewCullingComputePipeline);
+	vkCmdBindDescriptorSets(m_BasicCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+		m_ViewCullingComputePipelineLayout, 0, 1, &m_DescriptorManager.GetVkDescriptorSet(ToWideString("ViewFrustumCulling_COMPUTE")), 0, nullptr);
 
-	//vkCmdDispatch(m_BasicCommandBuffer, OBJECT_COUNT, 1, 1);
+	vkCmdDispatch(m_BasicCommandBuffer, OBJECT_COUNT, 1, 1);
 
 	//Begin Render Pass
 	vkCmdBeginRenderPass(m_BasicCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE); // 렌더 패스의 내용을 직접 명령 버퍼에 기록하는 것을 의미
