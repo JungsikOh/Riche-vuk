@@ -7,6 +7,7 @@
 
 #include "Utils/StringUtil.h"
 
+#include "VkUtils/ChooseFunc.h"
 #include "VkUtils/DescriptorBuilder.h"
 #include "VkUtils/DescriptorManager.h"
 #include "VkUtils/ResourceManager.h"
@@ -57,6 +58,7 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* newCamera)
 		g_ResourceManager.Initialize(mainDevice.logicalDevice, mainDevice.physicalDevice, m_TransferQueue, m_QueueFamilyIndices);
 
 		CreatePushConstantRange();
+
 		m_pCullingRenderPass = std::make_shared<CullingRenderPass>();
 		m_pCullingRenderPass->Initialize(mainDevice.logicalDevice, mainDevice.physicalDevice, m_GraphicsQueue, m_GraphicsCommandPool, camera, swapChainExtent.width, swapChainExtent.height);
 
@@ -151,6 +153,8 @@ void VulkanRenderer::Cleanup()
 {
 	// Wait Until no actions being run on device before destroying
 	vkDeviceWaitIdle(mainDevice.logicalDevice);
+
+	m_pCullingRenderPass->Cleanup();
 
 	editor.Cleanup();
 	auto entityView = m_Registry.view<Mesh>();
@@ -443,12 +447,18 @@ void VulkanRenderer::CreateSwapChain()
 		// Store the depth image handle and depth image memory
 		SwapChainImage depthStencilImage = {};
 		VkDeviceMemory depthStencilImageMemory = {};
+		VkFormat depthImageFormat = VkUtils::ChooseSupportedFormat(
+			mainDevice.physicalDevice,
+			{ VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT },
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+		);
 		VkUtils::CreateImage2D(mainDevice.logicalDevice, mainDevice.physicalDevice,
 			swapChainExtent.width, swapChainExtent.height, &depthStencilImageMemory, &depthStencilImage.image,
-			VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT,
+			depthImageFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, nullptr);
 		VkUtils::CreateImageView(mainDevice.logicalDevice, depthStencilImage.image, &depthStencilImage.imageView,
-			VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_ASPECT_DEPTH_BIT);
+			depthImageFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 
 		// Add to swapchain image list
 		m_SwapChainImages.push_back(swapChainImage);
@@ -512,7 +522,12 @@ void VulkanRenderer::CreateOffScreenRenderPass()
 	swapChainColourAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;			// Image data layout after render pass (to change to)
 
 	VkAttachmentDescription depthStencilAttachment = {};
-	depthStencilAttachment.format = VK_FORMAT_D24_UNORM_S8_UINT;
+	depthStencilAttachment.format = VkUtils::ChooseSupportedFormat(
+		mainDevice.physicalDevice,
+		{ VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT },
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+	);
 	depthStencilAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 	depthStencilAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	depthStencilAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -846,7 +861,7 @@ void VulkanRenderer::CreateSynchronisation()
 	{
 		if (vkCreateSemaphore(mainDevice.logicalDevice, &semaphoreCreateInfo, nullptr, &imageAvailable[i]) != VK_SUCCESS ||
 			vkCreateSemaphore(mainDevice.logicalDevice, &semaphoreCreateInfo, nullptr, &renderFinished[i]) != VK_SUCCESS ||
-			vkCreateFence(mainDevice.logicalDevice, &fenceCreateInfo, nullptr, &drawFences[i]))
+			vkCreateFence(mainDevice.logicalDevice, &fenceCreateInfo, nullptr, &drawFences[i]) != VK_SUCCESS)
 		{
 			throw std::runtime_error("Failed to create a Semaphore and/or Fence!");
 		}
@@ -1127,7 +1142,7 @@ VkSurfaceFormatKHR VulkanRenderer::ChooseBestSurfaceFormat(const std::vector<VkS
 	// If restriceted, search for optimal format
 	for (const auto& format : formats)
 	{
-		if ((format.format == VK_FORMAT_R8G8B8A8_UNORM || format.format == VK_FORMAT_B8G8R8A8_UNORM)
+		if ((format.format == VK_FORMAT_R8G8B8A8_UNORM/* || format.format == VK_FORMAT_B8G8R8A8_UNORM*/)
 			&& format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
 		{
 			return format;
@@ -1177,29 +1192,6 @@ VkExtent2D VulkanRenderer::ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& surf
 
 		return newExtent;
 	}
-}
-
-VkFormat VulkanRenderer::ChooseSupportedFormat(const std::vector<VkFormat>& formats, VkImageTiling tiling, VkFormatFeatureFlags featureFlags)
-{
-	// Loop through options and find compatible one
-	for (VkFormat format : formats)
-	{
-		// Get properties for give format on this device
-		VkFormatProperties properties;
-		vkGetPhysicalDeviceFormatProperties(mainDevice.physicalDevice, format, &properties);
-
-		// Depending on tiling choice, need to check for different bit flag
-		if (tiling == VK_IMAGE_TILING_LINEAR && (properties.linearTilingFeatures & featureFlags) == featureFlags)
-		{
-			return format;
-		}
-		else if (tiling == VK_IMAGE_TILING_OPTIMAL && (properties.optimalTilingFeatures & featureFlags) == featureFlags)
-		{
-			return format;
-		}
-	}
-
-	throw std::runtime_error("Failed to find a matching format!");
 }
 
 void VulkanRenderer::PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)

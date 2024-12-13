@@ -1,5 +1,7 @@
 #include "Editor.h"
 
+#include "VkUtils/ChooseFunc.h"
+
 void Editor::Initialize(GLFWwindow* window, VkInstance instance, VkDevice device, VkPhysicalDevice physicalDevice, VkUtils::QueueFamilyIndices queueFamily, VkQueue graphicsQueue)
 {
 	m_Window = window;
@@ -20,7 +22,11 @@ void Editor::Initialize(GLFWwindow* window, VkInstance instance, VkDevice device
 	// 
 	// SwapChain Colour attacment of render pass
 	VkAttachmentDescription swapChainColourAttachment = {};
-	swapChainColourAttachment.format = VK_FORMAT_B8G8R8A8_UNORM;							// format to use for attachment
+	swapChainColourAttachment.format = VkUtils::ChooseSupportedFormat(
+		mainDevice.physicalDevice, { VK_FORMAT_R8G8B8A8_UNORM },
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT
+	);							// format to use for attachment
 	swapChainColourAttachment.samples = VK_SAMPLE_COUNT_1_BIT;						// number of samples to write for multisampling, relative to multisampling
 	swapChainColourAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;					// Describes what to do with attachment before rendering
 	swapChainColourAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;				// Describes what to do with attachment after rendering
@@ -33,7 +39,11 @@ void Editor::Initialize(GLFWwindow* window, VkInstance instance, VkDevice device
 	swapChainColourAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;			// Image data layout after render pass (to change to)
 
 	VkAttachmentDescription depthStencilAttachment = {};
-	depthStencilAttachment.format = VK_FORMAT_D24_UNORM_S8_UINT;
+	depthStencilAttachment.format = VkUtils::ChooseSupportedFormat(
+		mainDevice.physicalDevice, { VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT },
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+	);
 	depthStencilAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 	depthStencilAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	depthStencilAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;

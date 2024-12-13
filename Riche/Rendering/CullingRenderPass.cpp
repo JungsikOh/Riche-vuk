@@ -4,6 +4,7 @@
 
 #include "Utils/BoundingBox.h"
 
+#include "VkUtils/ChooseFunc.h"
 #include "VkUtils/ShaderModule.h"
 #include "VkUtils/DescriptorManager.h"
 #include "VkUtils/DescriptorBuilder.h"
@@ -230,7 +231,11 @@ void CullingRenderPass::CreateRenderPass()
 	// SUBPASS 1 ATTACHMENTS (INPUT ATTACHMEMNTS)
 	// Colour Attachment
 	VkAttachmentDescription colourAttachment = {};
-	colourAttachment.format = VK_FORMAT_R8G8B8A8_UNORM;
+	colourAttachment.format = VkUtils::ChooseSupportedFormat(
+		m_pPhyscialDevice, { VK_FORMAT_R8G8B8A8_UNORM },
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+	);
 	colourAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 	colourAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	colourAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -240,7 +245,11 @@ void CullingRenderPass::CreateRenderPass()
 	colourAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 	VkAttachmentDescription depthStencilAttachment = {};
-	depthStencilAttachment.format = VK_FORMAT_D24_UNORM_S8_UINT;
+	depthStencilAttachment.format = VkUtils::ChooseSupportedFormat(
+		m_pPhyscialDevice, { VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT },
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+	);
 	depthStencilAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
 	depthStencilAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	depthStencilAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -303,19 +312,31 @@ void CullingRenderPass::CreateRenderPass()
 
 void CullingRenderPass::CreateFreameBuffer()
 {
+	VkFormat colourImageFormat = VkUtils::ChooseSupportedFormat(
+		m_pPhyscialDevice, { VK_FORMAT_R8G8B8A8_UNORM },
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT
+	);
+
 	VkUtils::CreateImage2D(m_pDevice, m_pPhyscialDevice, m_width, m_height,
 		&m_colourBufferImageMemory, &m_colourBufferImage,
-		VK_FORMAT_R8G8B8A8_UNORM,
+		colourImageFormat,
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, nullptr);
-	VkUtils::CreateImageView(m_pDevice, m_colourBufferImage, &m_colourBufferImageView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+	VkUtils::CreateImageView(m_pDevice, m_colourBufferImage, &m_colourBufferImageView, colourImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+
+	VkFormat depthImageFormat = VkUtils::ChooseSupportedFormat(
+		m_pPhyscialDevice, { VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT },
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+	);
 
 	VkUtils::CreateImage2D(m_pDevice, m_pPhyscialDevice, m_width, m_height,
 		&m_depthStencilBufferImageMemory, &m_depthStencilBufferImage,
-		VK_FORMAT_D24_UNORM_S8_UINT,
+		depthImageFormat,
 		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, nullptr);
-	VkUtils::CreateImageView(m_pDevice, m_depthStencilBufferImage, &m_depthStencilBufferImageView, VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_ASPECT_DEPTH_BIT);
+	VkUtils::CreateImageView(m_pDevice, m_depthStencilBufferImage, &m_depthStencilBufferImageView, depthImageFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 
 	std::array<VkImageView, 2> attachments =
 	{

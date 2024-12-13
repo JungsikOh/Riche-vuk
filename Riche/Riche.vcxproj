@@ -106,7 +106,7 @@
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:/dev/VulkanSDK/1.3.290.0/Include;$(SolutionDir)/ThirdParty/GLFW/include;$(SolutionDir)/ThirdParty/GLM;$(SolutionDir)/ThirdParty/imgui;$(SolutionDir)/ThirdParty;$(SolutionDir)/Riche;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:/VulkanSDK/1.3.290.0/Include;$(SolutionDir)/ThirdParty/GLFW/include;$(SolutionDir)/ThirdParty/GLM;$(SolutionDir)/ThirdParty/imgui;$(SolutionDir)/ThirdParty;$(SolutionDir)/Riche;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
@@ -115,7 +115,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:/dev/VulkanSDK/1.3.290.0/Lib;$(SolutionDir)/ThirdParty/GLFW/lib-vc2022;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:/VulkanSDK/1.3.290.0/Lib;$(SolutionDir)/ThirdParty/GLFW/lib-vc2022;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -146,6 +146,7 @@
     <ClCompile Include="Rendering\Camera.cpp" />
     <ClCompile Include="Rendering\CullingRenderPass.cpp" />
     <ClCompile Include="Rendering\Mesh.cpp" />
+    <ClCompile Include="VkUtils\ChooseFunc.h" />
     <ClCompile Include="VkUtils\DescriptorBuilder.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="VkUtils\DescriptorManager.cpp" />
