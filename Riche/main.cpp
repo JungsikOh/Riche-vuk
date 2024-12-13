@@ -90,10 +90,11 @@ int main()
 	g_camera.Initialize(cameraParams);
 
 	// Create Vulkan Renderer Instance
-	if (vulkanRenderer.Initialize(window, &g_camera) == EXIT_FAILURE)
+	vulkanRenderer.Initialize(window, &g_camera);
+	/*if (vulkanRenderer.Initialize(window, &g_camera) == EXIT_FAILURE)
 	{
 		return EXIT_FAILURE;
-	}
+	}*/
 	
 	float angle = 0.0f;
 	float lastTime = 0.0f;

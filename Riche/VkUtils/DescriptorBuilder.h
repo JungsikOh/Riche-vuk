@@ -1,9 +1,13 @@
 #pragma once
 
+#include "Utils/Singleton.h"
+
 namespace VkUtils
 {
-	class DescriptorAllocator
+	class DescriptorAllocator : public Singleton<DescriptorAllocator>
 	{
+		friend class Singleton<DescriptorAllocator>;
+
 	public:
 		struct PoolSizes
 		{
@@ -67,8 +71,10 @@ namespace VkUtils
 		return descriptorPool;
 	}
 
-	class DescriptorLayoutCache
+	class DescriptorLayoutCache : public Singleton<DescriptorLayoutCache>
 	{
+		friend class Singleton<DescriptorLayoutCache>;
+
 	public:
 		DescriptorLayoutCache() = default;
 		~DescriptorLayoutCache() = default;
@@ -120,3 +126,6 @@ namespace VkUtils
 		DescriptorAllocator* alloc;
 	};
 }
+
+#define g_DescriptorAllocator VkUtils::DescriptorAllocator::Get()
+#define g_DescriptorLayoutCache VkUtils::DescriptorLayoutCache::Get()

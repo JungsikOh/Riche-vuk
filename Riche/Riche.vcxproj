@@ -144,6 +144,7 @@
     <ClCompile Include="..\ThirdParty\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Editor\Editor.cpp" />
     <ClCompile Include="Rendering\Camera.cpp" />
+    <ClCompile Include="Rendering\CullingRenderPass.cpp" />
     <ClCompile Include="Rendering\Mesh.cpp" />
     <ClCompile Include="VkUtils\DescriptorBuilder.cpp" />
     <ClCompile Include="main.cpp" />
@@ -163,10 +164,13 @@
     <ClInclude Include="Editor\Editor.h" />
     <ClInclude Include="Rendering\BatchSystem.h" />
     <ClInclude Include="Rendering\Camera.h" />
+    <ClInclude Include="Rendering\IRenderPass.h" />
+    <ClInclude Include="Rendering\CullingRenderPass.h" />
     <ClInclude Include="Rendering\Mesh.h" />
     <ClInclude Include="Rendering\Core.h" />
     <ClInclude Include="Rendering\Swapchain.h" />
     <ClInclude Include="Utils\BoundingBox.h" />
+    <ClInclude Include="Utils\Singleton.h" />
     <ClInclude Include="Utils\StringUtil.h" />
     <ClInclude Include="VkUtils\DescriptorBuilder.h" />
     <ClInclude Include="pch.h" />

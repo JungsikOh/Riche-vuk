@@ -11,24 +11,18 @@ static size_t accumulatedVertexSize = 0;
 static size_t accumulatedIndexSize = 0;
 static uint32_t meshIndex = 0;
 
-struct DrawIndexedIndirectCPU
-{
-    VkDrawIndexedIndirectCommand drawIndexedCommand;
-    uint32_t padding[3];
-};
-
 struct MiniBatch
 {
-    VkBuffer m_VertexBuffer = nullptr;
-    VkDeviceMemory m_VertexBufferMemory;
-    VkBuffer m_IndexBuffer = nullptr;
-    VkDeviceMemory m_IndexBufferMemory;
+    VkBuffer m_vertexBuffer = nullptr;
+    VkDeviceMemory m_vertexBufferMemory;
+    VkBuffer m_indexBuffer = nullptr;
+    VkDeviceMemory m_indexBufferMemory;
 
     uint32_t currentVertexOffset = 0;
     uint32_t currentIndexOffset = 0;
     uint32_t currentBatchSize = 0;
 
-    std::vector<VkDrawIndexedIndirectCommand> m_DrawIndexedCommands;
+    std::vector<VkDrawIndexedIndirectCommand> m_drawIndexedCommands;
 };
 
 static void AddDataToMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::ResourceManager& manager, const Mesh& mesh, bool flag = false) {
@@ -56,7 +50,7 @@ static void AddDataToMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::Res
     drawCommand.vertexOffset = accumulatedVertexSize / sizeof(BasicVertex); // It's not byte offset, Just Index Offset
     drawCommand.firstInstance = meshIndex++;
 
-    currentBatch->m_DrawIndexedCommands.push_back(drawCommand);
+    currentBatch->m_drawIndexedCommands.push_back(drawCommand);
 
     // 누적된 데이터에 현재 메쉬 추가
     accumulatedVertices.insert(accumulatedVertices.end(), mesh.vertices.begin(), mesh.vertices.end());
@@ -70,8 +64,8 @@ static void AddDataToMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::Res
     {
         // 새로운 mini-batch 생성
         MiniBatch miniBatch;
-        manager.CreateVertexBuffer(accumulatedVertexSize, &miniBatch.m_VertexBufferMemory, &miniBatch.m_VertexBuffer, accumulatedVertices.data());
-        manager.CreateIndexBuffer(accumulatedIndexSize, &miniBatch.m_IndexBufferMemory, &miniBatch.m_IndexBuffer, accumulatedIndices.data());
+        manager.CreateVertexBuffer(accumulatedVertexSize, &miniBatch.m_vertexBufferMemory, &miniBatch.m_vertexBuffer, accumulatedVertices.data());
+        manager.CreateIndexBuffer(accumulatedIndexSize, &miniBatch.m_indexBufferMemory, &miniBatch.m_indexBuffer, accumulatedIndices.data());
 
         miniBatch.currentVertexOffset = accumulatedVertexSize;
         miniBatch.currentIndexOffset = accumulatedIndexSize;
@@ -107,8 +101,8 @@ static void FlushMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::Resourc
         miniBatches.push_back(newBatch);
         currentBatch = &miniBatches.back();
     }
-    manager.CreateVertexBuffer(accumulatedVertexSize, &currentBatch->m_VertexBufferMemory, &currentBatch->m_VertexBuffer, accumulatedVertices.data());
-    manager.CreateIndexBuffer(accumulatedIndexSize, &currentBatch->m_IndexBufferMemory, &currentBatch->m_IndexBuffer, accumulatedIndices.data());
+    manager.CreateVertexBuffer(accumulatedVertexSize, &currentBatch->m_vertexBufferMemory, &currentBatch->m_vertexBuffer, accumulatedVertices.data());
+    manager.CreateIndexBuffer(accumulatedIndexSize, &currentBatch->m_indexBufferMemory, &currentBatch->m_indexBuffer, accumulatedIndices.data());
 
     currentBatch->currentVertexOffset = accumulatedVertexSize;
     currentBatch->currentIndexOffset = accumulatedIndexSize;

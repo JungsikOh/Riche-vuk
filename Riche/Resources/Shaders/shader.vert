@@ -3,7 +3,7 @@
 #extension GL_ARB_shader_draw_parameters : enable
 #extension GL_EXT_debug_printf : enable
 
-#define MAX_OBJECTS 5
+#define MAX_OBJECTS 1000
 
 layout(location = 0) in vec3 pos; // output colour for vertex (location is required)
 layout(location = 1) in vec3 col;

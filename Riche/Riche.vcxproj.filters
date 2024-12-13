@@ -60,6 +60,9 @@
     <ClCompile Include="..\ThirdParty\imgui\imgui_widgets.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="Rendering\CullingRenderPass.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="VkUtils\DescriptorBuilder.h">
@@ -132,6 +135,15 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="Rendering\BatchSystem.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Rendering\IRenderPass.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Rendering\CullingRenderPass.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\Singleton.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

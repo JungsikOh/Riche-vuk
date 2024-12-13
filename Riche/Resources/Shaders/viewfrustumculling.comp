@@ -2,6 +2,12 @@
 layout(local_size_x = 1) in;
 
 // AABB 구조체
+struct AABB
+{
+    vec4 minPos;	// minimum coord
+    vec4 maxPos;	// maximum coord
+};
+
 struct BoundingSphere {
     vec3 center;
     float radius;
@@ -21,7 +27,7 @@ layout(set = 0, binding = 0) buffer DrawIndexedCommands {
 };
 
 layout(set = 0, binding = 1) uniform BoundingSphereBuffer {
-    BoundingSphere boundingSphereList[5];
+    AABB boundingSphereList[1000];
 };
 
 layout(set = 0, binding = 2) uniform FrustumPlanes {
@@ -50,13 +56,38 @@ bool IsSphereInFrustum(BoundingSphere sphere)
     return true;
 }
 
+bool IsAABBInFrustum(AABB aabb) 
+{
+    vec4 newMinPos = uboViewProjection.view * aabb.minPos;
+    vec4 newMaxPos = uboViewProjection.view * aabb.maxPos;
+    
+    for (int i = 0; i < 6; ++i) 
+    {
+        vec3 positiveVertex = newMinPos.xyz;
 
+        // 양수 방향 꼭짓점 선택
+        if (planes[i].x >= 0) positiveVertex.x = newMaxPos.x;
+        if (planes[i].y >= 0) positiveVertex.y = newMaxPos.y;
+        if (planes[i].z >= 0) positiveVertex.z = newMaxPos.z;
+
+        // 평면과 꼭짓점 사이의 거리 계산
+        float distance = dot(planes[i].xyz, positiveVertex) + planes[i].w;
+
+        // AABB의 한 좌표라도 평면 안에 있는 경우
+        if (distance > 0) 
+        {
+            return true;
+        }
+    }
+
+    return false; // 프러스텀 밖
+}
 
 void main() {
     uint idx = gl_GlobalInvocationID.x;
     
     // 각 AABB를 Frustum에 대해 검사하고, 포함된 경우 Indirect Draw 명령을 설정
-    if (IsSphereInFrustum(boundingSphereList[idx])) 
+    if (IsAABBInFrustum(boundingSphereList[idx])) 
     {
         drawIndexedCommands[idx].instanceCount = 1;
     }

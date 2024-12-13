@@ -1,12 +1,17 @@
 #pragma once
 #include "QueueFamilyIndices.h"
+
 #include "Rendering/Core.h"
+
+#include "Utils/Singleton.h"
 
 namespace VkUtils
 {
 	// TransferQueue를 이용해서 만들어야하는 Vulkan Object에 대해서 생성하는 클래스
-	class ResourceManager
+	class ResourceManager : public Singleton<ResourceManager>
 	{
+		friend class Singleton<ResourceManager>;
+
 		VkDevice m_Device;
 		VkPhysicalDevice m_PhysicalDevice;
 		QueueFamilyIndices m_QueueFamilyIndices;
@@ -389,3 +394,5 @@ namespace VkUtils
 		);
 	}
 }
+
+#define g_ResourceManager VkUtils::ResourceManager::Get()

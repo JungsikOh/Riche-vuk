@@ -7,7 +7,7 @@ namespace VkUtils
 	{
 	}
 
-	DescriptorHandle DescriptorManager::AddDescriptorSet(DescriptorBuilder* builder, std::wstring const& name)
+	DescriptorHandle DescriptorManager::AddDescriptorSet(DescriptorBuilder* builder, std::string const& name)
 	{
 		if (auto iter = loadedDescriptorSet.find(name) == loadedDescriptorSet.end())
 		{
@@ -31,7 +31,7 @@ namespace VkUtils
 		return descriptorSetMap.find(handle)->second;
 	}
 
-	VkDescriptorSet& DescriptorManager::GetVkDescriptorSet(std::wstring const& name)
+	VkDescriptorSet& DescriptorManager::GetVkDescriptorSet(std::string const& name)
 	{
 		return descriptorSetMap.find(loadedDescriptorSet.find(name)->second)->second;
 	}
@@ -41,7 +41,7 @@ namespace VkUtils
 		return setLayoutMap.find(handle)->second;
 	}
 
-	VkDescriptorSetLayout& DescriptorManager::GetVkDescriptorSetLayout(std::wstring const& name)
+	VkDescriptorSetLayout& DescriptorManager::GetVkDescriptorSetLayout(std::string const& name)
 	{
 		return setLayoutMap.find(loadedSetLayout.find(name)->second)->second;
 	}

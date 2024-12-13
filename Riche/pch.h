@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <fstream>
 #include <assert.h>
+#include <random>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
@@ -24,3 +25,5 @@
 #include <glm/matrix.hpp>
 
 #include "entt/entt.hpp"
+
+#include "Rendering/Core.h"

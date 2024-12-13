@@ -25,3 +25,12 @@ inline VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 
 	return VK_FALSE;
 }
+
+template<typename T>
+std::vector<T*> GetDataPointers(std::vector<std::vector<T>>& allVectors) {
+	std::vector<T*> pointers;
+	for (auto& vec : allVectors) {
+		pointers.push_back(vec.data());
+	}
+	return pointers;
+}

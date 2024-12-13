@@ -12,16 +12,14 @@
 #include "VkUtils/ResourceManager.h"
 #include "VkUtils/QueueFamilyIndices.h"
 
-static const int OBJECT_COUNT = 5;
+static const int OBJECT_COUNT = 1000;
 
 static std::vector<MiniBatch> g_MiniBatches;
 static std::vector<AABB> aabbList;
 static std::vector<BoundingSphere> bsList;
 
 class Mesh;
-
-class DescriptorManager;
-class DescriptorBuilder;
+class CullingRenderPass;
 
 class VulkanRenderer
 {
@@ -29,10 +27,9 @@ public:
 	VulkanRenderer() = default;
 	~VulkanRenderer() = default;
 
-	int Initialize(GLFWwindow* newWindow, Camera* newCamera);
+	void Initialize(GLFWwindow* newWindow, Camera* newCamera);
 
 	void UpdateModel(int modelId, glm::mat4 newModel);
-	void UpdateKeyInput();
 
 	void Draw();
 	void Cleanup();
@@ -71,12 +68,6 @@ private:
 	VkQueue m_PresentationQueue;
 	VkUtils::QueueFamilyIndices m_QueueFamilyIndices;
 
-	std::shared_ptr<VkUtils::DescriptorAllocator> m_pDescriptorAllocator = nullptr;
-	std::shared_ptr<VkUtils::DescriptorLayoutCache> m_pLayoutCache = nullptr;
-
-	VkUtils::DescriptorManager m_DescriptorManager;
-	VkUtils::ResourceManager m_ResoucreManager;
-
 
 	//
 	// Swapcain features
@@ -97,45 +88,7 @@ private:
 	VkPipelineLayout m_OffScreenPipelineLayout;
 	std::vector<VkCommandBuffer> m_SwapchainCommandBuffers;
 
-	//
-	// Basic Render Features
-	//
-	VkRenderPass m_BasicRenderPass;
-	VkPipeline m_BasicPipeline;
-	VkPipelineLayout m_BasicPipelineLayout;
-	VkCommandBuffer m_BasicCommandBuffer;
-
-	VkImage m_ColourBufferImage;
-	VkDeviceMemory m_ColourBufferImageMemory;
-	VkImageView m_ColourBufferImageView;
-
-	VkImage m_DepthBufferImage;
-	VkDeviceMemory m_DepthBufferImageMemory;
-	VkImageView m_DepthBufferImageView;
-
-	VkFramebuffer m_BasicFramebuffer;
-
-	ViewProjection m_ViewProjectionCPU;
-	VkBuffer m_ViewProjectionUBO;
-	VkDeviceMemory m_ViewProjectionUBOMemory;
-
-	std::vector<glm::mat4> m_ModelList;
-	VkBuffer m_ModelListUBO;
-	VkDeviceMemory m_ModelListUBOMemory;
-
-	// -- For Compute shader
-	VkPipeline m_ViewCullingComputePipeline;
-	VkPipelineLayout m_ViewCullingComputePipelineLayout;
-
-	VkBuffer m_InDirectDrawBuffer;
-	VkDeviceMemory m_InDirectDrawBufferMemory;
-	VkBuffer m_BoundingBoxes;
-	VkDeviceMemory m_BoundingBoxesMemory;
-	VkBuffer m_CameraBoudingBox;
-	VkDeviceMemory m_CameraBoudingBoxMemory;
-
-	VkSemaphore m_BasicRenderAvailable;
-	VkFence m_BasicFence;
+	std::shared_ptr<CullingRenderPass> m_pCullingRenderPass;
 
 	entt::registry m_Registry;
 
@@ -167,7 +120,7 @@ private:
 	void CreateInstance();
 	void CreateLogicalDevice();
 	void SetupDebugMessnger();
-	void CreateRenderPass();
+	virtual void CreateRenderPass();
 	//
 	// For Swapchains
 	//
@@ -176,19 +129,11 @@ private:
 	void CreateSwapchainFrameBuffers();
 	void CreateOffScreenRenderPass();
 	void CreateOffScrrenDescriptorSet();
-	void CreateOffScreenPipeline();
-
-	void CreateBasicFramebuffer();
-	void CreateBasicRenderPass();
-	void CreateBasicPipeline();
-	void CreateBasicSemaphores();
-
-	void CreateInDirectDrawBuffer();
-	void CreateComputePipeline();
+	void CreatePipeline();
 
 	void CreateDescriptorSetLayout();
 	void CreatePushConstantRange();
-	
+
 	void CreateCommandPool();
 	void CraeteSwapchainCommandPool();
 
@@ -203,7 +148,6 @@ private:
 	// - Record Functions
 	void RecordCommands(uint32_t currentImage);
 	void FillOffScreenCommands(uint32_t currentImage);
-	void FillBasicCommands();
 
 	// - Get Functions
 	void GetPhysicalDevice();
