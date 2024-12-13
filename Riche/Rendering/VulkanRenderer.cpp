@@ -62,10 +62,8 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* newCamera)
 		m_pCullingRenderPass = std::make_shared<CullingRenderPass>();
 		m_pCullingRenderPass->Initialize(mainDevice.logicalDevice, mainDevice.physicalDevice, m_GraphicsQueue, m_GraphicsCommandPool, camera, swapChainExtent.width, swapChainExtent.height);
 
-		CreateUniformBuffers();
 		CreateSwapchainFrameBuffers();
 
-		CreateDescriptorSets();
 		CreateOffScrrenDescriptorSet();
 
 		CreatePipeline();
@@ -74,10 +72,10 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* newCamera)
 	}
 	catch (const std::runtime_error& e) {
 		printf("ERROR: %s\n", e.what());
-		return ;
+		return;
 	}
 
-	return ;
+	return;
 }
 
 void VulkanRenderer::UpdateModel(int modelId, glm::mat4 newModel)
@@ -101,7 +99,7 @@ void VulkanRenderer::Draw()
 
 	m_pCullingRenderPass->Update();
 	m_pCullingRenderPass->Draw(imageAvailable[imageIndex]);
-		
+
 	RecordCommands(imageIndex);
 
 	// 2. Submit command buffer to queue for execution, making sure it waits for the image to be signalled as available before drawing
@@ -154,9 +152,9 @@ void VulkanRenderer::Cleanup()
 	// Wait Until no actions being run on device before destroying
 	vkDeviceWaitIdle(mainDevice.logicalDevice);
 
+	editor.Cleanup();
 	m_pCullingRenderPass->Cleanup();
 
-	editor.Cleanup();
 	auto entityView = m_Registry.view<Mesh>();
 	for (auto entity : entityView)
 	{
@@ -164,8 +162,10 @@ void VulkanRenderer::Cleanup()
 		_mesh.Cleanup();
 	}
 	vkDestroySampler(mainDevice.logicalDevice, textureSampler, nullptr);
-	//_aligned_free(modelTransferSpace);
+
 	g_ResourceManager.Cleanup();
+	g_DescriptorLayoutCache.Cleanup();
+	g_DescriptorAllocator.Cleanup();
 
 	for (size_t i = 0; i < MAX_FRAME_DRAWS; ++i)
 	{
@@ -185,9 +185,6 @@ void VulkanRenderer::Cleanup()
 	vkDestroyPipelineLayout(mainDevice.logicalDevice, m_OffScreenPipelineLayout, nullptr);
 	vkDestroyRenderPass(mainDevice.logicalDevice, m_OffScreenRenderPass, nullptr);
 
-	g_DescriptorLayoutCache.Cleanup();
-	g_DescriptorAllocator.Cleanup();
-
 	for (auto image : m_SwapChainImages)
 	{
 		// VkImageView는 VkImage를 직접 참조해서 뷰를 생성한 것이므로, 호출해서 파괴해야한다.
@@ -206,7 +203,7 @@ void VulkanRenderer::Cleanup()
 	if (enableValidationLayers)
 	{
 		DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
-}
+	}
 	vkDestroyInstance(instance, nullptr);
 }
 
@@ -642,10 +639,6 @@ void VulkanRenderer::CreateOffScrrenDescriptorSet()
 	g_DescriptorManager.AddDescriptorSet(&inputOffScreen, "OffScreenInput");
 }
 
-void VulkanRenderer::CreateDescriptorSetLayout()
-{
-}
-
 void VulkanRenderer::CreatePushConstantRange()
 {
 	// Define Push constant values(no 'create' needed)
@@ -821,10 +814,6 @@ void VulkanRenderer::CreateCommandPool()
 	VK_CHECK(vkCreateCommandPool(mainDevice.logicalDevice, &poolInfo, nullptr, &m_GraphicsCommandPool));
 }
 
-void VulkanRenderer::CraeteSwapchainCommandPool()
-{
-}
-
 void VulkanRenderer::CreateCommandBuffers()
 {
 	//
@@ -866,18 +855,6 @@ void VulkanRenderer::CreateSynchronisation()
 			throw std::runtime_error("Failed to create a Semaphore and/or Fence!");
 		}
 	}
-}
-
-void VulkanRenderer::CreateUniformBuffers()
-{
-}
-
-void VulkanRenderer::CreateDescriptorSets()
-{
-}
-
-void VulkanRenderer::UpdateUniformBuffers(uint32_t imageIndex)
-{
 }
 
 void VulkanRenderer::RecordCommands(uint32_t currentImage)

@@ -131,6 +131,14 @@ void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDev
 
 void CullingRenderPass::Cleanup()
 {
+	for (auto batch : m_miniBatchList) {
+		vkDestroyBuffer(m_pDevice, batch.m_vertexBuffer, nullptr);
+		vkFreeMemory(m_pDevice, batch.m_vertexBufferMemory, nullptr);
+
+		vkDestroyBuffer(m_pDevice, batch.m_indexBuffer, nullptr);
+		vkFreeMemory(m_pDevice, batch.m_indexBufferMemory, nullptr);
+	}
+
 	vkDestroyImageView(m_pDevice, m_colourBufferImageView, nullptr);
 	vkDestroyImage(m_pDevice, m_colourBufferImage, nullptr);
 	vkFreeMemory(m_pDevice, m_colourBufferImageMemory, nullptr);
@@ -570,6 +578,8 @@ void CullingRenderPass::CraeteComputePipeline()
 	computePipelineCreateInfo.layout = m_viewCullingComputePipelineLayout;
 
 	VK_CHECK(vkCreateComputePipelines(m_pDevice, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &m_viewCullingComputePipeline));
+
+	vkDestroyShaderModule(m_pDevice, computeShaderModule, nullptr);
 }
 
 void CullingRenderPass::CreateBuffers()

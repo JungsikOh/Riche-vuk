@@ -149,6 +149,9 @@ void Editor::Cleanup()
 	ImGui_ImplVulkan_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
+
+	vkDestroyDescriptorPool(mainDevice.logicalDevice, m_ImguiDescriptorPool, nullptr);
+	vkDestroyRenderPass(mainDevice.logicalDevice, renderPass, nullptr);
 }
 
 void Editor::RenderImGui(VkCommandBuffer commandBuffer)

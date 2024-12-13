@@ -7,6 +7,10 @@ namespace VkUtils
 	{
 	}
 
+	void DescriptorManager::Cleanup(VkDevice device)
+	{
+	}
+
 	DescriptorHandle DescriptorManager::AddDescriptorSet(DescriptorBuilder* builder, std::string const& name)
 	{
 		if (auto iter = loadedDescriptorSet.find(name) == loadedDescriptorSet.end())

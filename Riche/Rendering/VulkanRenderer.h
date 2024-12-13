@@ -80,9 +80,6 @@ private:
 	std::vector<VkDeviceMemory> m_SwapchainDepthStencilImageMemories;
 	std::vector<VkFramebuffer> m_SwapChainFramebuffers;
 
-	std::vector<VkDescriptorSet> m_OffScreenDescriptorSets;
-	VkDescriptorSetLayout m_OffScreenSetLayout;
-
 	VkRenderPass m_OffScreenRenderPass;
 	VkPipeline m_OffScreenPipeline;
 	VkPipelineLayout m_OffScreenPipelineLayout;
@@ -131,19 +128,11 @@ private:
 	void CreateOffScrrenDescriptorSet();
 	void CreatePipeline();
 
-	void CreateDescriptorSetLayout();
 	void CreatePushConstantRange();
 
 	void CreateCommandPool();
-	void CraeteSwapchainCommandPool();
-
 	void CreateCommandBuffers();
 	void CreateSynchronisation();
-
-	void CreateUniformBuffers();
-	void CreateDescriptorSets();
-
-	void UpdateUniformBuffers(uint32_t imageIndex);
 
 	// - Record Functions
 	void RecordCommands(uint32_t currentImage);

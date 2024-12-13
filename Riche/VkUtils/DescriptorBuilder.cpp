@@ -93,7 +93,7 @@ namespace VkUtils
 		}
 		else
 		{
-			return CreatePool(device, descriptorSizes, 1000, 0);
+			return CreatePool(device, descriptorSizes, 1000, VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT);
 		}
 	}
 

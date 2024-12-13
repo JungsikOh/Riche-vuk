@@ -29,6 +29,7 @@ namespace VkUtils
 		~DescriptorManager() = default;
 
 		void Initialize();
+		void Cleanup(VkDevice device);
 
 		DescriptorHandle AddDescriptorSet(DescriptorBuilder* builder, std::string const& name);
 		VkDescriptorSet& GetVkDescriptorSet(DescriptorHandle handle);
