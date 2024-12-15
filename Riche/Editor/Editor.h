@@ -14,9 +14,9 @@ class Editor
 		VkPhysicalDevice physicalDevice;
 	} mainDevice;
 
-	VkUtils::QueueFamilyIndices m_QueueFamilyIndices;
+	VkUtils::QueueFamilyIndices m_queueFamilyIndices;
 	VkCommandPool m_GraphicsPool;
-	VkQueue m_GraphicsQueue;
+	VkQueue m_graphicsQueue;
 
 	VkDescriptorPool m_ImguiDescriptorPool;
 	VkRenderPass renderPass;

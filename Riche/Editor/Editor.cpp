@@ -10,8 +10,8 @@ void Editor::Initialize(GLFWwindow* window, VkInstance instance, VkDevice device
 	mainDevice.logicalDevice = device;
 	mainDevice.physicalDevice = physicalDevice;
 
-	m_QueueFamilyIndices = queueFamily;
-	m_GraphicsQueue = graphicsQueue;
+	m_queueFamilyIndices = queueFamily;
+	m_graphicsQueue = graphicsQueue;
 
 	CreateImGuiDescriptorPool();
 	// Array of Subpasses
@@ -129,8 +129,8 @@ void Editor::Initialize(GLFWwindow* window, VkInstance instance, VkDevice device
 	init_info.Instance = m_Instance;
 	init_info.PhysicalDevice = mainDevice.physicalDevice;
 	init_info.Device = mainDevice.logicalDevice;
-	init_info.QueueFamily = m_QueueFamilyIndices.graphicsFamily;
-	init_info.Queue = m_GraphicsQueue;
+	init_info.QueueFamily = m_queueFamilyIndices.graphicsFamily;
+	init_info.Queue = m_graphicsQueue;
 	init_info.PipelineCache = VK_NULL_HANDLE;
 	init_info.DescriptorPool = m_ImguiDescriptorPool; // ImGui 전용 descriptor pool 생성 필요
 	init_info.MinImageCount = MAX_FRAME_DRAWS;

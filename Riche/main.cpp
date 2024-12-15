@@ -123,7 +123,7 @@ int main()
 		secondModel = glm::translate(secondModel, glm::vec3(-1.0f, 0.0f, -1.0f));
 		secondModel = glm::rotate(secondModel, glm::radians(angle * 50), glm::vec3(0.0f, 0.0f, 1.0f));
 
-		vulkanRenderer.UpdateModel(0, firstModel);
+		vulkanRenderer.Update();
 
 		vulkanRenderer.Draw();
 	}

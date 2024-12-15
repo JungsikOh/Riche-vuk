@@ -15,7 +15,7 @@ namespace VkUtils
 		VkCommandPoolCreateInfo poolInfo = {};
 		poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 		poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		poolInfo.queueFamilyIndex = m_QueueFamilyIndices.transferFamily;			// Queue family type that buffers from this command pool will use
+		poolInfo.queueFamilyIndex = m_queueFamilyIndices.transferFamily;			// Queue family type that buffers from this command pool will use
 
 		// Create a Graphics Queue family Command Pool
 		VK_CHECK(vkCreateCommandPool(m_Device, &poolInfo, nullptr, &m_TransferCommandPool));
@@ -50,8 +50,8 @@ namespace VkUtils
 	{
 		m_Device = device;
 		m_PhysicalDevice = physicalDevice;
-		m_TransferQueue = queue;
-		m_QueueFamilyIndices = indices;
+		m_transferQueue = queue;
+		m_queueFamilyIndices = indices;
 		CreateCommandPool();
 	}
 
@@ -83,7 +83,7 @@ namespace VkUtils
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &pVertexBuffer, &pVertexBufferMemory);
 
 		// Copy staging buffer to vertex buffer on GPU
-		CopyBuffer(m_Device, m_TransferQueue, m_TransferCommandPool, stagingBuffer, pVertexBuffer, bufferSize);
+		CopyBuffer(m_Device, m_transferQueue, m_TransferCommandPool, stagingBuffer, pVertexBuffer, bufferSize);
 
 		*pOutBuffer = pVertexBuffer;
 		*pOutVertexBufferMemory = pVertexBufferMemory;
@@ -123,7 +123,7 @@ namespace VkUtils
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &pVertexBuffer, &pVertexBufferMemory);
 
 		// Copy staging buffer to vertex buffer on GPU
-		CopyBuffer(m_Device, m_TransferQueue, m_TransferCommandPool, stagingBuffer, pVertexBuffer, bufferSize);
+		CopyBuffer(m_Device, m_transferQueue, m_TransferCommandPool, stagingBuffer, pVertexBuffer, bufferSize);
 
 		*pOutBuffer = pVertexBuffer;
 		*pOutVertexBufferMemory = pVertexBufferMemory;
@@ -160,7 +160,7 @@ namespace VkUtils
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &pIndexBuffer, &pIndexBufferMemory);
 
 		// Copy staging buffer to vertex buffer on GPU
-		CopyBuffer(m_Device, m_TransferQueue, m_TransferCommandPool, stagingBuffer, pIndexBuffer, bufferSize);
+		CopyBuffer(m_Device, m_transferQueue, m_TransferCommandPool, stagingBuffer, pIndexBuffer, bufferSize);
 
 		*pOutBuffer = pIndexBuffer;
 		*pOutIndexBufferMemory = pIndexBufferMemory;

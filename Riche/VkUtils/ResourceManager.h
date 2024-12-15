@@ -14,9 +14,9 @@ namespace VkUtils
 
 		VkDevice m_Device;
 		VkPhysicalDevice m_PhysicalDevice;
-		QueueFamilyIndices m_QueueFamilyIndices;
+		QueueFamilyIndices m_queueFamilyIndices;
 
-		VkQueue m_TransferQueue;
+		VkQueue m_transferQueue;
 		VkCommandPool m_TransferCommandPool;
 
 		VkFence m_pFence = VK_NULL_HANDLE;

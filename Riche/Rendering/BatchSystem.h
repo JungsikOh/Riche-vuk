@@ -18,9 +18,9 @@ struct MiniBatch
     VkBuffer m_indexBuffer = nullptr;
     VkDeviceMemory m_indexBufferMemory;
 
-    uint32_t currentVertexOffset = 0;
-    uint32_t currentIndexOffset = 0;
-    uint32_t currentBatchSize = 0;
+    uint32_t m_currentVertexOffset = 0;
+    uint32_t m_currentIndexOffset = 0;
+    uint32_t m_currentBatchSize = 0;
 
     std::vector<VkDrawIndexedIndirectCommand> m_drawIndexedCommands;
 };
@@ -67,13 +67,13 @@ static void AddDataToMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::Res
         manager.CreateVertexBuffer(accumulatedVertexSize, &miniBatch.m_vertexBufferMemory, &miniBatch.m_vertexBuffer, accumulatedVertices.data());
         manager.CreateIndexBuffer(accumulatedIndexSize, &miniBatch.m_indexBufferMemory, &miniBatch.m_indexBuffer, accumulatedIndices.data());
 
-        miniBatch.currentVertexOffset = accumulatedVertexSize;
-        miniBatch.currentIndexOffset = accumulatedIndexSize;
-        miniBatch.currentBatchSize = accumulatedVertexSize + accumulatedIndexSize;
+        miniBatch.m_currentVertexOffset = accumulatedVertexSize;
+        miniBatch.m_currentIndexOffset = accumulatedIndexSize;
+        miniBatch.m_currentBatchSize = accumulatedVertexSize + accumulatedIndexSize;
 
         miniBatches.push_back(miniBatch);
 
-        std::cout << "New mini-batch created with size: " << miniBatch.currentBatchSize << " bytes." << std::endl;
+        std::cout << "New mini-batch created with size: " << miniBatch.m_currentBatchSize << " bytes." << std::endl;
 
         // 누적된 데이터 초기화
         accumulatedVertices.clear();
@@ -104,11 +104,11 @@ static void FlushMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::Resourc
     manager.CreateVertexBuffer(accumulatedVertexSize, &currentBatch->m_vertexBufferMemory, &currentBatch->m_vertexBuffer, accumulatedVertices.data());
     manager.CreateIndexBuffer(accumulatedIndexSize, &currentBatch->m_indexBufferMemory, &currentBatch->m_indexBuffer, accumulatedIndices.data());
 
-    currentBatch->currentVertexOffset = accumulatedVertexSize;
-    currentBatch->currentIndexOffset = accumulatedIndexSize;
-    currentBatch->currentBatchSize = accumulatedVertexSize + accumulatedIndexSize;
+    currentBatch->m_currentVertexOffset = accumulatedVertexSize;
+    currentBatch->m_currentIndexOffset = accumulatedIndexSize;
+    currentBatch->m_currentBatchSize = accumulatedVertexSize + accumulatedIndexSize;
 
-    std::cout << "Flushed mini-batch with size: " << currentBatch->currentBatchSize << " bytes." << std::endl;
+    std::cout << "Flushed mini-batch with size: " << currentBatch->m_currentBatchSize << " bytes." << std::endl;
 
     // 누적된 데이터 초기화
     accumulatedVertices.clear();
