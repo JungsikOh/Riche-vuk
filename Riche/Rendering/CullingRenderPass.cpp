@@ -109,7 +109,10 @@ void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDev
   FlushMiniBatch(m_miniBatchList, g_ResourceManager);
 
   CreateRenderPass();
-  CreateFreameBuffer();
+  CreateDepthRenderPass();
+
+  CreateFramebuffer();
+  CreateDepthFramebuffer();
 
   CreateBuffers();
   CreateDesrciptorSets();
@@ -129,6 +132,7 @@ void CullingRenderPass::Cleanup() {
     vkFreeMemory(m_pDevice, batch.m_indexBufferMemory, nullptr);
   }
 
+  // Basic
   vkDestroyImageView(m_pDevice, m_colourBufferImageView, nullptr);
   vkDestroyImage(m_pDevice, m_colourBufferImage, nullptr);
   vkFreeMemory(m_pDevice, m_colourBufferImageMemory, nullptr);
@@ -162,8 +166,19 @@ void CullingRenderPass::Cleanup() {
   vkDestroyPipelineLayout(m_pDevice, m_graphicsPipelineLayout, nullptr);
   vkDestroyRenderPass(m_pDevice, m_renderPass, nullptr);
 
+  // Compute
   vkDestroyPipeline(m_pDevice, m_viewCullingComputePipeline, nullptr);
   vkDestroyPipelineLayout(m_pDevice, m_viewCullingComputePipelineLayout, nullptr);
+
+  // DepthOnly
+  vkDestroyImageView(m_pDevice, m_onlyDepthBufferImageView, nullptr);
+  vkDestroyImage(m_pDevice, m_onlyDepthBufferImage, nullptr);
+  vkFreeMemory(m_pDevice, m_onlyDepthBufferImageMemory, nullptr);
+
+  vkDestroyFramebuffer(m_pDevice, m_depthFramebuffer, nullptr);
+
+  vkDestroyPipeline(m_pDevice, m_depthGraphicePipeline, nullptr);
+  vkDestroyRenderPass(m_pDevice, m_depthRenderPass, nullptr);
 }
 
 void CullingRenderPass::Update() {
@@ -298,7 +313,74 @@ void CullingRenderPass::CreateRenderPass() {
   VK_CHECK(vkCreateRenderPass(m_pDevice, &renderPassCreateInfo, nullptr, &m_renderPass));
 }
 
-void CullingRenderPass::CreateFreameBuffer() {
+void CullingRenderPass::CreateDepthRenderPass() {
+  // Array of Subpasses
+  std::array<VkSubpassDescription, 1> subpasses{};
+
+  // ATTACHMENTS
+  // SUBPASS 1 ATTACHMENTS (INPUT ATTACHMEMNTS)
+  VkAttachmentDescription depthStencilAttachment = {};
+  depthStencilAttachment.format = VkUtils::ChooseSupportedFormat(
+      m_pPhyscialDevice, {VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT}, VK_IMAGE_TILING_OPTIMAL,
+      VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+  depthStencilAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+  depthStencilAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+  depthStencilAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+  depthStencilAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+  depthStencilAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  depthStencilAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  depthStencilAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+  VkAttachmentReference depthStencilAttachmentRef = {};
+  depthStencilAttachmentRef.attachment = 0;
+  depthStencilAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+  // Set up Subpass 1
+  subpasses[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+  subpasses[0].colorAttachmentCount = 0;
+  subpasses[0].pColorAttachments = VK_NULL_HANDLE;
+  subpasses[0].pDepthStencilAttachment = &depthStencilAttachmentRef;
+
+  // Need to determine when layout transitions occur using subpass dependencies
+  std::array<VkSubpassDependency, 2> subpassDependencies;
+
+  // Conversion from VK_IMAGE_LAYER-UNDEFINED to VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+  // Transition must happen after ..
+  subpassDependencies[0].srcSubpass =
+      VK_SUBPASS_EXTERNAL;  // 외부에서 들어오므로, Subpass index(VK_SUBPASS_EXTERNAL = Special value meaning outside of renderpass)
+  subpassDependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;  // Pipeline stage
+  subpassDependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;            // Stage access mask (memory access)
+  // But most happen before ..
+  subpassDependencies[0].dstSubpass = 0;
+  subpassDependencies[0].dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+  subpassDependencies[0].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+  subpassDependencies[0].dependencyFlags = 0;
+
+  // Subpass 1 layout (colour/depth) to Externel(image/image)
+  subpassDependencies[1].srcSubpass = 0;
+  subpassDependencies[1].srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+  subpassDependencies[1].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+  subpassDependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;  // We do not link swapchain. So, dstStageMask is to be SHADER_BIT.
+  subpassDependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+  subpassDependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+  subpassDependencies[1].dependencyFlags = 0;
+
+  std::array<VkAttachmentDescription, 1> renderPassAttachments = {depthStencilAttachment};
+
+  // Create info for Render Pass
+  VkRenderPassCreateInfo renderPassCreateInfo = {};
+  renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+  renderPassCreateInfo.attachmentCount = static_cast<uint32_t>(renderPassAttachments.size());
+  renderPassCreateInfo.pAttachments = renderPassAttachments.data();
+  renderPassCreateInfo.subpassCount = static_cast<uint32_t>(subpasses.size());
+  renderPassCreateInfo.pSubpasses = subpasses.data();
+  renderPassCreateInfo.dependencyCount = static_cast<uint32_t>(subpassDependencies.size());
+  renderPassCreateInfo.pDependencies = subpassDependencies.data();
+
+  VK_CHECK(vkCreateRenderPass(m_pDevice, &renderPassCreateInfo, nullptr, &m_depthRenderPass));
+}
+
+void CullingRenderPass::CreateFramebuffer() {
   VkFormat colourImageFormat = VkUtils::ChooseSupportedFormat(m_pPhyscialDevice, {VK_FORMAT_R8G8B8A8_UNORM}, VK_IMAGE_TILING_OPTIMAL,
                                                               VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT);
 
@@ -331,8 +413,34 @@ void CullingRenderPass::CreateFreameBuffer() {
   VK_CHECK(vkCreateFramebuffer(m_pDevice, &framebufferCreateInfo, nullptr, &m_framebuffer));
 }
 
+void CullingRenderPass::CreateDepthFramebuffer() {
+  VkFormat depthImageFormat = VkUtils::ChooseSupportedFormat(
+      m_pPhyscialDevice, {VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT}, VK_IMAGE_TILING_OPTIMAL,
+      VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+
+  VkUtils::CreateImage2D(m_pDevice, m_pPhyscialDevice, m_width, m_height, &m_onlyDepthBufferImageMemory, &m_onlyDepthBufferImage,
+                         depthImageFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, nullptr);
+  VkUtils::CreateImageView(m_pDevice, m_onlyDepthBufferImage, &m_onlyDepthBufferImageView, depthImageFormat,
+                           VK_IMAGE_ASPECT_DEPTH_BIT);
+
+  std::array<VkImageView, 1> attachments = {m_onlyDepthBufferImageView};
+
+  VkFramebufferCreateInfo framebufferCreateInfo = {};
+  framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+  framebufferCreateInfo.renderPass = m_depthRenderPass;  // Render pass layout the framebuffer will be used with
+  framebufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+  framebufferCreateInfo.pAttachments = attachments.data();  // List of attachments (1:1 with render pass)
+  framebufferCreateInfo.width = m_width;                    // framebuffer width
+  framebufferCreateInfo.height = m_height;                  // framebuffer height
+  framebufferCreateInfo.layers = 1;                         // framebuffer layers
+
+  VK_CHECK(vkCreateFramebuffer(m_pDevice, &framebufferCreateInfo, nullptr, &m_depthFramebuffer));
+}
+
 void CullingRenderPass::CreatePipeline() {
   CraeteGrahpicsPipeline();
+  CreateDepthGraphicsPipeline();
   CraeteComputePipeline();
 }
 
@@ -434,9 +542,9 @@ void CullingRenderPass::CraeteGrahpicsPipeline() {
                  // plane, you can only use this to accept depthBiasClamp of physical device VK_TRUE
   rasterizerCreateInfo.rasterizerDiscardEnable = VK_FALSE;  // Whether tp discard data and skip rasterizer. Never creates fragments
                                                             // only suitable for pipline without framebuffer output.
-  rasterizerCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;           // How to handle filling points between vertices.
-  rasterizerCreateInfo.lineWidth = 1.0f;                             // How thick lines should be when drawn
-  rasterizerCreateInfo.cullMode = VK_CULL_MODE_NONE;                 // Which face of a tri to cull
+  rasterizerCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;  // How to handle filling points between vertices.
+  rasterizerCreateInfo.lineWidth = 1.0f;                    // How thick lines should be when drawn
+  rasterizerCreateInfo.cullMode = VK_CULL_MODE_NONE;        // Which face of a tri to cull
   rasterizerCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;  // Winding to determine which side in front
   rasterizerCreateInfo.depthBiasEnable =
       VK_FALSE;  // Whether to add depth bias to fragments (good for stopping "shadow acne" in shadow mapping
@@ -522,6 +630,176 @@ void CullingRenderPass::CraeteGrahpicsPipeline() {
   // Destroy second shader modules
   vkDestroyShaderModule(m_pDevice, vertexShaderModule, nullptr);
   vkDestroyShaderModule(m_pDevice, fragmentShaderModule, nullptr);
+}
+
+void CullingRenderPass::CreateDepthGraphicsPipeline() {
+  auto vertexShaderCode = VkUtils::ReadFile("Resources/Shaders/DepthOnlyVS.spv");
+
+  // Build Shaders
+  VkShaderModule vertexShaderModule = VkUtils::CreateShaderModule(m_pDevice, vertexShaderCode);
+
+  // Set new shaders
+  // Vertex Stage Creation information
+  VkPipelineShaderStageCreateInfo vertexShaderCreateInfo = {};
+  vertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  vertexShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;  // Shader stage name
+  vertexShaderCreateInfo.module = vertexShaderModule;         // Shader moudle to be used by stage
+  vertexShaderCreateInfo.pName = "main";                      // Entry point in to shader
+
+  VkPipelineShaderStageCreateInfo shaderStages[] = {vertexShaderCreateInfo};
+
+  // -- VERTEX INPUT --
+  // -- Create Pipeline --
+  // How the data for a single vertex (including info suach as position, colour, textuer coords, normals, etc) is as a whole.
+  VkVertexInputBindingDescription bindingDescription = {};
+  bindingDescription.binding = 0;                                          // Can bind multiple streams of data, this defines which one
+  bindingDescription.stride = static_cast<uint32_t>(sizeof(BasicVertex));  // size of a single vertex object
+  bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;              // How to move between data after each vertex
+  // VK_VERTEX_INPUT_RATE_VERTEX		: Move on to the next vertex
+  // VK_VERTEX_INPUT_RATE_INSTANCE	: Move to a vertex for the next instance
+
+  // How the data for an attribute is defined whithin a vertex
+  std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions;
+  // Position Attribute
+  attributeDescriptions[0].binding = 0;                          // Which binding the data is at (should be same as above)
+  attributeDescriptions[0].location = 0;                         // Location in shader where data will be read from
+  attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;  // Format the data will take (also helps define size of data)
+  attributeDescriptions[0].offset = offsetof(BasicVertex, pos);  // Where this attribute is defined in the data for a single vertex.
+  // Colour Attribute
+  attributeDescriptions[1].binding = 0;                          // Which binding the data is at (should be same as above)
+  attributeDescriptions[1].location = 1;                         // Location in shader where data will be read from
+  attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;  // Format the data will take (also helps define size of data)
+  attributeDescriptions[1].offset = offsetof(BasicVertex, col);  // Where this attribute is defined in the data for a single vertex.
+  // Texture Attribute
+  attributeDescriptions[2].binding = 0;
+  attributeDescriptions[2].location = 2;
+  attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+  attributeDescriptions[2].offset = offsetof(BasicVertex, tex);
+  // -- VERTEX INPUT --
+  VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo = {};
+  vertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+  vertexInputCreateInfo.vertexBindingDescriptionCount = 1;
+  vertexInputCreateInfo.pVertexBindingDescriptions =
+      &bindingDescription;  // List of Vertex binding descriptions (data spacing / stride information)
+  vertexInputCreateInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+  vertexInputCreateInfo.pVertexAttributeDescriptions =
+      attributeDescriptions.data();  // List of Vertex Attribute Descripitions ( data format and where to bind from)
+
+  // -- INPUT ASSEMBLY --
+  VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+  inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+  // List versus Strip: 연속된 점(Strip), 딱 딱 끊어서 (List)
+  inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;  // Primitive type to assemble vertices
+  inputAssembly.primitiveRestartEnable = VK_FALSE;               // Allow overriding of "strip" topology to start new primitives
+
+  // -- VIPEPORT & SCISSOR --
+  // Create a viewport info struct
+  VkViewport viewport = {};
+  viewport.x = 0.0f;                  // x start coordinate
+  viewport.y = 0.0f;                  // y start coordinate
+  viewport.width = (float)m_width;    // width of viewport
+  viewport.height = (float)m_height;  // height of viewport
+  viewport.minDepth = 0.0f;           // min framebuffer depth
+  viewport.maxDepth = 1.0f;           // max framebuffer depth
+
+  // Create a scissor info struct
+  VkRect2D scissor = {};
+  scissor.offset = {0, 0};               // offset to use region from
+  scissor.extent = {m_width, m_height};  // extent to describe region to use, starting at offset
+
+  VkPipelineViewportStateCreateInfo viewportStateCreateInfo = {};
+  viewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+  viewportStateCreateInfo.viewportCount = 1;
+  viewportStateCreateInfo.pViewports = &viewport;
+  viewportStateCreateInfo.scissorCount = 1;
+  viewportStateCreateInfo.pScissors = &scissor;
+
+  // -- RASTERIZER --
+  VkPipelineRasterizationStateCreateInfo rasterizerCreateInfo = {};
+  rasterizerCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+  rasterizerCreateInfo.depthClampEnable =
+      VK_FALSE;  // Change if fragments beyond near/far planes are clipped (default) or clamped to
+                 // plane, you can only use this to accept depthBiasClamp of physical device VK_TRUE
+  rasterizerCreateInfo.rasterizerDiscardEnable = VK_FALSE;  // Whether tp discard data and skip rasterizer. Never creates fragments
+                                                            // only suitable for pipline without framebuffer output.
+  rasterizerCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;  // How to handle filling points between vertices.
+  rasterizerCreateInfo.lineWidth = 1.0f;                    // How thick lines should be when drawn
+  rasterizerCreateInfo.cullMode = VK_CULL_MODE_NONE;        // Which face of a tri to cull
+  rasterizerCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;  // Winding to determine which side in front
+  rasterizerCreateInfo.depthBiasEnable =
+      VK_FALSE;  // Whether to add depth bias to fragments (good for stopping "shadow acne" in shadow mapping
+
+  // -- MULTISAMPLING --
+  VkPipelineMultisampleStateCreateInfo multisamplingCreateInfo = {};
+  multisamplingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+  multisamplingCreateInfo.sampleShadingEnable = VK_FALSE;                // Enable multisample shading or not
+  multisamplingCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;  // Number of samples to use per fragment (e.g. 4xMSAA, 8xMSAA)
+
+  // -- BLENDING --
+  // Blending decides how to blend a new colour being written to a fragment, with the old value
+  // Blend Attacment State (how blending is handled)
+  VkPipelineColorBlendAttachmentState colourState = {};
+  colourState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
+                               VK_COLOR_COMPONENT_A_BIT;  // Colours to apply blending to
+  colourState.blendEnable = VK_FALSE;                      // Enable Blending
+
+  // Blending uses equation: (srcColorBlendFactor * new colour) colorBlendOp (dstColorBlendFactor * old colour)
+  colourState.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;            // if it is 0.3
+  colourState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;  // this is (1.0 - 0.3)
+  colourState.colorBlendOp = VK_BLEND_OP_ADD;
+  // Summarised: (SRC_ALPHA * new colour) + (MINUS_SRC_ALPHA * old colour) == (alpha * new ) + (1 - alpha * old)
+
+  colourState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+  colourState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+  colourState.alphaBlendOp = VK_BLEND_OP_ADD;
+  // Summarised: (1 * new alpha) + (0 * old alpha) == new alpha
+
+  VkPipelineColorBlendStateCreateInfo colourBlendingCreateInfo = {};
+  colourBlendingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+  colourBlendingCreateInfo.logicOpEnable = VK_FALSE;  // Alternative to calculations is to use logical operations
+  colourBlendingCreateInfo.attachmentCount = 0;
+  colourBlendingCreateInfo.pAttachments = VK_NULL_HANDLE;
+
+  //
+  // Use Graphics Pipeline Layout
+  //
+
+  // Don't want to write to depth buffer
+  // -- DEPTH STENCIL TESTING --
+  VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo = {};
+  depthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+  depthStencilCreateInfo.depthTestEnable = VK_TRUE;            // Enable checking depth to determine fragment wrtie
+  depthStencilCreateInfo.depthWriteEnable = VK_TRUE;           // Enable writing to depth buffer (to replace old values)
+  depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;  // Comparison operation that allows an overwrite (is in front)
+  depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;     // Depth Bounds Test: Does the depth value exist between two bounds, 즉
+                                                            // 픽셀의 깊이 값이 특정 범위 안에 있는지를 체크하는 검사
+  depthStencilCreateInfo.stencilTestEnable = VK_FALSE;  // Enable Stencil Test
+
+  // -- GRAPHICS PIPELINE CREATION --
+  VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
+  pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+  pipelineCreateInfo.stageCount = 1;                              // Number of shader stages
+  pipelineCreateInfo.pStages = shaderStages;                      // List of shader stages
+  pipelineCreateInfo.pVertexInputState = &vertexInputCreateInfo;  // All the fixed function pipeline states
+  pipelineCreateInfo.pInputAssemblyState = &inputAssembly;
+  pipelineCreateInfo.pViewportState = &viewportStateCreateInfo;
+  pipelineCreateInfo.pDynamicState = nullptr;
+  pipelineCreateInfo.pRasterizationState = &rasterizerCreateInfo;
+  pipelineCreateInfo.pMultisampleState = &multisamplingCreateInfo;
+  pipelineCreateInfo.pColorBlendState = &colourBlendingCreateInfo;
+  pipelineCreateInfo.pDepthStencilState = &depthStencilCreateInfo;
+  pipelineCreateInfo.layout = m_graphicsPipelineLayout;  // Pipeline Laytout pipeline should use
+  pipelineCreateInfo.renderPass = m_depthRenderPass;          // Render pass description the pipeline is compatible with
+  pipelineCreateInfo.subpass = 0;                        // Subpass of render pass to use with pipeline
+
+  // Pipeline Derivatives : can create multiple pipeline that derive from one another for optimization
+  pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;  // Existing pipline to derive from
+  pipelineCreateInfo.basePipelineIndex = -1;  // or index of pipeline being created to derive from (in case createing multiple at once)
+
+  VK_CHECK(vkCreateGraphicsPipelines(m_pDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_depthGraphicePipeline));
+
+  // Destroy second shader modules
+  vkDestroyShaderModule(m_pDevice, vertexShaderModule, nullptr);
 }
 
 void CullingRenderPass::CraeteComputePipeline() {
@@ -689,7 +967,66 @@ void CullingRenderPass::RecordCommands() {
   VkCommandBufferBeginInfo bufferBeginInfo = {};
   bufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   bufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;  // Buffer can be resubmitted when it has already been
-                                                                         // submitted and is awaiting execution
+                                                                         // submitted and is awaiting executi
+
+  // Start recording commands to command buffer!
+  VkResult result = vkBeginCommandBuffer(m_commandBuffer, &bufferBeginInfo);
+  if (result != VK_SUCCESS) {
+    throw std::runtime_error("Failed to start recording a Command Buffer!");
+  }
+
+  vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipeline);
+  vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 0, 1,
+                          &g_DescriptorManager.GetVkDescriptorSet("ViewFrustumCulling_COMPUTE"), 0, nullptr);
+
+  vkCmdDispatch(m_commandBuffer, 1000, 1, 1);
+
+  // Information about how to begin a render pass (only needed for graphical applications)
+  VkRenderPassBeginInfo depthOnlyRenderPassBeginInfo = {};
+  depthOnlyRenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+  depthOnlyRenderPassBeginInfo.renderPass = m_depthRenderPass;  // Render Pass to begin
+  depthOnlyRenderPassBeginInfo.renderArea.offset = {0, 0};      // Start point of render pass in pixels
+  depthOnlyRenderPassBeginInfo.renderArea.extent = {m_width, m_height};  // Size of region to run render pass on (starting at offset)
+
+  std::array<VkClearValue, 1> depthOnlyClearValue = {};
+  depthOnlyClearValue[0].depthStencil = {1.0f, 0};
+
+  depthOnlyRenderPassBeginInfo.pClearValues = depthOnlyClearValue.data();  // List of clear values
+  depthOnlyRenderPassBeginInfo.clearValueCount = static_cast<uint32_t>(depthOnlyClearValue.size());
+  depthOnlyRenderPassBeginInfo.framebuffer = m_depthFramebuffer;
+
+  // Begin Render Pass
+  vkCmdBeginRenderPass(m_commandBuffer, &depthOnlyRenderPassBeginInfo,
+                       VK_SUBPASS_CONTENTS_INLINE);  // 렌더 패스의 내용을 직접 명령 버퍼에 기록하는 것을 의미
+
+  // Bind Pipeline to be used in render pass
+  vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_depthGraphicePipeline);
+
+  //
+  // mini-batch system
+  //
+  for (auto miniBatch : m_miniBatchList) {
+    // Bind the vertex buffer with the correct offset
+    VkDeviceSize vertexOffset = 0;  // Always bind at offset 0 since indirect commands handle offsets
+    vkCmdBindVertexBuffers(m_commandBuffer, 0, 1, &miniBatch.m_vertexBuffer, &vertexOffset);
+
+    // Bind the index buffer with the correct offset
+    vkCmdBindIndexBuffer(m_commandBuffer, miniBatch.m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 0, 1,
+                            &g_DescriptorManager.GetVkDescriptorSet("ViewProjection"), 0, nullptr);
+
+    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 1, 1,
+                            &g_DescriptorManager.GetVkDescriptorSet("ModelList"), 0, nullptr);
+
+    uint32_t drawCount = static_cast<uint32_t>(miniBatch.m_drawIndexedCommands.size());
+    vkCmdDrawIndexedIndirect(m_commandBuffer, m_indirectDrawBuffer,
+                             0,                                    // offset
+                             drawCount,                            // drawCount
+                             sizeof(VkDrawIndexedIndirectCommand)  // stride
+    );
+  }
+  vkCmdEndRenderPass(m_commandBuffer);
 
   // Information about how to begin a render pass (only needed for graphical applications)
   VkRenderPassBeginInfo renderPassBeginInfo = {};
@@ -706,18 +1043,6 @@ void CullingRenderPass::RecordCommands() {
   renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
 
   renderPassBeginInfo.framebuffer = m_framebuffer;
-
-  // Start recording commands to command buffer!
-  VkResult result = vkBeginCommandBuffer(m_commandBuffer, &bufferBeginInfo);
-  if (result != VK_SUCCESS) {
-    throw std::runtime_error("Failed to start recording a Command Buffer!");
-  }
-
-  vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipeline);
-  vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 0, 1,
-                          &g_DescriptorManager.GetVkDescriptorSet("ViewFrustumCulling_COMPUTE"), 0, nullptr);
-
-  vkCmdDispatch(m_commandBuffer, 1000, 1, 1);
 
   // Begin Render Pass
   vkCmdBeginRenderPass(m_commandBuffer, &renderPassBeginInfo,

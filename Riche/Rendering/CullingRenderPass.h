@@ -26,10 +26,14 @@ class CullingRenderPass : public IRenderPass {
  private:
   // - Rendering Pipeline
   virtual void CreateRenderPass();
-  virtual void CreateFreameBuffer();
+  void CreateDepthRenderPass();
+
+  virtual void CreateFramebuffer();
+  void CreateDepthFramebuffer();
 
   virtual void CreatePipeline();
   void CraeteGrahpicsPipeline();
+  void CreateDepthGraphicsPipeline();
   void CraeteComputePipeline();
 
   virtual void CreateBuffers();
@@ -74,12 +78,20 @@ class CullingRenderPass : public IRenderPass {
   VkSemaphore m_renderAvailable;
   VkFence m_fence;
 
-  // - Compute Pipeline
+  // -- Only Depth Rendering Pipeline
+  VkRenderPass m_depthRenderPass;
+
+  VkPipeline m_depthGraphicePipeline;   // Use a same GraphicsPipelineLayout
+
+  VkImage m_onlyDepthBufferImage;
+  VkDeviceMemory m_onlyDepthBufferImageMemory;
+  VkImageView m_onlyDepthBufferImageView;
+
+  VkFramebuffer m_depthFramebuffer;
+
+  // -- Compute Pipeline
   VkPipeline m_viewCullingComputePipeline;
   VkPipelineLayout m_viewCullingComputePipelineLayout;
-
-  VkPipeline m_occlsionCullingComputePipeline;
-  VkPipelineLayout m_occlsionCullingComputePipelineLayout;
 
   // -- Indirect Draw Call
   VkBuffer m_indirectDrawBuffer;

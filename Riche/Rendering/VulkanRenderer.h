@@ -101,11 +101,10 @@ class VulkanRenderer {
 
  private:
   // Vulkan Functions
-  // - Create Functions
   void CreateInstance();
   void CreateLogicalDevice();
   void SetupDebugMessnger();
-  virtual void CreateRenderPass();
+  
   //
   // For Swapchains
   //
@@ -115,6 +114,7 @@ class VulkanRenderer {
   //
   // Rendering Pipeline
   //
+  void CreateRenderPass();
   void CreateOffScreenRenderPass();
   void CreateOffScrrenDescriptorSet();
   void CreatePipeline();
@@ -151,7 +151,7 @@ class VulkanRenderer {
   // -- Getter Functions
   SwapChainDetails GetSwapChainDetails(VkPhysicalDevice device);
 
-  // -- Choose Functions
+  // -- Choose Functions (For Swapchain)
   VkSurfaceFormatKHR ChooseBestSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats);
   VkPresentModeKHR ChooseBestPresentationMode(const std::vector<VkPresentModeKHR> presentationModes);
   VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& surfaceCapabilities);
