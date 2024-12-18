@@ -33,8 +33,10 @@ class CullingRenderPass : public IRenderPass {
 
   virtual void CreatePipeline();
   void CraeteGrahpicsPipeline();
+  void CreateWireGraphicsPipeline();
   void CreateDepthGraphicsPipeline();
-  void CraeteComputePipeline();
+  void CraeteViewCullingComputePipeline();
+  void CreateOcclusionCullingComputePipeline();
 
   virtual void CreateBuffers();
   void CreateShaderStorageBuffers();
@@ -61,6 +63,9 @@ class CullingRenderPass : public IRenderPass {
 
   VkPipeline m_graphicsPipeline;
   VkPipelineLayout m_graphicsPipelineLayout;
+
+  // -- Debugging (wireframe)
+  VkPipeline m_wireGraphicsPipeline;
 
   VkImage m_colourBufferImage;
   VkDeviceMemory m_colourBufferImageMemory;
@@ -92,6 +97,8 @@ class CullingRenderPass : public IRenderPass {
   // -- Compute Pipeline
   VkPipeline m_viewCullingComputePipeline;
   VkPipelineLayout m_viewCullingComputePipelineLayout;
+
+  VkPipeline m_occlusionCullingComputePipeline;
 
   // -- Indirect Draw Call
   VkBuffer m_indirectDrawBuffer;

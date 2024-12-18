@@ -2,6 +2,7 @@
 #include "BatchSystem.h"
 #include "Components.h"
 #include "Editor/Editor.h"
+#include "RenderSetting.h"
 #include "Mesh.h"
 #include "Swapchain.h"
 #include "VkUtils/DescriptorBuilder.h"
@@ -10,10 +11,6 @@
 #include "VkUtils/ResourceManager.h"
 
 static const int OBJECT_COUNT = 1000;
-
-static std::vector<MiniBatch> g_MiniBatches;
-static std::vector<AABB> aabbList;
-static std::vector<BoundingSphere> bsList;
 
 class Camera;
 class Mesh;
@@ -97,7 +94,12 @@ class VulkanRenderer {
   VkCommandPool m_graphicsCommandPool;
   VkCommandPool m_computeCommandPool;
 
-  VkSampler textureSampler;
+  // - Samplers
+  VkSampler m_linearWrapSS;
+  VkSampler m_linearClampSS;
+  VkSampler m_linearBorderSS;
+  VkSampler m_pointWrapSS;
+  VkSampler m_pointClampSS;
 
  private:
   // Vulkan Functions

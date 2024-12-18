@@ -170,7 +170,11 @@ void VulkanRenderer::Cleanup() {
     vkFreeMemory(mainDevice.logicalDevice, m_swapchainDepthStencilImageMemories[i], nullptr);
   }
 
-  vkDestroySampler(mainDevice.logicalDevice, textureSampler, nullptr);
+  vkDestroySampler(mainDevice.logicalDevice, m_linearWrapSS, nullptr);
+  vkDestroySampler(mainDevice.logicalDevice, m_linearClampSS, nullptr);
+  vkDestroySampler(mainDevice.logicalDevice, m_linearBorderSS, nullptr);
+  vkDestroySampler(mainDevice.logicalDevice, m_pointWrapSS, nullptr);
+  vkDestroySampler(mainDevice.logicalDevice, m_pointClampSS, nullptr);
 
   for (size_t i = 0; i < MAX_FRAME_DRAWS; ++i) {
     vkDestroySemaphore(mainDevice.logicalDevice, imageAvailable[i], nullptr);
@@ -296,6 +300,7 @@ void VulkanRenderer::CreateLogicalDevice() {
   deviceFeatures.samplerAnisotropy = VK_TRUE;
   deviceFeatures.multiDrawIndirect = VK_TRUE;
   deviceFeatures.drawIndirectFirstInstance = VK_TRUE;
+  deviceFeatures.fillModeNonSolid = VK_TRUE;
 
   deviceCreateInfo.pEnabledFeatures = &deviceFeatures;  // Physical device features logical device will use
 
@@ -549,41 +554,38 @@ void VulkanRenderer::CreateOffScreenRenderPass() {
 }
 
 void VulkanRenderer::CreateOffScrrenDescriptorSet() {
-  // Sampler Creation Info
-  VkSamplerCreateInfo samplerCreateInfo = {};
-  samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-  samplerCreateInfo.magFilter = VK_FILTER_LINEAR;                      // How to render when image is magnified on screen
-  samplerCreateInfo.minFilter = VK_FILTER_LINEAR;                      // How to render when image is minified on screen
-  samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;     // How to handle texture wrap in U(x) direction
-  samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;     // How to handle texture wrap in U(y) direction
-  samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;     // How to handle texture wrap in U(z) direction
-  samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;  // Border beyond texture (only works for border clamp)
-  samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;                // Whether coords should be normalized (between 0 and 1)
-  samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;        // Mipmap interpolation mode
-  samplerCreateInfo.mipLodBias = 0.0f;                                 // Level of Detatils bias for mip level
-  samplerCreateInfo.minLod = 0.0f;                                     // Minimum Level of Detail to pick mip level
-  samplerCreateInfo.maxLod = 0.0f;                                     // Maximum Level of Detail to pick mip level
-  samplerCreateInfo.anisotropyEnable = VK_TRUE;                        // Enable Anisotropy
-  samplerCreateInfo.maxAnisotropy = 16;                                // Anisotropy sample level
+  VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_FILTER_LINEAR, &m_linearWrapSS, false);
+  VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_FILTER_LINEAR, &m_linearClampSS, false);
+  VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_FILTER_LINEAR, &m_linearBorderSS,
+                         false);
+  VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_FILTER_NEAREST, &m_pointWrapSS, false);
+  VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_FILTER_NEAREST, &m_pointClampSS, false);
 
-  VkResult result = vkCreateSampler(mainDevice.logicalDevice, &samplerCreateInfo, nullptr, &textureSampler);
-  if (result != VK_SUCCESS) {
-    throw std::runtime_error("Failed to create a texture sampler!");
+  VkUtils::DescriptorBuilder samplerListBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
+  std::vector<VkDescriptorImageInfo> samplerDescriptorInfos = {{m_linearWrapSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED},
+                                                               {m_linearClampSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED},
+                                                               {m_linearBorderSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED},
+                                                               {m_pointWrapSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED},
+                                                               {m_pointClampSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED}};
+  for (int i = 0; i < samplerDescriptorInfos.size(); ++i) {
+    samplerListBuilder.BindImage(i, &samplerDescriptorInfos[i], VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_ALL);
   }
+  g_DescriptorManager.AddDescriptorSet(&samplerListBuilder, "SamplerList_ALL");
+
   // CREATE INPUT ATTACHMENT IMAGE DESCRIPTOR SET LAYOUT
   VkDescriptorImageInfo colourAttachmentDescriptor = {};
   colourAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-  colourAttachmentDescriptor.imageView = m_pCullingRenderPass.get()->GetFrameBufferImageView();
-  colourAttachmentDescriptor.sampler = textureSampler;
+  colourAttachmentDescriptor.imageView = m_pCullingRenderPass->GetFrameBufferImageView();
+  colourAttachmentDescriptor.sampler = VK_NULL_HANDLE;
 
   VkDescriptorImageInfo depthAttachmentDescriptor = {};
   depthAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-  depthAttachmentDescriptor.imageView = m_pCullingRenderPass.get()->GetDepthStencilImageView();
-  depthAttachmentDescriptor.sampler = textureSampler;
+  depthAttachmentDescriptor.imageView = m_pCullingRenderPass->GetDepthStencilImageView();
+  depthAttachmentDescriptor.sampler = VK_NULL_HANDLE;
 
   VkUtils::DescriptorBuilder inputOffScreen = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
-  inputOffScreen.BindImage(0, &colourAttachmentDescriptor, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-  inputOffScreen.BindImage(1, &depthAttachmentDescriptor, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+  inputOffScreen.BindImage(0, &colourAttachmentDescriptor, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT);
+  // inputOffScreen.BindImage(1, &depthAttachmentDescriptor, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT);
 
   g_DescriptorManager.AddDescriptorSet(&inputOffScreen, "OffScreenInput");
 }
@@ -705,11 +707,14 @@ void VulkanRenderer::CreatePipeline() {
   colourBlendingCreateInfo.attachmentCount = 1;
   colourBlendingCreateInfo.pAttachments = &colourState;
 
+  std::array<VkDescriptorSetLayout, 2> setLayouts = {g_DescriptorManager.GetVkDescriptorSetLayout("SamplerList_ALL"),
+                                                     g_DescriptorManager.GetVkDescriptorSetLayout("OffScreenInput")};
+
   // -- PIPELINE LAYOUT (It's like Root signature in D3D12) --
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
   pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  pipelineLayoutCreateInfo.setLayoutCount = 1;
-  pipelineLayoutCreateInfo.pSetLayouts = &g_DescriptorManager.GetVkDescriptorSetLayout("OffScreenInput");
+  pipelineLayoutCreateInfo.setLayoutCount = setLayouts.size();
+  pipelineLayoutCreateInfo.pSetLayouts = setLayouts.data();
   pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
   pipelineLayoutCreateInfo.pPushConstantRanges = VK_NULL_HANDLE;
 
@@ -840,6 +845,8 @@ void VulkanRenderer::FillOffScreenCommands(uint32_t currentImage) {
   vkCmdBindPipeline(m_swapchainCommandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_offScreenPipeline);
 
   vkCmdBindDescriptorSets(m_swapchainCommandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_offScreenPipelineLayout, 0, 1,
+                          &g_DescriptorManager.GetVkDescriptorSet("SamplerList_ALL"), 0, nullptr);
+  vkCmdBindDescriptorSets(m_swapchainCommandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_offScreenPipelineLayout, 1, 1,
                           &g_DescriptorManager.GetVkDescriptorSet("OffScreenInput"), 0, nullptr);
 
   vkCmdDraw(m_swapchainCommandBuffers[currentImage], 3, 1, 0, 0);
@@ -1088,7 +1095,7 @@ void VulkanRenderer::PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreat
   createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
   // messageSeverity filed allows 어떤 심각도에 대해 debug를 보여줄 것인가. 즉, 심각도 수준을 선택
   createInfo.messageSeverity = /*VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |*/
-                               VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+      VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
   // 어떤 유형의 디버그 메세지를 받을 것인지 설정. GENERAL_BIT / VALIDATION_BIT / PERFORMANCE_BIT
   createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                            VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;

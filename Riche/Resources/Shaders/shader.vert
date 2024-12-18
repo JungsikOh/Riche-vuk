@@ -18,9 +18,6 @@ layout(set = 1, binding = 0) uniform ModelListUBO {
 	mat4 model[MAX_OBJECTS];
 } modelListUBO;
 
-//layout(push_constant) uniform PushModel {
-//	mat4 model;
-//} pushModel;
 
 layout(location = 0) out vec3 fragCol;
 layout(location = 1) out vec2 fragTex;
