@@ -4,6 +4,7 @@ const int MAX_FRAME_DRAWS = 3;
 const std::vector<const char*> deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 	"VK_KHR_shader_draw_parameters",
+	//"VK_EXT_separate_sampler_usage"
 };
 
 inline bool VK_CHECK(VkResult result)

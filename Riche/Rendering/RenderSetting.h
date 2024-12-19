@@ -7,6 +7,7 @@ class RenderSetting : public Singleton<RenderSetting> {
 
  public:
   bool isWireRendering = false;
+  bool isOcclusionCulling = true;
 };
 
 #define g_RenderSetting RenderSetting::Get()

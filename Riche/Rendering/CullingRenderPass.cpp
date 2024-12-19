@@ -27,86 +27,192 @@ void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDev
   std::vector<BasicVertex> allMeshVertices;
   std::vector<uint32_t> allIndices;
 
-  for (int i = 0; i < 1000; ++i) {
-    // Create a mesh
-    // Vulkan의 viewport좌표계와 projection 행렬은 Y-Down
-    // Clip Space와 NDC 공간도 기본적으로 Y-Down이다.
-    // 정육면체의 정점 정의 (각 면을 개별적으로 정의)
-    std::vector<BasicVertex> meshVertices = {// Front face
-                                             {{-0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
-                                             {{0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
-                                             {{0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-                                             {{-0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+  //for (int i = 0; i < 1000; ++i) {
+  //  // Create a mesh
+  //  // Vulkan의 viewport좌표계와 projection 행렬은 Y-Down
+  //  // Clip Space와 NDC 공간도 기본적으로 Y-Down이다.
+  //  // 정육면체의 정점 정의 (각 면을 개별적으로 정의)
+  //  std::vector<BasicVertex> meshVertices = {// Front face
+  //                                           {{-0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
+  //                                           {{0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+  //                                           {{0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+  //                                           {{-0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
 
-                                             // Back face
-                                             {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}},
-                                             {{0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},
-                                             {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},
-                                             {{-0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},
+  //                                           // Back face
+  //                                           {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}},
+  //                                           {{0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},
+  //                                           {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},
+  //                                           {{-0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},
 
-                                             // Left face
-                                             {{-0.5f, -0.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-                                             {{-0.5f, -0.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-                                             {{-0.5f, 0.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-                                             {{-0.5f, 0.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //                                           // Left face
+  //                                           {{-0.5f, -0.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+  //                                           {{-0.5f, -0.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //                                           {{-0.5f, 0.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //                                           {{-0.5f, 0.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
 
-                                             // Right face
-                                             {{0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-                                             {{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-                                             {{0.5f, 0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-                                             {{0.5f, 0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //                                           // Right face
+  //                                           {{0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+  //                                           {{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //                                           {{0.5f, 0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //                                           {{0.5f, 0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
 
-                                             // Top face
-                                             {{-0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-                                             {{0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-                                             {{0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
-                                             {{-0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
+  //                                           // Top face
+  //                                           {{-0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+  //                                           {{0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+  //                                           {{0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
+  //                                           {{-0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
 
-                                             // Bottom face
-                                             {{-0.5f, -0.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}},
-                                             {{0.5f, -0.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}},
-                                             {{0.5f, -0.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},
-                                             {{-0.5f, -0.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}}};
+  //                                           // Bottom face
+  //                                           {{-0.5f, -0.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}},
+  //                                           {{0.5f, -0.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}},
+  //                                           {{0.5f, -0.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},
+  //                                           {{-0.5f, -0.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}}};
 
-    // 정육면체의 인덱스 정의
-    std::vector<uint32_t> meshIndices = {// Front face (CCW)
-                                         0, 3, 2, 2, 1, 0,
-                                         // Back face (CCW)
-                                         4, 7, 6, 6, 5, 4,
-                                         // Left face (CCW)
-                                         8, 11, 10, 10, 9, 8,
-                                         // Right face (CCW)
-                                         12, 15, 14, 14, 13, 12,
-                                         // Top face (CCW)
-                                         16, 19, 18, 18, 17, 16,
-                                         // Bottom face (CCW)
-                                         20, 23, 22, 22, 21, 20};
+  //  // 정육면체의 인덱스 정의
+  //  std::vector<uint32_t> meshIndices = {// Front face (CCW)
+  //                                       0, 3, 2, 2, 1, 0,
+  //                                       // Back face (CCW)
+  //                                       4, 7, 6, 6, 5, 4,
+  //                                       // Left face (CCW)
+  //                                       8, 11, 10, 10, 9, 8,
+  //                                       // Right face (CCW)
+  //                                       12, 15, 14, 14, 13, 12,
+  //                                       // Top face (CCW)
+  //                                       16, 19, 18, 18, 17, 16,
+  //                                       // Bottom face (CCW)
+  //                                       20, 23, 22, 22, 21, 20};
 
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<float> dis(-3.0f, 3.0f);
-    std::uniform_real_distribution<float> disZ(-6.0f, 0.0f);
+  //  std::random_device rd;
+  //  std::mt19937 gen(rd());
+  //  std::uniform_real_distribution<float> dis(-3.0f, 3.0f);
+  //  std::uniform_real_distribution<float> disZ(-6.0f, 0.0f);
 
-    Mesh mesh;
-    float randomX = dis(gen);
-    float randomY = dis(gen);
-    float randomZ = disZ(gen);
+  //  Mesh mesh;
+  //  float randomX = dis(gen);
+  //  float randomY = dis(gen);
+  //  float randomZ = disZ(gen);
 
-    // 모델 행렬에 변환 적용
-    mesh.GetModel() = glm::translate(glm::mat4(1.0f), glm::vec3(randomX, randomY, randomZ));
-    m_modelListCPU.push_back(glm::translate(glm::mat4(1.0f), glm::vec3(randomX, randomY, randomZ)));
+  //  // 모델 행렬에 변환 적용
+  //  mesh.GetModel() = glm::translate(glm::mat4(1.0f), glm::vec3(randomX, randomY, randomZ));
+  //  m_modelListCPU.push_back(glm::translate(glm::mat4(1.0f), glm::vec3(randomX, randomY, randomZ)));
 
-    mesh.Initialize(meshVertices, meshIndices);
-    AddDataToMiniBatch(m_miniBatchList, g_ResourceManager, mesh);
+  //  mesh.Initialize(meshVertices, meshIndices);
+  //  AddDataToMiniBatch(m_miniBatchList, g_ResourceManager, mesh);
 
-    std::vector<glm::vec3> positions;
-    for (const BasicVertex& vertex : meshVertices) {
-      positions.push_back(m_modelListCPU.back() * glm::vec4(vertex.pos, 1.0f));
+  //  std::vector<glm::vec3> positions;
+  //  for (const BasicVertex& vertex : meshVertices) {
+  //    positions.push_back(m_modelListCPU.back() * glm::vec4(vertex.pos, 1.0f));
+  //  }
+
+  //  // AABB aabb = ComputeAABB(positions);
+  //  AABB aabb = ComputeAABB(positions);
+  //  m_aabbList.push_back(aabb);
+  //}
+  for (int z = -15; z < -5; ++z) {
+    for (int y = -5; y < 5; ++y) {
+      for (int x = -5; x < 4; ++x) {
+        // Create a mesh
+        std::vector<BasicVertex> meshVertices = {
+            {{-0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},   {{0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+            {{0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},     {{-0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+
+            {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}}, {{0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},
+            {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},   {{-0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},
+
+            {{-0.5f, -0.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, {{-0.5f, -0.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+            {{-0.5f, 0.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},   {{-0.5f, 0.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+
+            {{0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},   {{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+            {{0.5f, 0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},     {{0.5f, 0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+
+            {{-0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},    {{0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+            {{0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},    {{-0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
+
+            {{-0.5f, -0.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}},  {{0.5f, -0.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}},
+            {{0.5f, -0.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},  {{-0.5f, -0.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}}};
+
+        std::vector<uint32_t> meshIndices = {0,  3,  2,  2,  1,  0,  4,  7,  6,  6,  5,  4,  8,  11, 10, 10, 9,  8,
+                                             12, 15, 14, 14, 13, 12, 16, 19, 18, 18, 17, 16, 20, 23, 22, 22, 21, 20};
+
+        Mesh mesh;
+        float posX = x * 1.3f;
+        float posY = y * 1.3f;
+        float posZ = z * 1.3f;
+
+        mesh.GetModel() = glm::translate(glm::mat4(1.0f), glm::vec3(posX, posY, posZ));
+        m_modelListCPU.push_back(mesh.GetModel());
+
+        mesh.Initialize(meshVertices, meshIndices);
+        AddDataToMiniBatch(m_miniBatchList, g_ResourceManager, mesh);
+
+        std::vector<glm::vec3> positions;
+        for (const BasicVertex& vertex : meshVertices) {
+          positions.push_back(mesh.GetModel() * glm::vec4(vertex.pos, 1.0f));
+        }
+
+        AABB aabb = ComputeAABB(positions);
+        m_aabbList.push_back(aabb);
+      }
     }
-
-    AABB aabb = ComputeAABB(positions);
-    m_aabbList.push_back(aabb);
   }
+  std::vector<BasicVertex> meshVertices = {// Front face
+                                           {{-7.5f, -7.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
+                                           {{7.5f, -7.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+                                           {{7.5f, 7.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+                                           {{-7.5f, 7.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+
+                                           // Back face
+                                           {{-7.5f, -7.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}},
+                                           {{7.5f, -7.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},
+                                           {{7.5f, 7.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},
+                                           {{-7.5f, 7.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},
+
+                                           // Left face
+                                           {{-7.5f, -7.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+                                           {{-7.5f, -7.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+                                           {{-7.5f, 7.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+                                           {{-7.5f, 7.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+
+                                           // Right face
+                                           {{7.5f, -7.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+                                           {{7.5f, -7.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+                                           {{7.5f, 7.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+                                           {{7.5f, 7.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+
+                                           // Top face
+                                           {{-7.5f, 7.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+                                           {{7.5f, 7.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+                                           {{7.5f, 7.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
+                                           {{-7.5f, 7.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
+
+                                           // Bottom face
+                                           {{-7.5f, -7.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}},
+                                           {{7.5f, -7.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}},
+                                           {{7.5f, -7.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},
+                                           {{-7.5f, -7.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}}};
+
+  std::vector<uint32_t> meshIndices = {
+      0,  3,  2,  2,  1,  0,   // Front face
+      4,  7,  6,  6,  5,  4,   // Back face
+      8,  11, 10, 10, 9,  8,   // Left face
+      12, 15, 14, 14, 13, 12,  // Right face
+      16, 19, 18, 18, 17, 16,  // Top face
+      20, 23, 22, 22, 21, 20   // Bottom face
+  };
+  Mesh mesh;
+  mesh.GetModel() = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+  m_modelListCPU.push_back(mesh.GetModel());
+
+  mesh.Initialize(meshVertices, meshIndices);
+  AddDataToMiniBatch(m_miniBatchList, g_ResourceManager, mesh);
+
+  std::vector<glm::vec3> positions;
+  for (const BasicVertex& vertex : meshVertices) {
+    positions.push_back(mesh.GetModel() * glm::vec4(vertex.pos, 1.0f));
+  }
+
+  AABB aabb = ComputeAABB(positions);
+  m_aabbList.push_back(aabb);
   FlushMiniBatch(m_miniBatchList, g_ResourceManager);
 
   CreateRenderPass();
@@ -172,12 +278,16 @@ void CullingRenderPass::Cleanup() {
   vkDestroyPipeline(m_pDevice, m_viewCullingComputePipeline, nullptr);
   vkDestroyPipelineLayout(m_pDevice, m_viewCullingComputePipelineLayout, nullptr);
 
+  vkDestroyPipeline(m_pDevice, m_occlusionCullingComputePipeline, nullptr);
+  vkDestroyPipelineLayout(m_pDevice, m_occlusionCullingComputePipelineLayout, nullptr);
+
   // DepthOnly
-  vkDestroyImageView(m_pDevice, m_onlyDepthBufferImageView, nullptr);
+  for (int i = 0; i < HIZ_MIP_LEVEL; ++i) {
+    vkDestroyFramebuffer(m_pDevice, m_depthFramebuffers[i], nullptr);
+    vkDestroyImageView(m_pDevice, m_onlyDepthBufferImageViews[i], nullptr);
+  }
   vkDestroyImage(m_pDevice, m_onlyDepthBufferImage, nullptr);
   vkFreeMemory(m_pDevice, m_onlyDepthBufferImageMemory, nullptr);
-
-  vkDestroyFramebuffer(m_pDevice, m_depthFramebuffer, nullptr);
 
   vkDestroyPipeline(m_pDevice, m_depthGraphicePipeline, nullptr);
   vkDestroyRenderPass(m_pDevice, m_depthRenderPass, nullptr);
@@ -322,9 +432,8 @@ void CullingRenderPass::CreateDepthRenderPass() {
   // ATTACHMENTS
   // SUBPASS 1 ATTACHMENTS (INPUT ATTACHMEMNTS)
   VkAttachmentDescription depthStencilAttachment = {};
-  depthStencilAttachment.format = VkUtils::ChooseSupportedFormat(
-      m_pPhyscialDevice, {VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT}, VK_IMAGE_TILING_OPTIMAL,
-      VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+  depthStencilAttachment.format = VkUtils::ChooseSupportedFormat(m_pPhyscialDevice, {VK_FORMAT_D32_SFLOAT}, VK_IMAGE_TILING_OPTIMAL,
+                                                                 VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
   depthStencilAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
   depthStencilAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
   depthStencilAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -416,28 +525,36 @@ void CullingRenderPass::CreateFramebuffer() {
 }
 
 void CullingRenderPass::CreateDepthFramebuffer() {
-  VkFormat depthImageFormat = VkUtils::ChooseSupportedFormat(
-      m_pPhyscialDevice, {VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT}, VK_IMAGE_TILING_OPTIMAL,
-      VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+  VkFormat depthImageFormat = VkUtils::ChooseSupportedFormat(m_pPhyscialDevice, {VK_FORMAT_D32_SFLOAT}, VK_IMAGE_TILING_OPTIMAL,
+                                                             VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
   VkUtils::CreateImage2D(m_pDevice, m_pPhyscialDevice, m_width, m_height, &m_onlyDepthBufferImageMemory, &m_onlyDepthBufferImage,
-                         depthImageFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, nullptr);
-  VkUtils::CreateImageView(m_pDevice, m_onlyDepthBufferImage, &m_onlyDepthBufferImageView, depthImageFormat,
-                           VK_IMAGE_ASPECT_DEPTH_BIT);
+                         depthImageFormat,
+                         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                             VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, nullptr, HIZ_MIP_LEVEL);
 
-  std::array<VkImageView, 1> attachments = {m_onlyDepthBufferImageView};
+  m_onlyDepthBufferImageViews.resize(HIZ_MIP_LEVEL + 1);
+  m_depthFramebuffers.resize(HIZ_MIP_LEVEL);
+  for (int i = 0; i < HIZ_MIP_LEVEL; ++i) {
+    VkUtils::CreateImageView(m_pDevice, m_onlyDepthBufferImage, &m_onlyDepthBufferImageViews[i], depthImageFormat,
+                             VK_IMAGE_ASPECT_DEPTH_BIT, i, 1);
 
-  VkFramebufferCreateInfo framebufferCreateInfo = {};
-  framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-  framebufferCreateInfo.renderPass = m_depthRenderPass;  // Render pass layout the framebuffer will be used with
-  framebufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-  framebufferCreateInfo.pAttachments = attachments.data();  // List of attachments (1:1 with render pass)
-  framebufferCreateInfo.width = m_width;                    // framebuffer width
-  framebufferCreateInfo.height = m_height;                  // framebuffer height
-  framebufferCreateInfo.layers = 1;                         // framebuffer layers
+    std::array<VkImageView, 1> attachments = {m_onlyDepthBufferImageViews[i]};
 
-  VK_CHECK(vkCreateFramebuffer(m_pDevice, &framebufferCreateInfo, nullptr, &m_depthFramebuffer));
+    VkFramebufferCreateInfo framebufferCreateInfo = {};
+    framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    framebufferCreateInfo.renderPass = m_depthRenderPass;  // Render pass layout the framebuffer will be used with
+    framebufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+    framebufferCreateInfo.pAttachments = attachments.data();     // List of attachments (1:1 with render pass)
+    framebufferCreateInfo.width = std::max(m_width >> i, 1u);    // framebuffer width
+    framebufferCreateInfo.height = std::max(m_height >> i, 1u);  // framebuffer height
+    framebufferCreateInfo.layers = 1;                            // framebuffer layers
+
+    VK_CHECK(vkCreateFramebuffer(m_pDevice, &framebufferCreateInfo, nullptr, &m_depthFramebuffers[i]));
+  }
+  VkUtils::CreateImageView(m_pDevice, m_onlyDepthBufferImage, &m_onlyDepthBufferImageViews[HIZ_MIP_LEVEL], depthImageFormat,
+                           VK_IMAGE_ASPECT_DEPTH_BIT, 0, HIZ_MIP_LEVEL);
 }
 
 void CullingRenderPass::CreatePipeline() {
@@ -445,6 +562,7 @@ void CullingRenderPass::CreatePipeline() {
   CreateWireGraphicsPipeline();
   CreateDepthGraphicsPipeline();
   CraeteViewCullingComputePipeline();
+  CreateOcclusionCullingComputePipeline();
 }
 
 void CullingRenderPass::CraeteGrahpicsPipeline() {
@@ -1005,7 +1123,35 @@ void CullingRenderPass::CraeteViewCullingComputePipeline() {
   vkDestroyShaderModule(m_pDevice, computeShaderModule, nullptr);
 }
 
-void CullingRenderPass::CreateOcclusionCullingComputePipeline() {}
+void CullingRenderPass::CreateOcclusionCullingComputePipeline() {
+  auto computeShaderCode = VkUtils::ReadFile("Resources/Shaders/HiZOcclusionCullingCS.spv");
+  // Build Shaders
+  VkShaderModule computeShaderModule = VkUtils::CreateShaderModule(m_pDevice, computeShaderCode);
+
+  std::array<VkDescriptorSetLayout, 3> setLayouts = {g_DescriptorManager.GetVkDescriptorSetLayout("SamplerList_ALL"),
+                                                     g_DescriptorManager.GetVkDescriptorSetLayout("ViewFrustumCulling_COMPUTE"),
+                                                     g_DescriptorManager.GetVkDescriptorSetLayout("DepthOnlyImage")};
+
+  VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+  pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+  pipelineLayoutInfo.setLayoutCount = setLayouts.size();
+  pipelineLayoutInfo.pSetLayouts = setLayouts.data();
+
+  VK_CHECK(vkCreatePipelineLayout(m_pDevice, &pipelineLayoutInfo, nullptr, &m_occlusionCullingComputePipelineLayout));
+
+  VkComputePipelineCreateInfo computePipelineCreateInfo = {};
+  computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+  computePipelineCreateInfo.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  computePipelineCreateInfo.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+  computePipelineCreateInfo.stage.module = computeShaderModule;
+  computePipelineCreateInfo.stage.pName = "main";
+  computePipelineCreateInfo.layout = m_occlusionCullingComputePipelineLayout;
+
+  VK_CHECK(
+      vkCreateComputePipelines(m_pDevice, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &m_occlusionCullingComputePipeline));
+
+  vkDestroyShaderModule(m_pDevice, computeShaderModule, nullptr);
+}
 
 void CullingRenderPass::CreateBuffers() {
   CreateUniformBuffers();
@@ -1110,6 +1256,18 @@ void CullingRenderPass::CreateDesrciptorSets() {
   VkUtils::DescriptorBuilder modelBulder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
   modelBulder.BindBuffer(0, &modelUBOInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT);
   g_DescriptorManager.AddDescriptorSet(&modelBulder, "ModelList");
+
+  VkUtils::DescriptorBuilder depthOnlyImageBuilder =
+      VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
+  for (int i = 0; i < 1; ++i) {
+    VkDescriptorImageInfo depthOnlyImageInfo = {};
+    depthOnlyImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    depthOnlyImageInfo.imageView = m_onlyDepthBufferImageViews[HIZ_MIP_LEVEL];
+    depthOnlyImageInfo.sampler = VK_NULL_HANDLE;
+
+    depthOnlyImageBuilder.BindImage(i, &depthOnlyImageInfo, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
+  }
+  g_DescriptorManager.AddDescriptorSet(&depthOnlyImageBuilder, "DepthOnlyImage");
 }
 
 void CullingRenderPass::CreateSemaphores() {
@@ -1173,7 +1331,7 @@ void CullingRenderPass::RecordCommands() {
 
   depthOnlyRenderPassBeginInfo.pClearValues = depthOnlyClearValue.data();  // List of clear values
   depthOnlyRenderPassBeginInfo.clearValueCount = static_cast<uint32_t>(depthOnlyClearValue.size());
-  depthOnlyRenderPassBeginInfo.framebuffer = m_depthFramebuffer;
+  depthOnlyRenderPassBeginInfo.framebuffer = m_depthFramebuffers[0];
 
   // Begin Render Pass
   vkCmdBeginRenderPass(m_commandBuffer, &depthOnlyRenderPassBeginInfo,
@@ -1208,8 +1366,125 @@ void CullingRenderPass::RecordCommands() {
   }
   vkCmdEndRenderPass(m_commandBuffer);
 
-  //VkUtils::CmdImageBarrier(m_commandBuffer, m_onlyDepthBufferImage, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-  //                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+  if (g_RenderSetting.isOcclusionCulling) {
+    VkImageMemoryBarrier barrier = {};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = m_onlyDepthBufferImage;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+    barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+    vkCmdPipelineBarrier(m_commandBuffer, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
+                         nullptr, 1, &barrier);
+
+    // 8.3. Blit to generate Mip Levels
+    for (uint32_t i = 1; i < HIZ_MIP_LEVEL; ++i) {
+      // Define source and destination Mip Levels
+      uint32_t srcMip = i - 1;
+      uint32_t dstMip = i;
+
+      // Define source and destination regions
+      VkImageBlit blit = {};
+      blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+      blit.srcSubresource.mipLevel = srcMip;
+      blit.srcSubresource.baseArrayLayer = 0;
+      blit.srcSubresource.layerCount = 1;
+      blit.srcOffsets[0] = {0, 0, 0};
+      blit.srcOffsets[1] = {static_cast<int32_t>(std::max(m_width >> srcMip, 1u)),
+                            static_cast<int32_t>(std::max(m_height >> srcMip, 1u)), 1};
+
+      blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+      blit.dstSubresource.mipLevel = dstMip;
+      blit.dstSubresource.baseArrayLayer = 0;
+      blit.dstSubresource.layerCount = 1;
+      blit.dstOffsets[0] = {0, 0, 0};
+      blit.dstOffsets[1] = {static_cast<int32_t>(std::max(m_width >> dstMip, 1u)),
+                            static_cast<int32_t>(std::max(m_height >> dstMip, 1u)), 1};
+
+      // Transition destination Mip Level to TRANSFER_DST_OPTIMAL
+      VkImageMemoryBarrier dstBarrier = {};
+      dstBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+      dstBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+      dstBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+      dstBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      dstBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      dstBarrier.image = m_onlyDepthBufferImage;
+      dstBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+      dstBarrier.subresourceRange.baseMipLevel = dstMip;
+      dstBarrier.subresourceRange.levelCount = 1;
+      dstBarrier.subresourceRange.baseArrayLayer = 0;
+      dstBarrier.subresourceRange.layerCount = 1;
+      dstBarrier.srcAccessMask = 0;
+      dstBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+      vkCmdPipelineBarrier(m_commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr,
+                           1, &dstBarrier);
+
+      // Perform the blit
+      vkCmdBlitImage(m_commandBuffer, m_onlyDepthBufferImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_onlyDepthBufferImage,
+                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_NEAREST);
+
+      // Transition destination Mip Level to TRANSFER_SRC_OPTIMAL for next Blit
+      VkImageMemoryBarrier srcBarrier = {};
+      srcBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+      srcBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+      srcBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+      srcBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      srcBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      srcBarrier.image = m_onlyDepthBufferImage;
+      srcBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+      srcBarrier.subresourceRange.baseMipLevel = dstMip;
+      srcBarrier.subresourceRange.levelCount = 1;
+      srcBarrier.subresourceRange.baseArrayLayer = 0;
+      srcBarrier.subresourceRange.layerCount = 1;
+      srcBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+      srcBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+      vkCmdPipelineBarrier(m_commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr,
+                           1, &srcBarrier);
+    }
+
+    // 8.4. Transition all Mip Levels to SHADER_READ_ONLY_OPTIMAL
+    VkImageMemoryBarrier finalBarrier = {};
+    finalBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    finalBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    finalBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    finalBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    finalBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    finalBarrier.image = m_onlyDepthBufferImage;
+    finalBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    finalBarrier.subresourceRange.baseMipLevel = 0;
+    finalBarrier.subresourceRange.levelCount = HIZ_MIP_LEVEL;
+    finalBarrier.subresourceRange.baseArrayLayer = 0;
+    finalBarrier.subresourceRange.layerCount = 1;
+    finalBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+    finalBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    vkCmdPipelineBarrier(m_commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,  // 또는 필요한 셰이더 스테이지
+                         0, 0, nullptr, 0, nullptr, 1, &finalBarrier);
+
+    //
+    // Hi-Z Occlusion Culling
+    //
+    vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipeline);
+    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 0, 1,
+                            &g_DescriptorManager.GetVkDescriptorSet("SamplerList_ALL"), 0, nullptr);
+    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 1, 1,
+                            &g_DescriptorManager.GetVkDescriptorSet("ViewFrustumCulling_COMPUTE"), 0, nullptr);
+    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 2, 1,
+                            &g_DescriptorManager.GetVkDescriptorSet("DepthOnlyImage"), 0, nullptr);
+
+    vkCmdDispatch(m_commandBuffer, 1000, 1, 1);
+  }
 
   // Information about how to begin a render pass (only needed for graphical applications)
   VkRenderPassBeginInfo renderPassBeginInfo = {};

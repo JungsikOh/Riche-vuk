@@ -185,12 +185,13 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer) {
 
   // FPS 정보를 표시하는 창
   ImGui::Begin("Performance");
-  ImGui::Text("Current FPS: %.1f: (frame rate : %.5f)", fps, 1 / fps * 1000.0f);
+  ImGui::Text("Current FPS: %.1f", fps);
   ImGui::Text("Max FPS: %.1f | Average FPS: %.1f", maxFps, averageFps);
   ImGui::End();
 
   ImGui::Begin("Rendering");
-  ImGui::Checkbox("active", &(g_RenderSetting.isWireRendering));
+  ImGui::Checkbox("Wire Frame", &(g_RenderSetting.isWireRendering));
+  ImGui::Checkbox("Occlusion Culling", &(g_RenderSetting.isOcclusionCulling));
   ImGui::End();
 
   // ImGui 렌더링

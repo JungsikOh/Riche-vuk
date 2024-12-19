@@ -138,7 +138,7 @@ static void CopyBuffer(VkDevice device, VkQueue transferQueue, VkCommandPool tra
 
 static VkResult CreateImage2D(VkDevice device, VkPhysicalDevice physicalDevice, uint32_t width, uint32_t height,
                               VkDeviceMemory* pOutImageMemory, VkImage* pOutVkImage, VkFormat format, VkImageUsageFlags usage,
-                              VkMemoryPropertyFlags propFlags, void* pInitImage) {
+                              VkMemoryPropertyFlags propFlags, void* pInitImage, int numberOfMipLevls = 1) {
   // CREATE IMAGE
   // Image creation info
   VkImageCreateInfo imageCreateInfo = {};
@@ -147,7 +147,7 @@ static VkResult CreateImage2D(VkDevice device, VkPhysicalDevice physicalDevice, 
   imageCreateInfo.extent.width = width;
   imageCreateInfo.extent.height = height;
   imageCreateInfo.extent.depth = 1;
-  imageCreateInfo.mipLevels = 1;                              // Number of mipmap levels
+  imageCreateInfo.mipLevels = numberOfMipLevls;               // Number of mipmap levels
   imageCreateInfo.arrayLayers = 1;                            // Number of levels in image array
   imageCreateInfo.format = format;                            // Format type of image
   imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;           // How image data should be "tiled" (arranged for optimal reading)
@@ -180,7 +180,7 @@ static VkResult CreateImage2D(VkDevice device, VkPhysicalDevice physicalDevice, 
 }
 
 static VkResult CreateImageView(VkDevice device, VkImage image, VkImageView* pOutImageView, VkFormat format,
-                                VkImageAspectFlags aspectFlags) {
+                                VkImageAspectFlags aspectFlags, int baseMip = 0, int maxLevelCount = 1) {
   VkImageViewCreateInfo viewCreateInfo = {};
   viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
   viewCreateInfo.image = image;                                 // image to create view for
@@ -193,8 +193,8 @@ static VkResult CreateImageView(VkDevice device, VkImage image, VkImageView* pOu
 
   // Subresources allow the view to view only a part of an image
   viewCreateInfo.subresourceRange.aspectMask = aspectFlags;  // Which aspect of image to view (e.g. COLOR_BIT for viewing color)
-  viewCreateInfo.subresourceRange.baseMipLevel = 0;          // Start Mipmap level to view from
-  viewCreateInfo.subresourceRange.levelCount = 1;            // Number of mipmap levels to view
+  viewCreateInfo.subresourceRange.baseMipLevel = baseMip;    // Start Mipmap level to view from
+  viewCreateInfo.subresourceRange.levelCount = maxLevelCount;  // Number of mipmap levels to view
   viewCreateInfo.subresourceRange.baseArrayLayer = 0;        // Start array level to view from
   viewCreateInfo.subresourceRange.layerCount = 1;            // Number of array levels to view
 
@@ -382,7 +382,9 @@ static void CreateSampler(VkDevice device, VkSamplerAddressMode addressMode, VkF
   samplerCreateInfo.maxAnisotropy = 1.0f;                                  // Maximum anisotropy
   samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;        // Border color
   samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;                    // Use normalized texture coordinates
-  samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+  samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+  samplerCreateInfo.minLod = 0.0f;
+  samplerCreateInfo.maxLod = 8.0f;
 
   VK_CHECK(vkCreateSampler(device, &samplerCreateInfo, nullptr, pOutSampler));
 }

@@ -47,11 +47,30 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
 
     CreateCommandPool();
     CreateCommandBuffers();
-    CreateSynchronisation();
+    CreateSynchronisation(); 
 
     g_DescriptorAllocator.Initialize(mainDevice.logicalDevice);
     g_DescriptorLayoutCache.Initialize(mainDevice.logicalDevice);
     g_ResourceManager.Initialize(mainDevice.logicalDevice, mainDevice.physicalDevice, m_transferQueue, m_queueFamilyIndices);
+
+    VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_FILTER_LINEAR, &m_linearWrapSS, false);
+    VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_FILTER_LINEAR, &m_linearClampSS, false);
+    VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_FILTER_LINEAR, &m_linearBorderSS,
+                           false);
+    VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_FILTER_NEAREST, &m_pointWrapSS, false);
+    VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_FILTER_NEAREST, &m_pointClampSS, false);
+
+    VkUtils::DescriptorBuilder samplerListBuilder =
+        VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
+    std::vector<VkDescriptorImageInfo> samplerDescriptorInfos = {{m_linearWrapSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED},
+                                                                 {m_linearClampSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED},
+                                                                 {m_linearBorderSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED},
+                                                                 {m_pointWrapSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED},
+                                                                 {m_pointClampSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED}};
+    for (int i = 0; i < samplerDescriptorInfos.size(); ++i) {
+      samplerListBuilder.BindImage(i, &samplerDescriptorInfos[i], VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_ALL);
+    }
+    g_DescriptorManager.AddDescriptorSet(&samplerListBuilder, "SamplerList_ALL");
 
     /// Editor Pipeline
     m_pEditor = std::make_shared<Editor>();
@@ -554,24 +573,6 @@ void VulkanRenderer::CreateOffScreenRenderPass() {
 }
 
 void VulkanRenderer::CreateOffScrrenDescriptorSet() {
-  VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_FILTER_LINEAR, &m_linearWrapSS, false);
-  VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_FILTER_LINEAR, &m_linearClampSS, false);
-  VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_FILTER_LINEAR, &m_linearBorderSS,
-                         false);
-  VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_FILTER_NEAREST, &m_pointWrapSS, false);
-  VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_FILTER_NEAREST, &m_pointClampSS, false);
-
-  VkUtils::DescriptorBuilder samplerListBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
-  std::vector<VkDescriptorImageInfo> samplerDescriptorInfos = {{m_linearWrapSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED},
-                                                               {m_linearClampSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED},
-                                                               {m_linearBorderSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED},
-                                                               {m_pointWrapSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED},
-                                                               {m_pointClampSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED}};
-  for (int i = 0; i < samplerDescriptorInfos.size(); ++i) {
-    samplerListBuilder.BindImage(i, &samplerDescriptorInfos[i], VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_ALL);
-  }
-  g_DescriptorManager.AddDescriptorSet(&samplerListBuilder, "SamplerList_ALL");
-
   // CREATE INPUT ATTACHMENT IMAGE DESCRIPTOR SET LAYOUT
   VkDescriptorImageInfo colourAttachmentDescriptor = {};
   colourAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;

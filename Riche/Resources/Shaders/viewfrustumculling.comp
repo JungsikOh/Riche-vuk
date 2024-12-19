@@ -48,12 +48,12 @@ bool IsSphereInFrustum(BoundingSphere sphere)
         // 평면과 구의 중심 사이의 거리 계산
         float distance = dot(planes[i].xyz, sphere.center) + planes[i].w;
         // 구의 반지름이 거리보다 작으면 Frustum 밖에 있는 것
-        if (distance < -sphere.radius) 
+        if (distance > -sphere.radius) 
         {
-            return false;
+            return true;
         }
     }
-    return true;
+    return false;
 }
 
 bool IsAABBInFrustum(AABB aabb) 
@@ -74,7 +74,7 @@ bool IsAABBInFrustum(AABB aabb)
         float distance = dot(planes[i].xyz, positiveVertex) + planes[i].w;
 
         // AABB의 한 좌표라도 평면 안에 있는 경우
-        if (distance > 0) 
+        if (distance >= 0) 
         {
             return true;
         }

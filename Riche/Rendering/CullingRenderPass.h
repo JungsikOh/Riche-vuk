@@ -4,6 +4,8 @@
 #include "Components.h"
 #include "IRenderPass.h"
 
+const static int HIZ_MIP_LEVEL = 6;
+
 class Camera;
 
 class CullingRenderPass : public IRenderPass {
@@ -90,15 +92,16 @@ class CullingRenderPass : public IRenderPass {
 
   VkImage m_onlyDepthBufferImage;
   VkDeviceMemory m_onlyDepthBufferImageMemory;
-  VkImageView m_onlyDepthBufferImageView;
+  std::vector<VkImageView> m_onlyDepthBufferImageViews;
 
-  VkFramebuffer m_depthFramebuffer;
+  std::vector<VkFramebuffer> m_depthFramebuffers;       // mipmap 별로 생성.
 
   // -- Compute Pipeline
   VkPipeline m_viewCullingComputePipeline;
   VkPipelineLayout m_viewCullingComputePipelineLayout;
 
   VkPipeline m_occlusionCullingComputePipeline;
+  VkPipelineLayout m_occlusionCullingComputePipelineLayout;
 
   // -- Indirect Draw Call
   VkBuffer m_indirectDrawBuffer;

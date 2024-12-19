@@ -1,0 +1,106 @@
+#version 450
+#extension GL_KHR_vulkan_glsl : enable
+#extension GL_EXT_samplerless_texture_functions : enable
+#extension GL_EXT_debug_printf : enable
+
+layout(local_size_x = 1) in;
+
+// AABB 구조체
+struct AABB
+{
+    vec4 minPos;	// minimum coord
+    vec4 maxPos;	// maximum coord
+};
+
+// Indirect Draw 명령
+struct IndircetDrawIndexedCommand {
+    uint    indexCount;
+    uint    instanceCount;
+    uint    firstIndex;
+    int     vertexOffset;
+    uint    firstInstance;
+};
+
+layout(set = 0, binding = 0) uniform sampler linearWrapSS;
+layout(set = 0, binding = 1) uniform sampler linearClampSS;
+layout(set = 0, binding = 2) uniform sampler linearBorderSS;
+layout(set = 0, binding = 3) uniform sampler pointWrapSS;
+layout(set = 0, binding = 4) uniform sampler pointClampSS;
+
+layout(set = 1, binding = 0) buffer DrawIndexedCommands {
+    IndircetDrawIndexedCommand drawIndexedCommands[];
+};
+layout(set = 1, binding = 1) uniform BoundingBoxes {
+    AABB boundingBoxList[1000];
+};
+layout(set = 1, binding = 2) uniform FrustumPlanes {
+    vec4 planes[6];  // View Frustum의 6개 평면
+};
+layout(set = 1, binding = 3) uniform ViewProjectionUBO {
+	mat4 view;
+	mat4 projection;
+} viewProjectionUBO;
+
+layout(set = 2, binding = 0) uniform texture2D DepthMapTextureLOD0;
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+
+    // AABB의 최소 및 최대 좌표
+    vec3 bmin = boundingBoxList[idx].minPos.xyz;
+    vec3 bmax = boundingBoxList[idx].maxPos.xyz;
+
+    // AABB의 8개 코너 계산
+    vec3 corners[8] = {
+        vec3(bmin.x, bmin.y, bmin.z),
+        vec3(bmin.x, bmin.y, bmax.z),
+        vec3(bmin.x, bmax.y, bmin.z),
+        vec3(bmin.x, bmax.y, bmax.z),
+        vec3(bmax.x, bmin.y, bmin.z),
+        vec3(bmax.x, bmin.y, bmax.z),
+        vec3(bmax.x, bmax.y, bmin.z),
+        vec3(bmax.x, bmax.y, bmax.z)
+    };
+
+    vec2 screenMin = vec2(1.0, 1.0);
+    vec2 screenMax = vec2(0.0, 0.0);
+    float depthMin = 1.0;
+    bool isVisible = false;
+
+    // AABB의 모든 코너 검사
+    for (uint i = 0; i < 8; ++i) {
+        vec4 clipPos = viewProjectionUBO.projection * viewProjectionUBO.view * vec4(corners[i], 1.0);
+        vec3 ndcPos = clipPos.xyz / clipPos.w;
+
+        // NDC 클리핑 (-1 ~ 1 범위 확인)
+        if (ndcPos.x < -1.0 || ndcPos.x > 1.0 ||
+            ndcPos.y < -1.0 || ndcPos.y > 1.0 ||
+            ndcPos.z < 0.0 || ndcPos.z > 1.0) {
+            continue;
+        }
+
+        // NDC -> 화면 좌표 (0 ~ 1)
+        vec2 screenPos = ndcPos.xy * 0.5 + 0.5;
+        screenMin = min(screenMin, screenPos);
+        screenMax = max(screenMax, screenPos);
+        depthMin = min(depthMin, ndcPos.z);
+
+        // LOD 계산
+        ivec2 texSize = textureSize(DepthMapTextureLOD0, 0);
+        vec2 screenSize = vec2(texSize) * (screenMax - screenMin);
+        float maxScreenSize = max(screenSize.x, screenSize.y);
+        float fLOD = clamp(ceil(log2(maxScreenSize)), 0.0, 6.0);
+
+        // Hi-Z 맵의 중심 샘플링
+        vec2 samplePos = (screenMin + screenMax) * 0.5;
+        float hizDepth = textureLod(sampler2D(DepthMapTextureLOD0, pointClampSS), screenPos, fLOD).r;
+
+        // 깊이 비교
+        if (ndcPos.z <= hizDepth + 0.0015) {
+            isVisible = true;
+            break; // 하나라도 보이면 더 이상 검사할 필요 없음
+        }
+    }
+
+    drawIndexedCommands[idx].instanceCount = isVisible ? 1 : 0;
+}
