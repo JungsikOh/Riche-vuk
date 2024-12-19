@@ -4,7 +4,7 @@
 #include "Components.h"
 #include "IRenderPass.h"
 
-const static int HIZ_MIP_LEVEL = 6;
+const static int HIZ_MIP_LEVEL = 3;
 
 class Camera;
 
