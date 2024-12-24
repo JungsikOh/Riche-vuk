@@ -27,87 +27,6 @@ void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDev
   std::vector<BasicVertex> allMeshVertices;
   std::vector<uint32_t> allIndices;
 
-  //for (int i = 0; i < 1000; ++i) {
-  //  // Create a mesh
-  //  // Vulkan의 viewport좌표계와 projection 행렬은 Y-Down
-  //  // Clip Space와 NDC 공간도 기본적으로 Y-Down이다.
-  //  // 정육면체의 정점 정의 (각 면을 개별적으로 정의)
-  //  std::vector<BasicVertex> meshVertices = {// Front face
-  //                                           {{-0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
-  //                                           {{0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
-  //                                           {{0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-  //                                           {{-0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-
-  //                                           // Back face
-  //                                           {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}},
-  //                                           {{0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},
-  //                                           {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},
-  //                                           {{-0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},
-
-  //                                           // Left face
-  //                                           {{-0.5f, -0.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-  //                                           {{-0.5f, -0.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-  //                                           {{-0.5f, 0.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-  //                                           {{-0.5f, 0.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-
-  //                                           // Right face
-  //                                           {{0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-  //                                           {{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-  //                                           {{0.5f, 0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-  //                                           {{0.5f, 0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
-
-  //                                           // Top face
-  //                                           {{-0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-  //                                           {{0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-  //                                           {{0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
-  //                                           {{-0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
-
-  //                                           // Bottom face
-  //                                           {{-0.5f, -0.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}},
-  //                                           {{0.5f, -0.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}},
-  //                                           {{0.5f, -0.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},
-  //                                           {{-0.5f, -0.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}}};
-
-  //  // 정육면체의 인덱스 정의
-  //  std::vector<uint32_t> meshIndices = {// Front face (CCW)
-  //                                       0, 3, 2, 2, 1, 0,
-  //                                       // Back face (CCW)
-  //                                       4, 7, 6, 6, 5, 4,
-  //                                       // Left face (CCW)
-  //                                       8, 11, 10, 10, 9, 8,
-  //                                       // Right face (CCW)
-  //                                       12, 15, 14, 14, 13, 12,
-  //                                       // Top face (CCW)
-  //                                       16, 19, 18, 18, 17, 16,
-  //                                       // Bottom face (CCW)
-  //                                       20, 23, 22, 22, 21, 20};
-
-  //  std::random_device rd;
-  //  std::mt19937 gen(rd());
-  //  std::uniform_real_distribution<float> dis(-3.0f, 3.0f);
-  //  std::uniform_real_distribution<float> disZ(-6.0f, 0.0f);
-
-  //  Mesh mesh;
-  //  float randomX = dis(gen);
-  //  float randomY = dis(gen);
-  //  float randomZ = disZ(gen);
-
-  //  // 모델 행렬에 변환 적용
-  //  mesh.GetModel() = glm::translate(glm::mat4(1.0f), glm::vec3(randomX, randomY, randomZ));
-  //  m_modelListCPU.push_back(glm::translate(glm::mat4(1.0f), glm::vec3(randomX, randomY, randomZ)));
-
-  //  mesh.Initialize(meshVertices, meshIndices);
-  //  AddDataToMiniBatch(m_miniBatchList, g_ResourceManager, mesh);
-
-  //  std::vector<glm::vec3> positions;
-  //  for (const BasicVertex& vertex : meshVertices) {
-  //    positions.push_back(m_modelListCPU.back() * glm::vec4(vertex.pos, 1.0f));
-  //  }
-
-  //  // AABB aabb = ComputeAABB(positions);
-  //  AABB aabb = ComputeAABB(positions);
-  //  m_aabbList.push_back(aabb);
-  //}
   for (int z = -15; z < -5; ++z) {
     for (int y = -5; y < 5; ++y) {
       for (int x = -5; x < 4; ++x) {
@@ -223,6 +142,7 @@ void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDev
 
   CreateBuffers();
   CreateDesrciptorSets();
+  CreatePushConstantRange();
 
   CreatePipeline();
 
@@ -281,11 +201,17 @@ void CullingRenderPass::Cleanup() {
   vkDestroyPipeline(m_pDevice, m_occlusionCullingComputePipeline, nullptr);
   vkDestroyPipelineLayout(m_pDevice, m_occlusionCullingComputePipelineLayout, nullptr);
 
+#ifdef _DEBUG
+  vkDestroyBuffer(m_pDevice, m_fLODListBuffer, nullptr);
+  vkFreeMemory(m_pDevice, m_fLODListBufferMemory, nullptr);
+#endif  // _DEBUG
+
   // DepthOnly
   for (int i = 0; i < HIZ_MIP_LEVEL; ++i) {
     vkDestroyFramebuffer(m_pDevice, m_depthFramebuffers[i], nullptr);
     vkDestroyImageView(m_pDevice, m_onlyDepthBufferImageViews[i], nullptr);
   }
+  vkDestroyImageView(m_pDevice, m_onlyDepthBufferImageViews[HIZ_MIP_LEVEL], nullptr);
   vkDestroyImage(m_pDevice, m_onlyDepthBufferImage, nullptr);
   vkFreeMemory(m_pDevice, m_onlyDepthBufferImageMemory, nullptr);
 
@@ -709,8 +635,6 @@ void CullingRenderPass::CraeteGrahpicsPipeline() {
   pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   pipelineLayoutCreateInfo.setLayoutCount = 2;
   pipelineLayoutCreateInfo.pSetLayouts = setLayouts;
-  pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
-  pipelineLayoutCreateInfo.pPushConstantRanges = VK_NULL_HANDLE;
 
   VK_CHECK(vkCreatePipelineLayout(m_pDevice, &pipelineLayoutCreateInfo, nullptr, &m_graphicsPipelineLayout));
 
@@ -1136,6 +1060,8 @@ void CullingRenderPass::CreateOcclusionCullingComputePipeline() {
   pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   pipelineLayoutInfo.setLayoutCount = setLayouts.size();
   pipelineLayoutInfo.pSetLayouts = setLayouts.data();
+  pipelineLayoutInfo.pushConstantRangeCount = 1;
+  pipelineLayoutInfo.pPushConstantRanges = &m_debugPushConstant;
 
   VK_CHECK(vkCreatePipelineLayout(m_pDevice, &pipelineLayoutInfo, nullptr, &m_occlusionCullingComputePipelineLayout));
 
@@ -1221,6 +1147,20 @@ void CullingRenderPass::CreateShaderStorageBuffers() {
   indirect.BindBuffer(2, &cameraBoundingBoxInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
   indirect.BindBuffer(3, &viewProjectionBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 
+#ifdef _DEBUG  // NDEBUG is C++ standard Macro.
+  VkDeviceSize fLODListSize = sizeof(float) * m_aabbList.size();
+  VkUtils::CreateBuffer(m_pDevice, m_pPhyscialDevice, fLODListSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &m_fLODListBuffer,
+                        &m_fLODListBufferMemory);
+
+  VkDescriptorBufferInfo fLODListBufferInfo = {};
+  fLODListBufferInfo.buffer = m_fLODListBuffer;  // Buffer to get data from
+  fLODListBufferInfo.offset = 0;                 // Position of start of data
+  fLODListBufferInfo.range = fLODListSize;       // size of data
+
+  indirect.BindBuffer(4, &fLODListBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
+#endif
+
   g_DescriptorManager.AddDescriptorSet(&indirect, "ViewFrustumCulling_COMPUTE");
 }
 
@@ -1268,6 +1208,12 @@ void CullingRenderPass::CreateDesrciptorSets() {
     depthOnlyImageBuilder.BindImage(i, &depthOnlyImageInfo, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
   }
   g_DescriptorManager.AddDescriptorSet(&depthOnlyImageBuilder, "DepthOnlyImage");
+}
+
+void CullingRenderPass::CreatePushConstantRange() {
+  m_debugPushConstant.stageFlags = VK_SHADER_STAGE_ALL;                 // Shader stage push constant will go to
+  m_debugPushConstant.offset = 0;                               // Offset into given data to pass to push constant
+  m_debugPushConstant.size = sizeof(ShaderSetting);                     // Size of Data Being Passed
 }
 
 void CullingRenderPass::CreateSemaphores() {
@@ -1476,6 +1422,9 @@ void CullingRenderPass::RecordCommands() {
     // Hi-Z Occlusion Culling
     //
     vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipeline);
+    vkCmdPushConstants(m_commandBuffer, m_occlusionCullingComputePipelineLayout, VK_SHADER_STAGE_ALL, 0,
+                       sizeof(ShaderSetting), &g_ShaderSetting);
+
     vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 0, 1,
                             &g_DescriptorManager.GetVkDescriptorSet("SamplerList_ALL"), 0, nullptr);
     vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 1, 1,

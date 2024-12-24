@@ -41,7 +41,15 @@ layout(set = 1, binding = 3) uniform ViewProjectionUBO {
 	mat4 projection;
 } viewProjectionUBO;
 
-layout(set = 2, binding = 0) uniform texture2D DepthMapTextureLOD0;
+layout(set = 1, binding = 4) buffer fLODListSSBO {
+    float fLODList[1000];
+};
+
+layout(set = 2, binding = 0) uniform texture2D DepthMapTextureLOD;
+
+layout(push_constant) uniform ShaderSetting {
+	uint isDebugging;
+} shaderSetting;
 
 void main() {
     uint idx = gl_GlobalInvocationID.x;
@@ -66,6 +74,7 @@ void main() {
     vec2 screenMax = vec2(0.0, 0.0);
     float depthMin = 1.0;
     bool isVisible = false;
+    float fLOD = 3.0;
 
     // AABB의 모든 코너 검사
     for (uint i = 0; i < 8; ++i) {
@@ -79,14 +88,14 @@ void main() {
         depthMin = min(depthMin, ndcPos.z);
 
         // LOD 계산
-        ivec2 texSize = textureSize(DepthMapTextureLOD0, 0);
+        ivec2 texSize = textureSize(DepthMapTextureLOD, 0);
         vec2 screenSize = vec2(texSize) * (screenMax - screenMin);
         float maxScreenSize = max(screenSize.x, screenSize.y);
-        float fLOD = clamp(ceil(log2(maxScreenSize)), 0.0, 3.0);
+        fLOD = clamp(floor(log2(maxScreenSize)), 0.0, 3.0);
 
         // Hi-Z 맵의 중심 샘플링
         vec2 samplePos = (screenMin + screenMax) * 0.5;
-        float hizDepth = textureLod(sampler2D(DepthMapTextureLOD0, pointClampSS), screenPos, fLOD).r;
+        float hizDepth = textureLod(sampler2D(DepthMapTextureLOD, pointClampSS), screenPos, fLOD).r;
 
         // 깊이 비교
         if (ndcPos.z <= hizDepth + 0.001) {
@@ -94,6 +103,9 @@ void main() {
             break; // 하나라도 보이면 더 이상 검사할 필요 없음
         }
     }
+
+    // for debugging
+    if(shaderSetting.isDebugging) fLODList[idx] = fLOD;
 
     drawIndexedCommands[idx].instanceCount = isVisible ? 1 : 0;
 }

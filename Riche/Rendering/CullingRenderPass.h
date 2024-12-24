@@ -5,6 +5,8 @@
 #include "IRenderPass.h"
 
 const static int HIZ_MIP_LEVEL = 3;
+static ShaderSetting g_ShaderSetting = {};
+
 
 class Camera;
 
@@ -44,6 +46,8 @@ class CullingRenderPass : public IRenderPass {
   void CreateShaderStorageBuffers();
   void CreateUniformBuffers();
   void CreateDesrciptorSets();
+
+  void CreatePushConstantRange();
 
   void CreateSemaphores();
   virtual void CreateCommandBuffers();
@@ -102,6 +106,12 @@ class CullingRenderPass : public IRenderPass {
 
   VkPipeline m_occlusionCullingComputePipeline;
   VkPipelineLayout m_occlusionCullingComputePipelineLayout;
+
+  // -- For debuging
+  VkBuffer m_fLODListBuffer;
+  VkDeviceMemory m_fLODListBufferMemory;
+
+  VkPushConstantRange m_debugPushConstant;
 
   // -- Indirect Draw Call
   VkBuffer m_indirectDrawBuffer;
