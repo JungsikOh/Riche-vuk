@@ -66,6 +66,9 @@
     <ClCompile Include="VkUtils\ChooseFunc.h">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="Utils\ModelLoader.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="VkUtils\DescriptorBuilder.h">
@@ -150,6 +153,9 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="Rendering\RenderSetting.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\ModelLoader.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

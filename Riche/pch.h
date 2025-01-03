@@ -13,6 +13,14 @@
 #include <assert.h>
 #include <random>
 
+//
+// 3rd party
+//
+
+// pass the certain waring messeage
+#pragma warning(push)
+#pragma warning(disable : 4819)
+
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
 #include "imgui_impl_vulkan.h"
@@ -25,5 +33,10 @@
 #include <glm/matrix.hpp>
 
 #include "entt/entt.hpp"
+
+#include "tiny_obj_loader.h"
+
+#pragma warning(pop)
+
 
 #include "Rendering/Core.h"

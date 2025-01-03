@@ -47,7 +47,7 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
 
     CreateCommandPool();
     CreateCommandBuffers();
-    CreateSynchronisation(); 
+    CreateSynchronisation();
 
     g_DescriptorAllocator.Initialize(mainDevice.logicalDevice);
     g_DescriptorLayoutCache.Initialize(mainDevice.logicalDevice);
@@ -304,6 +304,17 @@ void VulkanRenderer::CreateLogicalDevice() {
     queueCreateInfos.push_back(queueCreateInfo);
   }
 
+  VkPhysicalDeviceDescriptorIndexingFeaturesEXT indexingFeatures = {};
+  indexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
+  indexingFeatures.runtimeDescriptorArray = VK_TRUE;                     // 배열 크기 동적
+  indexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;  // 동적 인덱싱
+  indexingFeatures.pNext = nullptr;
+
+  VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
+  deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+  deviceFeatures2.features = {};  // 원하는 일반 피처
+  deviceFeatures2.pNext = &indexingFeatures;
+
   // Information to create logical device (someties called device)
   VkDeviceCreateInfo deviceCreateInfo = {};
   deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -322,6 +333,7 @@ void VulkanRenderer::CreateLogicalDevice() {
   deviceFeatures.fillModeNonSolid = VK_TRUE;
 
   deviceCreateInfo.pEnabledFeatures = &deviceFeatures;  // Physical device features logical device will use
+  deviceCreateInfo.pNext = &deviceFeatures2;
 
   // Create the logical device for the given physical device
   VkResult result = vkCreateDevice(mainDevice.physicalDevice, &deviceCreateInfo, nullptr, &mainDevice.logicalDevice);
