@@ -54,6 +54,12 @@ layout(push_constant) uniform ShaderSetting {
 void main() {
     uint idx = gl_GlobalInvocationID.x;
 
+    vec2 screenMin = vec2(1.0, 1.0);
+    vec2 screenMax = vec2(0.0, 0.0);
+    float depthMin = 1.0;
+    bool isVisible = false;
+    float fLOD = 3.0;
+
     // AABB의 최소 및 최대 좌표
     vec3 bmin = boundingBoxList[idx].minPos.xyz;
     vec3 bmax = boundingBoxList[idx].maxPos.xyz;
@@ -69,12 +75,6 @@ void main() {
         vec3(bmax.x, bmax.y, bmin.z),
         vec3(bmax.x, bmax.y, bmax.z)
     };
-
-    vec2 screenMin = vec2(1.0, 1.0);
-    vec2 screenMax = vec2(0.0, 0.0);
-    float depthMin = 1.0;
-    bool isVisible = false;
-    float fLOD = 3.0;
 
     // AABB의 모든 코너 검사
     for (uint i = 0; i < 8; ++i) {
@@ -93,16 +93,64 @@ void main() {
         float maxScreenSize = max(screenSize.x, screenSize.y);
         fLOD = clamp(floor(log2(maxScreenSize)), 0.0, 3.0);
 
-        // Hi-Z 맵의 중심 샘플링
-        vec2 samplePos = (screenMin + screenMax) * 0.5;
-        float hizDepth = textureLod(sampler2D(DepthMapTextureLOD, pointClampSS), screenPos, fLOD).r;
+//        // Hi-Z 맵의 중심 샘플링
+//        vec2 samplePos = (screenMin + screenMax) * 0.5;
+//        float hizDepth = textureLod(sampler2D(DepthMapTextureLOD, pointClampSS), samplePos, fLOD).r;
+//
+//        // 깊이 비교
+//        if (ndcPos.z <= hizDepth + 0.0001) {
+//            isVisible = true;
+//            break; // 하나라도 보이면 더 이상 검사할 필요 없음
+//        }
 
-        // 깊이 비교
-        if (ndcPos.z <= hizDepth + 0.001) {
-            isVisible = true;
-            break; // 하나라도 보이면 더 이상 검사할 필요 없음
+        // ---- 다중 샘플링 방식을 적용 ----
+        // 예) 4개의 샘플(화면 bounding box의 4분점 + 중앙 등)
+        const uint SAMPLE_COUNT = 5;
+        // 4분점 + 중앙
+        vec2 sampleOffsets[SAMPLE_COUNT] = {
+            vec2(0.0, 0.0),  // center
+            vec2(-0.5, -0.5),
+            vec2(-0.5,  0.5),
+            vec2( 0.5, -0.5),
+            vec2( 0.5,  0.5)
+        };
+
+        // "모든 샘플"이 occluded인지 판단하기 위해, 우선 occludedCount=0
+        // 모든 샘플이 가려진다면 occludedCount == SAMPLE_COUNT
+        // -> Cull
+        // 하나라도 보이면 -> Draw
+        uint occludedCount = 0;
+
+        // 중심(혹은 bounding box 중점)을 기준으로 -/+ 오프셋
+        vec2 boxCenter = 0.5 * (screenMin + screenMax);
+        vec2 halfSize  = 0.5 * (screenMax - screenMin);
+
+        for (uint s = 0; s < SAMPLE_COUNT; s++) {
+            // 샘플 위치 구하기
+            vec2 offset   = sampleOffsets[s];
+            vec2 testPos  = boxCenter + offset * halfSize;
+            testPos       = clamp(testPos, vec2(0.0), vec2(1.0));  // 화면 밖 방지
+
+            // Hi-Z 샘플
+            float hizDepth = textureLod(sampler2D(DepthMapTextureLOD, pointClampSS), testPos, fLOD).r;
+
+            // 비교
+            // depthMin(가장 앞 코너의 ndc.z) vs hizDepth
+            // "샘플 위치에서 Hi-Z보다 앞에 있다면 -> 보인다"
+            if (depthMin <= hizDepth + 0.0025) {
+                // 보이는 샘플 하나라도 발견 -> Draw
+                // => break out
+                break;
+            }
+            else {
+                occludedCount++;
+            }
         }
+
+        isVisible = (occludedCount < SAMPLE_COUNT); // 하나라도 보이면 isVisible=true
     }
+
+
 
     // for debugging
     if(shaderSetting.isDebugging > 0) fLODList[idx] = fLOD;

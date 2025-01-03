@@ -56,79 +56,79 @@ bool IsSphereInFrustum(BoundingSphere sphere)
     return false;
 }
 
-//bool IsAABBInFrustum(AABB aabb) 
-//{
-//    vec4 newMinPos = uboViewProjection.view * aabb.minPos;
-//    vec4 newMaxPos = uboViewProjection.view * aabb.maxPos;
-//    
-//    for (int i = 0; i < 6; ++i) 
-//    {
-//        vec3 positiveVertex = newMinPos.xyz;
-//
-//        // 양수 방향 꼭짓점 선택
-//        if (planes[i].x >= 0) positiveVertex.x = newMaxPos.x;
-//        if (planes[i].y >= 0) positiveVertex.y = newMaxPos.y;
-//        if (planes[i].z >= 0) positiveVertex.z = newMaxPos.z;
-//
-//        // 평면과 꼭짓점 사이의 거리 계산
-//        float distance = dot(planes[i].xyz, positiveVertex) + planes[i].w;
-//
-//        // AABB의 한 좌표라도 평면 안에 있는 경우
-//        if (distance >= 0) 
-//        {
-//            return true;
-//        }
-//    }
-//
-//    return false; // 프러스텀 밖
-//}
-
 bool IsAABBInFrustum(AABB aabb) 
 {
     vec4 newMinPos = uboViewProjection.view * aabb.minPos;
     vec4 newMaxPos = uboViewProjection.view * aabb.maxPos;
-
-    // AABB의 8개 코너 계산
-    vec3 corners[8] = {
-        vec3(newMinPos.x, newMinPos.y, newMinPos.z),
-        vec3(newMinPos.x, newMinPos.y, newMaxPos.z),
-        vec3(newMinPos.x, newMaxPos.y, newMinPos.z),
-        vec3(newMinPos.x, newMaxPos.y, newMaxPos.z),
-        vec3(newMaxPos.x, newMinPos.y, newMinPos.z),
-        vec3(newMaxPos.x, newMinPos.y, newMaxPos.z),
-        vec3(newMaxPos.x, newMaxPos.y, newMinPos.z),
-        vec3(newMaxPos.x, newMaxPos.y, newMaxPos.z)
-    };
-
-    // AABB가 모든 프러스텀 평면의 외부에 있는지 확인
+    
     for (int i = 0; i < 6; ++i) 
     {
-        bool allOutside = true;
+        vec3 positiveVertex = newMinPos.xyz;
 
-        for (int j = 0; j < 8; ++j) 
+        // 양수 방향 꼭짓점 선택
+        if (planes[i].x >= 0) positiveVertex.x = newMaxPos.x;
+        if (planes[i].y >= 0) positiveVertex.y = newMaxPos.y;
+        if (planes[i].z >= 0) positiveVertex.z = newMaxPos.z;
+
+        // 평면과 꼭짓점 사이의 거리 계산
+        float distance = dot(planes[i].xyz, positiveVertex) + planes[i].w;
+
+        // AABB의 한 좌표라도 평면 안에 있는 경우
+        if (distance >= 0) 
         {
-            // 평면과 꼭짓점 사이의 거리 계산
-            float distance = dot(planes[i].xyz, corners[j]) + planes[i].w;
-
-            // AABB의 한 점이라도 평면 내부에 있다면 allOutside는 false
-            if (distance >= 0) 
-            {
-                allOutside = false;
-                return true;
-                break;
-            }
-        }
-
-        // AABB가 현재 평면에서 완전히 외부에 있다면 프러스텀 밖
-        if (allOutside) 
-        {
-            return false;
+            return true;
         }
     }
 
-    // 모든 프러스텀 평면에서 AABB가 일부라도 걸쳐 있거나 내부에 있다면 true
-    return true;
+    return false; // 프러스텀 밖
 }
+
+//bool IsAABBInFrustum(AABB aabb) 
+//{
+//    vec4 newMinPos = uboViewProjection.view * aabb.minPos;
+//    vec4 newMaxPos = uboViewProjection.view * aabb.maxPos;
+//
+//    // AABB의 8개 코너 계산
+//    vec3 corners[8] = {
+//        vec3(newMinPos.x, newMinPos.y, newMinPos.z),
+//        vec3(newMinPos.x, newMinPos.y, newMaxPos.z),
+//        vec3(newMinPos.x, newMaxPos.y, newMinPos.z),
+//        vec3(newMinPos.x, newMaxPos.y, newMaxPos.z),
+//        vec3(newMaxPos.x, newMinPos.y, newMinPos.z),
+//        vec3(newMaxPos.x, newMinPos.y, newMaxPos.z),
+//        vec3(newMaxPos.x, newMaxPos.y, newMinPos.z),
+//        vec3(newMaxPos.x, newMaxPos.y, newMaxPos.z)
+//    };
+//
+//    // AABB가 모든 프러스텀 평면의 외부에 있는지 확인
+//    for (int i = 0; i < 6; ++i) 
+//    {
+//        bool allOutside = true;
+//
+//        for (int j = 0; j < 8; ++j) 
+//        {
+//            // 평면과 꼭짓점 사이의 거리 계산
+//            float distance = dot(planes[i].xyz, corners[j]) + planes[i].w;
+//
+//            // AABB의 한 점이라도 평면 내부에 있다면 allOutside는 false
+//            if (distance >= 0) 
+//            {
+//                allOutside = false;
+//                return true;
+//                break;
+//            }
+//        }
+//
+//        // AABB가 현재 평면에서 완전히 외부에 있다면 프러스텀 밖
+//        if (allOutside) 
+//        {
+//            return false;
+//        }
+//    }
+//
+//    // 모든 프러스텀 평면에서 AABB가 일부라도 걸쳐 있거나 내부에 있다면 true
+//    return true;
+//}
 
 void main() {
     uint idx = gl_GlobalInvocationID.x;
