@@ -5,7 +5,7 @@
 #define MAX_OBJECTS 1000
 
 layout(location = 0) in vec3 pos; // output colour for vertex (location is required)
-layout(location = 1) in vec3 col;
+layout(location = 1) in vec3 normal;
 layout(location = 2) in vec2 tex;
 
 layout(set = 0, binding = 0) uniform ViewProjectionUBO {
@@ -27,6 +27,6 @@ void main() {
 	debugPrintfEXT("gl_BaseInstance: %d\n", gl_BaseInstanceARB);
 	gl_Position = viewProjectionUBO.projection * viewProjectionUBO.view * model * vec4(pos, 1.0);
 
-	fragCol = col;
+	fragCol = vec3(1.0, 0.0, 0.0);
 	fragTex = tex;
 }

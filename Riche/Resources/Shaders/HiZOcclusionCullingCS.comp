@@ -105,7 +105,7 @@ void main() {
     }
 
     // for debugging
-    if(shaderSetting.isDebugging) fLODList[idx] = fLOD;
+    if(shaderSetting.isDebugging > 0) fLODList[idx] = fLOD;
 
     drawIndexedCommands[idx].instanceCount = isVisible ? 1 : 0;
 }

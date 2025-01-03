@@ -536,7 +536,7 @@ void CullingRenderPass::CraeteGrahpicsPipeline() {
   attributeDescriptions[1].binding = 0;                          // Which binding the data is at (should be same as above)
   attributeDescriptions[1].location = 1;                         // Location in shader where data will be read from
   attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;  // Format the data will take (also helps define size of data)
-  attributeDescriptions[1].offset = offsetof(BasicVertex, col);  // Where this attribute is defined in the data for a single vertex.
+  attributeDescriptions[1].offset = offsetof(BasicVertex, normal);  // Where this attribute is defined in the data for a single vertex.
   // Texture Attribute
   attributeDescriptions[2].binding = 0;
   attributeDescriptions[2].location = 2;
@@ -722,7 +722,7 @@ void CullingRenderPass::CreateWireGraphicsPipeline() {
   attributeDescriptions[1].binding = 0;                          // Which binding the data is at (should be same as above)
   attributeDescriptions[1].location = 1;                         // Location in shader where data will be read from
   attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;  // Format the data will take (also helps define size of data)
-  attributeDescriptions[1].offset = offsetof(BasicVertex, col);  // Where this attribute is defined in the data for a single vertex.
+  attributeDescriptions[1].offset = offsetof(BasicVertex, normal);  // Where this attribute is defined in the data for a single vertex.
   // Texture Attribute
   attributeDescriptions[2].binding = 0;
   attributeDescriptions[2].location = 2;
@@ -889,7 +889,7 @@ void CullingRenderPass::CreateDepthGraphicsPipeline() {
   attributeDescriptions[1].binding = 0;                          // Which binding the data is at (should be same as above)
   attributeDescriptions[1].location = 1;                         // Location in shader where data will be read from
   attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;  // Format the data will take (also helps define size of data)
-  attributeDescriptions[1].offset = offsetof(BasicVertex, col);  // Where this attribute is defined in the data for a single vertex.
+  attributeDescriptions[1].offset = offsetof(BasicVertex, normal);  // Where this attribute is defined in the data for a single vertex.
   // Texture Attribute
   attributeDescriptions[2].binding = 0;
   attributeDescriptions[2].location = 2;
