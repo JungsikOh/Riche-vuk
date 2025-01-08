@@ -35,6 +35,7 @@
 #include "entt/entt.hpp"
 
 #include "tiny_obj_loader.h"
+#include "tinygltf/tiny_gltf.h"
 
 #pragma warning(pop)
 

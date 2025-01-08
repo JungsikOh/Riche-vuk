@@ -4,6 +4,7 @@
 #include "Editor/Editor.h"
 #include "Mesh.h"
 #include "Utils/BoundingBox.h"
+#include "Utils/ModelLoader.h"
 #include "VkUtils/ChooseFunc.h"
 #include "VkUtils/DescriptorBuilder.h"
 #include "VkUtils/DescriptorManager.h"
@@ -24,114 +25,136 @@ void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDev
 
   m_pGraphicsCommandPool = commandPool;
 
+  std::vector<Mesh> test;
+  //loadGltfModel("Resources/Models/Sponza/glTF/sponza.gltf", test);
+  loadObjModel("Resources/Models/sponza (1)/sponza.obj", test);
+  //loadObjModel("Resources/Models/sponza_obj/sponza.obj", test);
+  //loadObjModel("Resources/Models/San_Miguel/san-miguel.obj", test);
+
+  for (auto& mesh : test) {
+    mesh.GetModel() = glm::mat4(1.0f);
+    m_modelListCPU.push_back(mesh.GetModel());
+
+    AddDataToMiniBatch(m_miniBatchList, g_ResourceManager, mesh);
+
+    std::vector<glm::vec3> positions;
+    for (const BasicVertex& vertex : mesh.vertices) {
+      positions.push_back(vertex.pos);
+    }
+
+
+    AABB aabb = ComputeAABB(positions);
+    m_aabbList.push_back(aabb);
+  }
+
   std::vector<BasicVertex> allMeshVertices;
   std::vector<uint32_t> allIndices;
 
-  for (int z = -15; z < -5; ++z) {
-    for (int y = -5; y < 5; ++y) {
-      for (int x = -5; x < 4; ++x) {
-        // Create a mesh
-        std::vector<BasicVertex> meshVertices = {
-            {{-0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},   {{0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
-            {{0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},     {{-0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+  //for (int z = -15; z < -5; ++z) {
+  //  for (int y = -5; y < 5; ++y) {
+  //    for (int x = -5; x < 4; ++x) {
+  //      // Create a mesh
+  //      std::vector<BasicVertex> meshVertices = {
+  //          {{-0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},   {{0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+  //          {{0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},     {{-0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
 
-            {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}}, {{0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},
-            {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},   {{-0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},
+  //          {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}}, {{0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},
+  //          {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},   {{-0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},
 
-            {{-0.5f, -0.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, {{-0.5f, -0.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-            {{-0.5f, 0.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},   {{-0.5f, 0.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //          {{-0.5f, -0.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}}, {{-0.5f, -0.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //          {{-0.5f, 0.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},   {{-0.5f, 0.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
 
-            {{0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},   {{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-            {{0.5f, 0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},     {{0.5f, 0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //          {{0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},   {{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //          {{0.5f, 0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},     {{0.5f, 0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
 
-            {{-0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},    {{0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-            {{0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},    {{-0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
+  //          {{-0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},    {{0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+  //          {{0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},    {{-0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
 
-            {{-0.5f, -0.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}},  {{0.5f, -0.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}},
-            {{0.5f, -0.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},  {{-0.5f, -0.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}}};
+  //          {{-0.5f, -0.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}},  {{0.5f, -0.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}},
+  //          {{0.5f, -0.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},  {{-0.5f, -0.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}}};
 
-        std::vector<uint32_t> meshIndices = {0,  3,  2,  2,  1,  0,  4,  7,  6,  6,  5,  4,  8,  11, 10, 10, 9,  8,
-                                             12, 15, 14, 14, 13, 12, 16, 19, 18, 18, 17, 16, 20, 23, 22, 22, 21, 20};
+  //      std::vector<uint32_t> meshIndices = {0,  3,  2,  2,  1,  0,  4,  7,  6,  6,  5,  4,  8,  11, 10, 10, 9,  8,
+  //                                           12, 15, 14, 14, 13, 12, 16, 19, 18, 18, 17, 16, 20, 23, 22, 22, 21, 20};
 
-        Mesh mesh;
-        float posX = x * 1.3f;
-        float posY = y * 1.3f;
-        float posZ = z * 1.3f;
+  //      Mesh mesh;
+  //      float posX = x * 1.3f;
+  //      float posY = y * 1.3f;
+  //      float posZ = z * 1.3f;
 
-        mesh.GetModel() = glm::translate(glm::mat4(1.0f), glm::vec3(posX, posY, posZ));
-        m_modelListCPU.push_back(mesh.GetModel());
+  //      mesh.GetModel() = glm::translate(glm::mat4(1.0f), glm::vec3(posX, posY, posZ));
+  //      m_modelListCPU.push_back(mesh.GetModel());
 
-        mesh.Initialize(meshVertices, meshIndices);
-        AddDataToMiniBatch(m_miniBatchList, g_ResourceManager, mesh);
+  //      mesh.Initialize(meshVertices, meshIndices);
+  //      AddDataToMiniBatch(m_miniBatchList, g_ResourceManager, mesh);
 
-        std::vector<glm::vec3> positions;
-        for (const BasicVertex& vertex : meshVertices) {
-          positions.push_back(mesh.GetModel() * glm::vec4(vertex.pos, 1.0f));
-        }
+  //      std::vector<glm::vec3> positions;
+  //      for (const BasicVertex& vertex : meshVertices) {
+  //        positions.push_back(mesh.GetModel() * glm::vec4(vertex.pos, 1.0f));
+  //      }
 
-        AABB aabb = ComputeAABB(positions);
-        m_aabbList.push_back(aabb);
-      }
-    }
-  }
-  std::vector<BasicVertex> meshVertices = {// Front face
-                                           {{-7.5f, -7.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
-                                           {{7.5f, -7.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
-                                           {{7.5f, 7.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-                                           {{-7.5f, 7.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+  //      AABB aabb = ComputeAABB(positions);
+  //      m_aabbList.push_back(aabb);
+  //    }
+  //  }
+  //}
+  //std::vector<BasicVertex> meshVertices = {// Front face
+  //                                         {{-7.5f, -7.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
+  //                                         {{7.5f, -7.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+  //                                         {{7.5f, 7.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+  //                                         {{-7.5f, 7.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
 
-                                           // Back face
-                                           {{-7.5f, -7.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}},
-                                           {{7.5f, -7.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},
-                                           {{7.5f, 7.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},
-                                           {{-7.5f, 7.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},
+  //                                         // Back face
+  //                                         {{-7.5f, -7.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}},
+  //                                         {{7.5f, -7.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},
+  //                                         {{7.5f, 7.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},
+  //                                         {{-7.5f, 7.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},
 
-                                           // Left face
-                                           {{-7.5f, -7.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-                                           {{-7.5f, -7.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-                                           {{-7.5f, 7.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-                                           {{-7.5f, 7.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //                                         // Left face
+  //                                         {{-7.5f, -7.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+  //                                         {{-7.5f, -7.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //                                         {{-7.5f, 7.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //                                         {{-7.5f, 7.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
 
-                                           // Right face
-                                           {{7.5f, -7.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-                                           {{7.5f, -7.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-                                           {{7.5f, 7.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
-                                           {{7.5f, 7.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+  //                                         // Right face
+  //                                         {{7.5f, -7.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+  //                                         {{7.5f, -7.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+  //                                         {{7.5f, 7.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+  //                                         {{7.5f, 7.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
 
-                                           // Top face
-                                           {{-7.5f, 7.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-                                           {{7.5f, 7.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-                                           {{7.5f, 7.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
-                                           {{-7.5f, 7.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
+  //                                         // Top face
+  //                                         {{-7.5f, 7.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+  //                                         {{7.5f, 7.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+  //                                         {{7.5f, 7.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
+  //                                         {{-7.5f, 7.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
 
-                                           // Bottom face
-                                           {{-7.5f, -7.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}},
-                                           {{7.5f, -7.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}},
-                                           {{7.5f, -7.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},
-                                           {{-7.5f, -7.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}}};
+  //                                         // Bottom face
+  //                                         {{-7.5f, -7.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}},
+  //                                         {{7.5f, -7.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}},
+  //                                         {{7.5f, -7.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},
+  //                                         {{-7.5f, -7.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}}};
 
-  std::vector<uint32_t> meshIndices = {
-      0,  3,  2,  2,  1,  0,   // Front face
-      4,  7,  6,  6,  5,  4,   // Back face
-      8,  11, 10, 10, 9,  8,   // Left face
-      12, 15, 14, 14, 13, 12,  // Right face
-      16, 19, 18, 18, 17, 16,  // Top face
-      20, 23, 22, 22, 21, 20   // Bottom face
-  };
-  Mesh mesh;
-  mesh.GetModel() = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
-  m_modelListCPU.push_back(mesh.GetModel());
+  //std::vector<uint32_t> meshIndices = {
+  //    0,  3,  2,  2,  1,  0,   // Front face
+  //    4,  7,  6,  6,  5,  4,   // Back face
+  //    8,  11, 10, 10, 9,  8,   // Left face
+  //    12, 15, 14, 14, 13, 12,  // Right face
+  //    16, 19, 18, 18, 17, 16,  // Top face
+  //    20, 23, 22, 22, 21, 20   // Bottom face
+  //};
+  //Mesh mesh;
+  //mesh.GetModel() = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+  //m_modelListCPU.push_back(mesh.GetModel());
 
-  mesh.Initialize(meshVertices, meshIndices);
-  AddDataToMiniBatch(m_miniBatchList, g_ResourceManager, mesh);
+  //mesh.Initialize(meshVertices, meshIndices);
+  //AddDataToMiniBatch(m_miniBatchList, g_ResourceManager, mesh);
 
-  std::vector<glm::vec3> positions;
-  for (const BasicVertex& vertex : meshVertices) {
-    positions.push_back(mesh.GetModel() * glm::vec4(vertex.pos, 1.0f));
-  }
+  //std::vector<glm::vec3> positions;
+  //for (const BasicVertex& vertex : meshVertices) {
+  //  positions.push_back(mesh.GetModel() * glm::vec4(vertex.pos, 1.0f));
+  //}
 
-  AABB aabb = ComputeAABB(positions);
-  m_aabbList.push_back(aabb);
+  //AABB aabb = ComputeAABB(positions);
+  //m_aabbList.push_back(aabb);
   FlushMiniBatch(m_miniBatchList, g_ResourceManager);
 
   CreateRenderPass();
@@ -1259,6 +1282,7 @@ void CullingRenderPass::RecordCommands() {
     throw std::runtime_error("Failed to start recording a Command Buffer!");
   }
 
+  
   vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipeline);
   vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 0, 1,
                           &g_DescriptorManager.GetVkDescriptorSet("ViewFrustumCulling_COMPUTE"), 0, nullptr);
@@ -1289,7 +1313,7 @@ void CullingRenderPass::RecordCommands() {
   //
   // mini-batch system
   //
-  for (auto miniBatch : m_miniBatchList) {
+  for (auto& miniBatch : m_miniBatchList) {
     // Bind the vertex buffer with the correct offset
     VkDeviceSize vertexOffset = 0;  // Always bind at offset 0 since indirect commands handle offsets
     vkCmdBindVertexBuffers(m_commandBuffer, 0, 1, &miniBatch.m_vertexBuffer, &vertexOffset);
@@ -1305,7 +1329,7 @@ void CullingRenderPass::RecordCommands() {
 
     uint32_t drawCount = static_cast<uint32_t>(miniBatch.m_drawIndexedCommands.size());
     vkCmdDrawIndexedIndirect(m_commandBuffer, m_indirectDrawBuffer,
-                             0,                                    // offset
+                             miniBatch.m_indirectCommandsOffset,   // offset
                              drawCount,                            // drawCount
                              sizeof(VkDrawIndexedIndirectCommand)  // stride
     );
@@ -1434,7 +1458,8 @@ void CullingRenderPass::RecordCommands() {
 
     vkCmdDispatch(m_commandBuffer, 1000, 1, 1);
   }
-
+  
+  
   // Information about how to begin a render pass (only needed for graphical applications)
   VkRenderPassBeginInfo renderPassBeginInfo = {};
   renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -1458,11 +1483,11 @@ void CullingRenderPass::RecordCommands() {
   // Bind Pipeline to be used in render pass
   vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                     g_RenderSetting.isWireRendering ? m_wireGraphicsPipeline : m_graphicsPipeline);
-
   //
   // mini-batch system
   //
-  for (auto miniBatch : m_miniBatchList) {
+
+  for (auto& miniBatch : m_miniBatchList) {
     // Bind the vertex buffer with the correct offset
     VkDeviceSize vertexOffset = 0;  // Always bind at offset 0 since indirect commands handle offsets
     vkCmdBindVertexBuffers(m_commandBuffer, 0, 1, &miniBatch.m_vertexBuffer, &vertexOffset);
@@ -1478,7 +1503,7 @@ void CullingRenderPass::RecordCommands() {
 
     uint32_t drawCount = static_cast<uint32_t>(miniBatch.m_drawIndexedCommands.size());
     vkCmdDrawIndexedIndirect(m_commandBuffer, m_indirectDrawBuffer,
-                             0,                                    // offset
+                             miniBatch.m_indirectCommandsOffset,                 // offset
                              drawCount,                            // drawCount
                              sizeof(VkDrawIndexedIndirectCommand)  // stride
     );

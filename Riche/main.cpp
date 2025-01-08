@@ -43,8 +43,6 @@ void CursorPositionCallback(GLFWwindow* window, double xpos, double ypos) {
     lastX = xpos;
     lastY = ypos;
 
-    // DeltaX¿Í DeltaY Ãâ·Â
-    std::cout << "DeltaX: " << deltaX << ", DeltaY: " << deltaY << std::endl;
     g_camera.OnMouseInput(deltaX, deltaY);
   }
 }
@@ -69,14 +67,14 @@ int main() {
   glfwSetCursorPosCallback(window, CursorPositionCallback);
 
   CameraParameters cameraParams = {};
-  cameraParams.speed = 30.0f;
+  cameraParams.speed = 3000.0f;
   cameraParams.sensitivity = 0.2f;
   cameraParams.position = glm::vec3(0.0f, 0.0f, 2.0f);
   cameraParams.lootAt = glm::vec3(0.0f, 0.0f, -1.0f);
   cameraParams.fov = 45.0f;
   cameraParams.aspectRatio = 1920.0f / 1080.0f;
   cameraParams.nearPlane = 0.5f;
-  cameraParams.farPlane = 100.0f;
+  cameraParams.farPlane = 5000.0f;
   g_camera.Initialize(cameraParams);
 
   // Create Vulkan Renderer Instance

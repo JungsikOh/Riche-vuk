@@ -23,9 +23,11 @@ struct ShaderSetting {
 };
 
 struct BasicVertex {
-  glm::vec3 pos;  // Vertex pos (x, y, z)
+  glm::vec3 pos;     // Vertex pos (x, y, z)
   glm::vec3 normal;  // Vertex colour (r, g, b)
-  glm::vec2 tex;  // Texture Coords (u, v)
+  glm::vec2 tex;     // Texture Coords (u, v)
+
+  bool operator==(const BasicVertex& other) const { return pos == other.pos && normal == other.normal && tex == other.tex; }
 };
 
 struct COMPONENTS Transform {

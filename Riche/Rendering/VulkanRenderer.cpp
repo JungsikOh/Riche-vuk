@@ -7,6 +7,7 @@
 #include "CullingRenderPass.h"
 #include "Mesh.h"
 #include "Utils/StringUtil.h"
+#include "Utils/ThreadPool.h"
 #include "VkUtils/ChooseFunc.h"
 #include "VkUtils/DescriptorBuilder.h"
 #include "VkUtils/DescriptorManager.h"
@@ -49,6 +50,7 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
     CreateCommandBuffers();
     CreateSynchronisation();
 
+    g_ThreadPool.Initialize(std::thread::hardware_concurrency() - 1);
     g_DescriptorAllocator.Initialize(mainDevice.logicalDevice);
     g_DescriptorLayoutCache.Initialize(mainDevice.logicalDevice);
     g_ResourceManager.Initialize(mainDevice.logicalDevice, mainDevice.physicalDevice, m_transferQueue, m_queueFamilyIndices);

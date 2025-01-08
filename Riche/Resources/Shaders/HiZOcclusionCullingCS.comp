@@ -105,14 +105,18 @@ void main() {
 
         // ---- 다중 샘플링 방식을 적용 ----
         // 예) 4개의 샘플(화면 bounding box의 4분점 + 중앙 등)
-        const uint SAMPLE_COUNT = 5;
         // 4분점 + 중앙
+        const uint SAMPLE_COUNT = 9;
         vec2 sampleOffsets[SAMPLE_COUNT] = {
-            vec2(0.0, 0.0),  // center
-            vec2(-0.5, -0.5),
-            vec2(-0.5,  0.5),
-            vec2( 0.5, -0.5),
-            vec2( 0.5,  0.5)
+            vec2( 0.0,  0.0),  // center
+            vec2(-0.5, -0.5),  // bottom-left
+            vec2(-0.5,  0.5),  // top-left
+            vec2( 0.5, -0.5),  // bottom-right
+            vec2( 0.5,  0.5),  // top-right
+            vec2( 0.0, -1.0),  // bottom-center
+            vec2( 0.0,  1.0),  // top-center
+            vec2(-1.0,  0.0),  // left-center
+            vec2( 1.0,  0.0)   // right-center
         };
 
         // "모든 샘플"이 occluded인지 판단하기 위해, 우선 occludedCount=0
