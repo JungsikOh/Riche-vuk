@@ -67,8 +67,8 @@ static std::array<FrustumPlane, 6> CalculateFrustumPlanes(const glm::mat4& viewP
     return planes;
 }
 
-static AABB ComputeAABB(const std::vector<BasicVertex>& vertices)
-{
+template <typename VERTEX>
+static AABB ComputeAABB(const std::vector<VERTEX>& vertices) {
     glm::vec3 min(
         std::numeric_limits<float>::max(),
         std::numeric_limits<float>::max(),
