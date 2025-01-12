@@ -57,6 +57,7 @@ static bool loadObjModel(const std::string& filepath, std::vector<Mesh>& outMesh
     futures.push_back(std::move(future));
   }
 
+  size_t initObjectIDSize = g_BatchManager.m_meshIDList.size();
   for (int i = 0; i < futures.size(); ++i) {
     auto& f = futures[i];
 
@@ -68,7 +69,7 @@ static bool loadObjModel(const std::string& filepath, std::vector<Mesh>& outMesh
 
     entt::entity object = g_Registry.create();
     ObjectID _id;
-    _id.handle = static_cast<uint64_t>(i);
+    _id.handle = static_cast<uint64_t>(i + initObjectIDSize);
     g_BatchManager.m_meshIDList.push_back(_id);
     g_Registry.emplace<ObjectID>(object, _id);
 
