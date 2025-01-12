@@ -1,5 +1,6 @@
 #include "CullingRenderPass.h"
 
+#include "VulkanRenderer.h"
 #include "Camera.h"
 #include "Editor/Editor.h"
 #include "Mesh.h"
@@ -26,24 +27,24 @@ void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDev
   m_pGraphicsCommandPool = commandPool;
 
   std::vector<Mesh> test;
-  //loadGltfModel("Resources/Models/Sponza/glTF/sponza.gltf", test);
   loadObjModel("Resources/Models/sponza (1)/sponza.obj", test);
-  //loadObjModel("Resources/Models/sponza_obj/sponza.obj", test);
-  //loadObjModel("Resources/Models/San_Miguel/san-miguel.obj", test);
 
-  for (auto& mesh : test) {
+  for (int i = 0; i < test.size(); ++i) {
+    auto& mesh = test[i];
     mesh.GetModel() = glm::mat4(1.0f);
-    m_modelListCPU.push_back(mesh.GetModel());
+    m_modelListCPU.push_back(glm::scale(glm::mat4(1.0f), glm::vec3(0.75f)));
 
-    AddDataToMiniBatch(m_miniBatchList, g_ResourceManager, mesh);
+    entt::entity object = g_Registry.create();
+    g_Registry.emplace<ObjectID>(object, static_cast<uint64_t>(i));
 
-    std::vector<glm::vec3> positions;
-    for (const BasicVertex& vertex : mesh.vertices) {
-      positions.push_back(vertex.pos);
-    }
+    Transform _transfrom = {};
+    _transfrom.startTransform = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
+    _transfrom.currentTransform = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
+    g_Registry.emplace<Transform>(object, _transfrom);
 
+    AddDataToMiniBatch(g_BatchManager.m_miniBatchList, g_ResourceManager, mesh);
 
-    AABB aabb = ComputeAABB(positions);
+    AABB aabb = ComputeAABB(mesh.vertices);
     m_aabbList.push_back(aabb);
   }
 
@@ -155,7 +156,7 @@ void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDev
 
   //AABB aabb = ComputeAABB(positions);
   //m_aabbList.push_back(aabb);
-  FlushMiniBatch(m_miniBatchList, g_ResourceManager);
+  FlushMiniBatch(g_BatchManager.m_miniBatchList, g_ResourceManager);
 
   CreateRenderPass();
   CreateDepthRenderPass();
@@ -174,7 +175,7 @@ void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDev
 }
 
 void CullingRenderPass::Cleanup() {
-  for (auto batch : m_miniBatchList) {
+  for (auto batch : g_BatchManager.m_miniBatchList) {
     vkDestroyBuffer(m_pDevice, batch.m_vertexBuffer, nullptr);
     vkFreeMemory(m_pDevice, batch.m_vertexBufferMemory, nullptr);
 
@@ -1112,10 +1113,10 @@ void CullingRenderPass::CreateShaderStorageBuffers() {
 
   VkDeviceSize indirectBufferSize = 0;
   std::vector<VkDrawIndexedIndirectCommand> flattenCommands;
-  for (int i = 0; i < m_miniBatchList.size(); ++i) {
-    indirectBufferSize += sizeof(VkDrawIndexedIndirectCommand) * m_miniBatchList[i].m_drawIndexedCommands.size();
-    flattenCommands.insert(flattenCommands.end(), m_miniBatchList[i].m_drawIndexedCommands.begin(),
-                           m_miniBatchList[i].m_drawIndexedCommands.end());
+  for (int i = 0; i < g_BatchManager.m_miniBatchList.size(); ++i) {
+    indirectBufferSize += sizeof(VkDrawIndexedIndirectCommand) * g_BatchManager.m_miniBatchList[i].m_drawIndexedCommands.size();
+    flattenCommands.insert(flattenCommands.end(), g_BatchManager.m_miniBatchList[i].m_drawIndexedCommands.begin(),
+                           g_BatchManager.m_miniBatchList[i].m_drawIndexedCommands.end());
   }
   VkUtils::CreateBuffer(
       m_pDevice, m_pPhyscialDevice, indirectBufferSize, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -1313,7 +1314,7 @@ void CullingRenderPass::RecordCommands() {
   //
   // mini-batch system
   //
-  for (auto& miniBatch : m_miniBatchList) {
+  for (auto& miniBatch : g_BatchManager.m_miniBatchList) {
     // Bind the vertex buffer with the correct offset
     VkDeviceSize vertexOffset = 0;  // Always bind at offset 0 since indirect commands handle offsets
     vkCmdBindVertexBuffers(m_commandBuffer, 0, 1, &miniBatch.m_vertexBuffer, &vertexOffset);
@@ -1487,7 +1488,7 @@ void CullingRenderPass::RecordCommands() {
   // mini-batch system
   //
 
-  for (auto& miniBatch : m_miniBatchList) {
+  for (auto& miniBatch : g_BatchManager.m_miniBatchList) {
     // Bind the vertex buffer with the correct offset
     VkDeviceSize vertexOffset = 0;  // Always bind at offset 0 since indirect commands handle offsets
     vkCmdBindVertexBuffers(m_commandBuffer, 0, 1, &miniBatch.m_vertexBuffer, &vertexOffset);

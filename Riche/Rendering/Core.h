@@ -1,4 +1,5 @@
 #pragma once
+#define DESC_HANDLE uint64_t
 
 const int MAX_FRAME_DRAWS = 3;
 const std::vector<const char*> deviceExtensions = {

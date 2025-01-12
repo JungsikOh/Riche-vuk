@@ -67,7 +67,7 @@ static std::array<FrustumPlane, 6> CalculateFrustumPlanes(const glm::mat4& viewP
     return planes;
 }
 
-static AABB ComputeAABB(const std::vector<glm::vec3>& vertices)
+static AABB ComputeAABB(const std::vector<BasicVertex>& vertices)
 {
     glm::vec3 min(
         std::numeric_limits<float>::max(),
@@ -81,9 +81,9 @@ static AABB ComputeAABB(const std::vector<glm::vec3>& vertices)
     );
 
     // Update min/max, visiting each point
-    for (const auto& point : vertices) {
-        min = glm::min(min, point);
-        max = glm::max(max, point);
+    for (const auto& vertex : vertices) {
+      min = glm::min(min, vertex.pos);
+      max = glm::max(max, vertex.pos);
     }
 
     return { glm::vec4(min, 1.0f), glm::vec4(max, 1.0f) };

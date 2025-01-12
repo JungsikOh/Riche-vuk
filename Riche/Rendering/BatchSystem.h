@@ -2,6 +2,8 @@
 
 #include "Components.h"
 #include "Mesh.h"
+#include "Utils/Boundingbox.h"
+#include "VkUtils/DescriptorManager.h"
 #include "VkUtils/ResourceManager.h"
 
 static const uint32_t MAX_BATCH_SIZE = 3 * 1024 * 1024;  // 3MB
@@ -13,10 +15,27 @@ static uint64_t accumulatedIndirectOffset = 0;
 static uint32_t accumulatedMeshIndex = 0;
 
 struct MiniBatch {
-  VkBuffer m_vertexBuffer = nullptr;
+  VkBuffer m_vertexBuffer = VK_NULL_HANDLE;
   VkDeviceMemory m_vertexBufferMemory;
-  VkBuffer m_indexBuffer = nullptr;
+  VkBuffer m_indexBuffer = VK_NULL_HANDLE;
   VkDeviceMemory m_indexBufferMemory;
+
+  // Mesh
+  std::vector<ObjectID> m_meshIDList;
+  std::vector<Transform> m_trasfromCPUList;
+
+  VkBuffer m_transformBuffer = VK_NULL_HANDLE;
+  VkDeviceMemory m_transformBufferMemory = VK_NULL_HANDLE;
+  DESC_HANDLE m_transformSetHandle = VkUtils::INVALID_DESC_HANDLE;
+
+  // Material
+  VkBuffer m_materialBuffer = VK_NULL_HANDLE;
+  VkDeviceMemory m_materialBufferMemory = VK_NULL_HANDLE;
+  DESC_HANDLE m_materialBufferSetHandle = VkUtils::INVALID_DESC_HANDLE;
+
+  std::vector<VkImage> m_imageGPU;
+  VkDeviceMemory m_imageGPUMemory;
+  std::vector<VkImageView> m_imageViewGPU;
 
   uint32_t m_currentVertexOffset = 0;
   uint32_t m_currentIndexOffset = 0;
@@ -24,6 +43,18 @@ struct MiniBatch {
 
   uint64_t m_indirectCommandsOffset = 0;
   std::vector<VkDrawIndexedIndirectCommand> m_drawIndexedCommands;
+};
+
+struct BatchManager {
+  std::vector<MiniBatch> m_miniBatchList;
+
+  // -- Indirect Draw Call
+  VkBuffer m_indirectDrawBuffer;
+  VkDeviceMemory m_indirectDrawBufferMemory;
+
+  std::vector<AABB> m_boundingBoxList;
+  VkBuffer m_boundingBoxListBuffer;
+  VkDeviceMemory m_boundingBoxListBufferMemory;
 };
 
 static void AddDataToMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::ResourceManager& manager, const Mesh& mesh,

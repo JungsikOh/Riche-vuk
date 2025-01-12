@@ -30,9 +30,39 @@ struct BasicVertex {
   bool operator==(const BasicVertex& other) const { return pos == other.pos && normal == other.normal && tex == other.tex; }
 };
 
+struct COMPONENTS MaterialCPU {
+  glm::vec4 baseColor = glm::vec4(1.0f);
+  float albedoFactor = 1.0f;
+  float metallicFactor = 1.0f;
+  float roughnessFactor = 1.0f;
+  float emissiveFactor = 1.0f;
+};
+
+struct MaterialBufferManager {
+  std::vector<MaterialCPU> m_materialCPUList;
+
+  VkBuffer m_materialGPUBuffer = VK_NULL_HANDLE;
+  VkDeviceMemory m_materialGPUBufferMemory = VK_NULL_HANDLE;
+  size_t m_materialCount = 0;
+
+  uint32_t AddMaterial(const MaterialCPU& mat) {
+    uint32_t idx = static_cast<uint32_t>(m_materialCPUList.size());
+    m_materialCPUList.push_back(mat);
+    return idx;
+  }
+
+  void UploadToGPU(VkDevice device) {
+
+  }
+};
+
+struct COMPONENTS ObjectID {
+  uint64_t handle = uint64_t(-1);
+};
+
 struct COMPONENTS Transform {
-  glm::mat4 startTransform;
-  glm::mat4 currentTransform;
+  glm::mat4 startTransform = glm::mat4(1.0f);
+  glm::mat4 currentTransform = glm::mat4(1.0f);
 };
 
 struct COMPONENTS BoundingBox {

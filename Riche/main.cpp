@@ -1,3 +1,7 @@
+#include <filesystem>
+#include <cstdlib>     // std::system
+#include <string_view>
+
 #include "Rendering/Camera.h"
 #include "Rendering/VulkanRenderer.h"
 
@@ -59,6 +63,7 @@ void InitWindow(std::string wName = "Test Window", const int w = 800, const int 
 }
 
 int main() {
+
   // Create Window
   InitWindow("Test Widnow", 1920, 1080);
 
