@@ -10,8 +10,9 @@
 #include "VkUtils/QueueFamilyIndices.h"
 #include "VkUtils/ResourceManager.h"
 
+
 static const int OBJECT_COUNT = 1000;
-static BatchManager g_BatchManager;
+
 
 class Camera;
 class Mesh;

@@ -3,6 +3,7 @@
 #include "Components.h"
 #include "Mesh.h"
 #include "Utils/Boundingbox.h"
+#include "Utils/Singleton.h"
 #include "VkUtils/DescriptorManager.h"
 #include "VkUtils/ResourceManager.h"
 
@@ -24,15 +25,6 @@ struct MiniBatch {
   std::vector<ObjectID> m_meshIDList;
   std::vector<Transform> m_trasfromCPUList;
 
-  VkBuffer m_transformBuffer = VK_NULL_HANDLE;
-  VkDeviceMemory m_transformBufferMemory = VK_NULL_HANDLE;
-  DESC_HANDLE m_transformSetHandle = VkUtils::INVALID_DESC_HANDLE;
-
-  // Material
-  VkBuffer m_materialBuffer = VK_NULL_HANDLE;
-  VkDeviceMemory m_materialBufferMemory = VK_NULL_HANDLE;
-  DESC_HANDLE m_materialBufferSetHandle = VkUtils::INVALID_DESC_HANDLE;
-
   std::vector<VkImage> m_imageGPU;
   VkDeviceMemory m_imageGPUMemory;
   std::vector<VkImageView> m_imageViewGPU;
@@ -43,15 +35,39 @@ struct MiniBatch {
 
   uint64_t m_indirectCommandsOffset = 0;
   std::vector<VkDrawIndexedIndirectCommand> m_drawIndexedCommands;
+
+  void Cleanup(VkDevice device) {
+    vkDestroyBuffer(device, m_vertexBuffer, nullptr);
+    vkFreeMemory(device, m_vertexBufferMemory, nullptr);
+
+    vkDestroyBuffer(device, m_indexBuffer, nullptr);
+    vkFreeMemory(device, m_indexBufferMemory, nullptr);
+  }
 };
 
-struct BatchManager {
+struct BatchManager : public Singleton<BatchManager> {
+
+  void Cleanup(VkDevice device) {
+    vkDestroyBuffer(device, m_indirectDrawBuffer, nullptr);
+    vkFreeMemory(device, m_indirectDrawBufferMemory, nullptr);
+
+    vkDestroyBuffer(device, m_boundingBoxListBuffer, nullptr);
+    vkFreeMemory(device, m_boundingBoxListBufferMemory, nullptr);
+  }
+
+ public:
   std::vector<MiniBatch> m_miniBatchList;
+  std::vector<ObjectID> m_meshIDList;
+
+  std::vector<Transform> m_trasformList;
+  VkBuffer m_trasformListBuffer;
+  VkDeviceMemory m_trasformListBufferMemory;
 
   // -- Indirect Draw Call
   VkBuffer m_indirectDrawBuffer;
   VkDeviceMemory m_indirectDrawBufferMemory;
 
+  // -- Bounding Box
   std::vector<AABB> m_boundingBoxList;
   VkBuffer m_boundingBoxListBuffer;
   VkDeviceMemory m_boundingBoxListBufferMemory;
@@ -145,3 +161,5 @@ static void FlushMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::Resourc
   accumulatedIndexSize = 0;
   accumulatedMeshIndex = 0;
 }
+
+#define g_BatchManager BatchManager::Get()

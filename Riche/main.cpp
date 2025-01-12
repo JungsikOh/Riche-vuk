@@ -72,7 +72,7 @@ int main() {
   glfwSetCursorPosCallback(window, CursorPositionCallback);
 
   CameraParameters cameraParams = {};
-  cameraParams.speed = 3000.0f;
+  cameraParams.speed = 300.0f;
   cameraParams.sensitivity = 0.2f;
   cameraParams.position = glm::vec3(0.0f, 0.0f, 2.0f);
   cameraParams.lootAt = glm::vec3(0.0f, 0.0f, -1.0f);

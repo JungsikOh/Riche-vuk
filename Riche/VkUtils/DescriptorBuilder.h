@@ -26,6 +26,7 @@ class DescriptorAllocator : public Singleton<DescriptorAllocator> {
 
   void ResetPools();
   bool Allocate(VkDescriptorSet* set, VkDescriptorSetLayout layout);
+  bool AllocateBindless(VkDescriptorSet* outSet, VkDescriptorSetLayout layout, uint32_t descriptorCount);
 
   void Initialize(VkDevice newDevice);
   void Cleanup();
@@ -65,30 +66,6 @@ static VkDescriptorPool CreatePool(VkDevice device, const DescriptorAllocator::P
   return descriptorPool;
 }
 
-static VkDescriptorPool CreateBindlessPool(VkDevice device, uint32_t maxSampledImages) {
-  // UPDATE_AFTER_BIND 플래그 필요
-  VkDescriptorPoolCreateFlags poolFlags =
-      VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT | VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT;
-
-  // Pool Size
-  std::vector<VkDescriptorPoolSize> sizes;
-  // SAMPLED_IMAGE를 대량으로 쓸 경우
-  sizes.push_back({VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, maxSampledImages});
-  // 필요한 경우 SAMPLER, STORAGE_IMAGE 등 추가
-
-  VkDescriptorPoolCreateInfo poolInfo = {};
-  poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-  poolInfo.flags = poolFlags;
-  poolInfo.maxSets = 1;  // bindless 세트 1개만 크게 쓸 수도 있음
-  poolInfo.poolSizeCount = (uint32_t)sizes.size();
-  poolInfo.pPoolSizes = sizes.data();
-
-  VkDescriptorPool descriptorPool;
-  VK_CHECK(vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool));
-
-  return descriptorPool;
-}
-
 class DescriptorLayoutCache : public Singleton<DescriptorLayoutCache> {
   friend class Singleton<DescriptorLayoutCache>;
 
@@ -100,7 +77,6 @@ class DescriptorLayoutCache : public Singleton<DescriptorLayoutCache> {
   void Cleanup();
 
   VkDescriptorSetLayout CreateDescriptorLayout(VkDescriptorSetLayoutCreateInfo* info);
-  VkDescriptorSetLayout CreateBindlessLayout(uint32_t maxCount, VkDescriptorType descriptorType, VkShaderStageFlags stageFlags);
 
   struct DescriptorLayoutInfo {
     // good idea to turn this into a inlined array
@@ -132,7 +108,7 @@ class DescriptorBuilder {
   DescriptorBuilder& BindImage(uint32_t binding, VkDescriptorImageInfo* imageInfo, VkDescriptorType type,
                                VkShaderStageFlags stageFlags);
 
-  bool Build(VkDescriptorSet& set, VkDescriptorSetLayout& layout);
+  bool Build(VkDescriptorSet& set, VkDescriptorSetLayout& layout, bool isBindless = false);
   bool Build(VkDescriptorSet& set);
 
  private:

@@ -58,6 +58,54 @@ bool DescriptorAllocator::Allocate(VkDescriptorSet* set, VkDescriptorSetLayout l
   return false;
 }
 
+bool DescriptorAllocator::AllocateBindless(VkDescriptorSet* outSet, VkDescriptorSetLayout layout, uint32_t descriptorCount) {
+  if (currentPool == VK_NULL_HANDLE) {
+    currentPool = GrapPool();  // create or fetch
+    usedPools.push_back(currentPool);
+  }
+
+  // variable descriptor count info
+  VkDescriptorSetVariableDescriptorCountAllocateInfoEXT varCountInfo{};
+  varCountInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO_EXT;
+  varCountInfo.descriptorSetCount = 1;
+  varCountInfo.pDescriptorCounts = &descriptorCount;
+
+  VkDescriptorSetAllocateInfo allocInfo{};
+  allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  allocInfo.descriptorPool = currentPool;
+  allocInfo.descriptorSetCount = 1;
+  allocInfo.pSetLayouts = &layout;
+  allocInfo.pNext = &varCountInfo;
+
+  VkResult result = vkAllocateDescriptorSets(device, &allocInfo, outSet);
+  bool needReallocate = false;
+
+  switch (result) {
+    case VK_SUCCESS:
+      return true;
+    case VK_ERROR_FRAGMENTED_POOL:
+    case VK_ERROR_OUT_OF_POOL_MEMORY:
+      needReallocate = true;
+      break;
+    default:
+      return false;
+  }
+
+  if (needReallocate) {
+    // allocate a new pool and retry
+    currentPool = GrapPool();
+    usedPools.push_back(currentPool);
+
+    result = vkAllocateDescriptorSets(device, &allocInfo, outSet);
+
+    // if it still fails then we have big issues
+    if (result == VK_SUCCESS) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void DescriptorAllocator::Initialize(VkDevice newDevice) { device = newDevice; }
 
 void DescriptorAllocator::Cleanup() {
@@ -77,7 +125,8 @@ VkDescriptorPool DescriptorAllocator::GrapPool() {
     freePools.pop_back();
     return pool;
   } else {
-    return CreatePool(device, descriptorSizes, 1000, VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT);
+    return CreatePool(device, descriptorSizes, 1000,
+                      VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT | VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT);
   }
 }
 
@@ -234,7 +283,7 @@ DescriptorBuilder& DescriptorBuilder::BindImage(uint32_t binding, VkDescriptorIm
   return *this;
 }
 
-bool DescriptorBuilder::Build(VkDescriptorSet& set, VkDescriptorSetLayout& layout) {
+bool DescriptorBuilder::Build(VkDescriptorSet& set, VkDescriptorSetLayout& layout, bool isBindless /* = false */) {
   // build layout first
   VkDescriptorSetLayoutCreateInfo layoutInfo{};
   layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -243,10 +292,24 @@ bool DescriptorBuilder::Build(VkDescriptorSet& set, VkDescriptorSetLayout& layou
   layoutInfo.pBindings = bindings.data();
   layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
 
+  VkDescriptorSetLayoutBindingFlagsCreateInfoEXT flagsCreateInfo{};
+  if (isBindless) {
+    VkDescriptorBindingFlagsEXT bindlessFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT |
+                                                VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT |
+                                                VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT;
+
+    flagsCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT;
+    flagsCreateInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    flagsCreateInfo.pBindingFlags = &bindlessFlags;
+
+    layoutInfo.pNext = &flagsCreateInfo;
+    layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
+  }
+
   layout = cache->CreateDescriptorLayout(&layoutInfo);
 
   // allocate descriptor
-  bool success = alloc->Allocate(&set, layout);
+  bool success = isBindless ? alloc->AllocateBindless(&set, layout, 3000) : alloc->Allocate(&set, layout);
   if (!success) {
     return false;
   };

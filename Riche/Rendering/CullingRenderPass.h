@@ -112,10 +112,6 @@ class CullingRenderPass : public IRenderPass {
 
   VkPushConstantRange m_debugPushConstant;
 
-  // -- Indirect Draw Call
-  VkBuffer m_indirectDrawBuffer;
-  VkDeviceMemory m_indirectDrawBufferMemory;
-
   // -- Descriptor Set
   ViewProjection m_viewProjectionCPU;
   VkBuffer m_viewProjectionUBO;
@@ -125,13 +121,6 @@ class CullingRenderPass : public IRenderPass {
   VkBuffer m_modelListUBO;
   VkDeviceMemory m_modelListUBOMemory;
 
-  std::vector<AABB> m_aabbList;
-  VkBuffer m_aabbListBuffer;
-  VkDeviceMemory m_aabbListBufferMemory;
-
   VkBuffer m_cameraFrustumBuffer;
   VkDeviceMemory m_cameraFrustumBufferMemory;
-
-  // - Rendering Object
-  std::vector<MiniBatch> m_miniBatchList;
 };

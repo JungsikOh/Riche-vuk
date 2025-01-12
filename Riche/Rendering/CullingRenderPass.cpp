@@ -34,18 +34,8 @@ void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDev
     mesh.GetModel() = glm::mat4(1.0f);
     m_modelListCPU.push_back(glm::scale(glm::mat4(1.0f), glm::vec3(0.75f)));
 
-    entt::entity object = g_Registry.create();
-    g_Registry.emplace<ObjectID>(object, static_cast<uint64_t>(i));
-
-    Transform _transfrom = {};
-    _transfrom.startTransform = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
-    _transfrom.currentTransform = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
-    g_Registry.emplace<Transform>(object, _transfrom);
-
-    AddDataToMiniBatch(g_BatchManager.m_miniBatchList, g_ResourceManager, mesh);
-
-    AABB aabb = ComputeAABB(mesh.vertices);
-    m_aabbList.push_back(aabb);
+    //AABB aabb = ComputeAABB(mesh.vertices);
+    //m_aabbList.push_back(aabb);
   }
 
   std::vector<BasicVertex> allMeshVertices;
@@ -175,13 +165,6 @@ void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDev
 }
 
 void CullingRenderPass::Cleanup() {
-  for (auto batch : g_BatchManager.m_miniBatchList) {
-    vkDestroyBuffer(m_pDevice, batch.m_vertexBuffer, nullptr);
-    vkFreeMemory(m_pDevice, batch.m_vertexBufferMemory, nullptr);
-
-    vkDestroyBuffer(m_pDevice, batch.m_indexBuffer, nullptr);
-    vkFreeMemory(m_pDevice, batch.m_indexBufferMemory, nullptr);
-  }
 
   // Basic
   vkDestroyImageView(m_pDevice, m_colourBufferImageView, nullptr);
@@ -197,14 +180,8 @@ void CullingRenderPass::Cleanup() {
   vkDestroyBuffer(m_pDevice, m_viewProjectionUBO, nullptr);
   vkFreeMemory(m_pDevice, m_viewProjectionUBOMemory, nullptr);
 
-  vkDestroyBuffer(m_pDevice, m_indirectDrawBuffer, nullptr);
-  vkFreeMemory(m_pDevice, m_indirectDrawBufferMemory, nullptr);
-
   vkDestroyBuffer(m_pDevice, m_modelListUBO, nullptr);
   vkFreeMemory(m_pDevice, m_modelListUBOMemory, nullptr);
-
-  vkDestroyBuffer(m_pDevice, m_aabbListBuffer, nullptr);
-  vkFreeMemory(m_pDevice, m_aabbListBufferMemory, nullptr);
 
   vkDestroyBuffer(m_pDevice, m_cameraFrustumBuffer, nullptr);
   vkFreeMemory(m_pDevice, m_cameraFrustumBufferMemory, nullptr);
@@ -256,10 +233,10 @@ void CullingRenderPass::Update() {
   memcpy(pData, &m_viewProjectionCPU, sizeof(ViewProjection));
   vkUnmapMemory(m_pDevice, m_viewProjectionUBOMemory);
 
-  VkDeviceSize aabbBufferSize = sizeof(AABB) * m_aabbList.size();
-  vkMapMemory(m_pDevice, m_aabbListBufferMemory, 0, aabbBufferSize, 0, &pData);
-  memcpy(pData, m_aabbList.data(), aabbBufferSize);
-  vkUnmapMemory(m_pDevice, m_aabbListBufferMemory);
+  VkDeviceSize aabbBufferSize = sizeof(AABB) * g_BatchManager.m_boundingBoxList.size();
+  vkMapMemory(m_pDevice, g_BatchManager.m_boundingBoxListBufferMemory, 0, aabbBufferSize, 0, &pData);
+  memcpy(pData, g_BatchManager.m_boundingBoxList.data(), aabbBufferSize);
+  vkUnmapMemory(m_pDevice, g_BatchManager.m_boundingBoxListBufferMemory);
 
   std::array<FrustumPlane, 6> cameraFrustumPlanes = CalculateFrustumPlanes(m_pCamera->ViewProj());
   VkDeviceSize cameraPlaneSize = sizeof(FrustumPlane) * cameraFrustumPlanes.size();
@@ -1120,20 +1097,21 @@ void CullingRenderPass::CreateShaderStorageBuffers() {
   }
   VkUtils::CreateBuffer(
       m_pDevice, m_pPhyscialDevice, indirectBufferSize, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &m_indirectDrawBuffer, &m_indirectDrawBufferMemory);
+                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                        &g_BatchManager.m_indirectDrawBuffer, &g_BatchManager.m_indirectDrawBufferMemory);
 
-  vkMapMemory(m_pDevice, m_indirectDrawBufferMemory, 0, indirectBufferSize, 0, &pData);
+  vkMapMemory(m_pDevice, g_BatchManager.m_indirectDrawBufferMemory, 0, indirectBufferSize, 0, &pData);
   memcpy(pData, flattenCommands.data(), indirectBufferSize);
-  vkUnmapMemory(m_pDevice, m_indirectDrawBufferMemory);
+  vkUnmapMemory(m_pDevice, g_BatchManager.m_indirectDrawBufferMemory);
 
-  VkDeviceSize aabbBufferSize = sizeof(AABB) * m_aabbList.size();
+  VkDeviceSize aabbBufferSize = sizeof(AABB) * g_BatchManager.m_boundingBoxList.size();
   VkUtils::CreateBuffer(
       m_pDevice, m_pPhyscialDevice, aabbBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &m_aabbListBuffer, &m_aabbListBufferMemory);
+                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &g_BatchManager.m_boundingBoxListBuffer, &g_BatchManager.m_boundingBoxListBufferMemory);
 
-  vkMapMemory(m_pDevice, m_aabbListBufferMemory, 0, aabbBufferSize, 0, &pData);
-  memcpy(pData, m_aabbList.data(), aabbBufferSize);
-  vkUnmapMemory(m_pDevice, m_aabbListBufferMemory);
+  vkMapMemory(m_pDevice, g_BatchManager.m_boundingBoxListBufferMemory, 0, aabbBufferSize, 0, &pData);
+  memcpy(pData, g_BatchManager.m_boundingBoxList.data(), aabbBufferSize);
+  vkUnmapMemory(m_pDevice, g_BatchManager.m_boundingBoxListBufferMemory);
 
   std::array<FrustumPlane, 6> cameraFrustumPlanes = CalculateFrustumPlanes(m_pCamera->ViewProj());
   VkDeviceSize cameraPlaneSize = sizeof(FrustumPlane) * cameraFrustumPlanes.size();
@@ -1146,12 +1124,12 @@ void CullingRenderPass::CreateShaderStorageBuffers() {
   vkUnmapMemory(m_pDevice, m_cameraFrustumBufferMemory);
 
   VkDescriptorBufferInfo indirectBufferInfo = {};
-  indirectBufferInfo.buffer = m_indirectDrawBuffer;  // Buffer to get data from
+  indirectBufferInfo.buffer = g_BatchManager.m_indirectDrawBuffer;  // Buffer to get data from
   indirectBufferInfo.offset = 0;                     // Position of start of data
   indirectBufferInfo.range = indirectBufferSize;     // size of data
 
   VkDescriptorBufferInfo aabbIndirectInfo = {};
-  aabbIndirectInfo.buffer = m_aabbListBuffer;  // Buffer to get data from
+  aabbIndirectInfo.buffer = g_BatchManager.m_boundingBoxListBuffer;  // Buffer to get data from
   aabbIndirectInfo.offset = 0;                 // Position of start of data
   aabbIndirectInfo.range = aabbBufferSize;     // size of data
 
@@ -1172,7 +1150,7 @@ void CullingRenderPass::CreateShaderStorageBuffers() {
   indirect.BindBuffer(3, &viewProjectionBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 
 #ifdef _DEBUG  // NDEBUG is C++ standard Macro.
-  VkDeviceSize fLODListSize = sizeof(float) * m_aabbList.size();
+  VkDeviceSize fLODListSize = sizeof(float) * g_BatchManager.m_boundingBoxList.size();
   VkUtils::CreateBuffer(m_pDevice, m_pPhyscialDevice, fLODListSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &m_fLODListBuffer,
                         &m_fLODListBufferMemory);
@@ -1329,7 +1307,7 @@ void CullingRenderPass::RecordCommands() {
                             &g_DescriptorManager.GetVkDescriptorSet("ModelList"), 0, nullptr);
 
     uint32_t drawCount = static_cast<uint32_t>(miniBatch.m_drawIndexedCommands.size());
-    vkCmdDrawIndexedIndirect(m_commandBuffer, m_indirectDrawBuffer,
+    vkCmdDrawIndexedIndirect(m_commandBuffer, g_BatchManager.m_indirectDrawBuffer,
                              miniBatch.m_indirectCommandsOffset,   // offset
                              drawCount,                            // drawCount
                              sizeof(VkDrawIndexedIndirectCommand)  // stride
@@ -1503,7 +1481,7 @@ void CullingRenderPass::RecordCommands() {
                             &g_DescriptorManager.GetVkDescriptorSet("ModelList"), 0, nullptr);
 
     uint32_t drawCount = static_cast<uint32_t>(miniBatch.m_drawIndexedCommands.size());
-    vkCmdDrawIndexedIndirect(m_commandBuffer, m_indirectDrawBuffer,
+    vkCmdDrawIndexedIndirect(m_commandBuffer, g_BatchManager.m_indirectDrawBuffer,
                              miniBatch.m_indirectCommandsOffset,                 // offset
                              drawCount,                            // drawCount
                              sizeof(VkDrawIndexedIndirectCommand)  // stride

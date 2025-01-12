@@ -63,10 +63,26 @@ static bool loadObjModel(const std::string& filepath, std::vector<Mesh>& outMesh
     Mesh partial = f.get();
     partial.vertexCount = static_cast<uint32_t>(partial.vertices.size());
     partial.indexCount = static_cast<uint32_t>(partial.indices.size());
-    outMeshes.push_back(std::move(partial));
 
-    AABB aabb = ComputeAABB(partial.vertices);
-    g_BatchManager.m_boundingBoxList.push_back(std::move(aabb));
+    AddDataToMiniBatch(g_BatchManager.m_miniBatchList, g_ResourceManager, partial);
+
+    entt::entity object = g_Registry.create();
+    ObjectID _id;
+    _id.handle = static_cast<uint64_t>(i);
+    g_BatchManager.m_meshIDList.push_back(_id);
+    g_Registry.emplace<ObjectID>(object, _id);
+
+    Transform _transfrom = {};
+    _transfrom.startTransform = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
+    _transfrom.currentTransform = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
+    g_BatchManager.m_trasformList.push_back(_transfrom);
+    g_Registry.emplace<Transform>(object, _transfrom);
+
+    AABB _aabb = ComputeAABB(partial.vertices);
+    g_BatchManager.m_boundingBoxList.push_back(_aabb);
+    g_Registry.emplace<AABB>(object, _aabb);
+
+    outMeshes.push_back(partial);
   }
 
   return true;

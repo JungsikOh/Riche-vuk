@@ -163,6 +163,7 @@ void VulkanRenderer::Draw() {
 }
 
 void VulkanRenderer::Cleanup() {
+
   // Wait Until no actions being run on device before destroying
   vkDeviceWaitIdle(mainDevice.logicalDevice);
 
@@ -172,6 +173,10 @@ void VulkanRenderer::Cleanup() {
 
   m_pEditor->Cleanup();
   m_pCullingRenderPass->Cleanup();
+  for (auto& batch : g_BatchManager.m_miniBatchList) {
+    batch.Cleanup(mainDevice.logicalDevice);
+  }
+  g_BatchManager.Cleanup(mainDevice.logicalDevice);
 
   vkDestroyPipeline(mainDevice.logicalDevice, m_offScreenPipeline, nullptr);
   vkDestroyPipelineLayout(mainDevice.logicalDevice, m_offScreenPipelineLayout, nullptr);
