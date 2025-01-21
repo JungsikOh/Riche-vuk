@@ -1,6 +1,5 @@
 #include "CullingRenderPass.h"
 
-#include "VulkanRenderer.h"
 #include "Camera.h"
 #include "Editor/Editor.h"
 #include "Mesh.h"
@@ -12,6 +11,7 @@
 #include "VkUtils/QueueFamilyIndices.h"
 #include "VkUtils/ResourceManager.h"
 #include "VkUtils/ShaderModule.h"
+#include "VulkanRenderer.h"
 
 void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDevice, VkQueue queue, VkCommandPool commandPool,
                                    Camera* camera, const uint32_t width, const uint32_t height) {
@@ -27,27 +27,29 @@ void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDev
   m_pGraphicsCommandPool = commandPool;
 
   std::vector<Mesh> test;
-  loadObjModel("Resources/Models/sponza (1)/sponza.obj", test);
+  //loadObjModel(m_pDevice, "Resources/Models/sponza (1)/", "sponza.obj", test);
+  //loadObjModel(m_pDevice, "Resources/Models/Sponza-master/", "sponza.obj", test);
+  loadGltfModel(m_pDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", test);
 
   for (int i = 0; i < test.size(); ++i) {
     auto& mesh = test[i];
     mesh.GetModel() = glm::mat4(1.0f);
     m_modelListCPU.push_back(glm::scale(glm::mat4(1.0f), glm::vec3(0.75f)));
 
-    //AABB aabb = ComputeAABB(mesh.vertices);
-    //m_aabbList.push_back(aabb);
+    // AABB aabb = ComputeAABB(mesh.vertices);
+    // m_aabbList.push_back(aabb);
   }
 
   std::vector<BasicVertex> allMeshVertices;
   std::vector<uint32_t> allIndices;
 
-  //for (int z = -15; z < -5; ++z) {
-  //  for (int y = -5; y < 5; ++y) {
-  //    for (int x = -5; x < 4; ++x) {
-  //      // Create a mesh
-  //      std::vector<BasicVertex> meshVertices = {
-  //          {{-0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},   {{0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
-  //          {{0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},     {{-0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+  // for (int z = -15; z < -5; ++z) {
+  //   for (int y = -5; y < 5; ++y) {
+  //     for (int x = -5; x < 4; ++x) {
+  //       // Create a mesh
+  //       std::vector<BasicVertex> meshVertices = {
+  //           {{-0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},   {{0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+  //           {{0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},     {{-0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
 
   //          {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}}, {{0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},
   //          {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},   {{-0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},
@@ -88,7 +90,7 @@ void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDev
   //    }
   //  }
   //}
-  //std::vector<BasicVertex> meshVertices = {// Front face
+  // std::vector<BasicVertex> meshVertices = {// Front face
   //                                         {{-7.5f, -7.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
   //                                         {{7.5f, -7.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
   //                                         {{7.5f, 7.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
@@ -124,28 +126,28 @@ void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDev
   //                                         {{7.5f, -7.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},
   //                                         {{-7.5f, -7.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}}};
 
-  //std::vector<uint32_t> meshIndices = {
-  //    0,  3,  2,  2,  1,  0,   // Front face
-  //    4,  7,  6,  6,  5,  4,   // Back face
-  //    8,  11, 10, 10, 9,  8,   // Left face
-  //    12, 15, 14, 14, 13, 12,  // Right face
-  //    16, 19, 18, 18, 17, 16,  // Top face
-  //    20, 23, 22, 22, 21, 20   // Bottom face
-  //};
-  //Mesh mesh;
-  //mesh.GetModel() = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
-  //m_modelListCPU.push_back(mesh.GetModel());
+  // std::vector<uint32_t> meshIndices = {
+  //     0,  3,  2,  2,  1,  0,   // Front face
+  //     4,  7,  6,  6,  5,  4,   // Back face
+  //     8,  11, 10, 10, 9,  8,   // Left face
+  //     12, 15, 14, 14, 13, 12,  // Right face
+  //     16, 19, 18, 18, 17, 16,  // Top face
+  //     20, 23, 22, 22, 21, 20   // Bottom face
+  // };
+  // Mesh mesh;
+  // mesh.GetModel() = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+  // m_modelListCPU.push_back(mesh.GetModel());
 
-  //mesh.Initialize(meshVertices, meshIndices);
-  //AddDataToMiniBatch(m_miniBatchList, g_ResourceManager, mesh);
+  // mesh.Initialize(meshVertices, meshIndices);
+  // AddDataToMiniBatch(m_miniBatchList, g_ResourceManager, mesh);
 
-  //std::vector<glm::vec3> positions;
-  //for (const BasicVertex& vertex : meshVertices) {
-  //  positions.push_back(mesh.GetModel() * glm::vec4(vertex.pos, 1.0f));
-  //}
+  // std::vector<glm::vec3> positions;
+  // for (const BasicVertex& vertex : meshVertices) {
+  //   positions.push_back(mesh.GetModel() * glm::vec4(vertex.pos, 1.0f));
+  // }
 
-  //AABB aabb = ComputeAABB(positions);
-  //m_aabbList.push_back(aabb);
+  // AABB aabb = ComputeAABB(positions);
+  // m_aabbList.push_back(aabb);
   FlushMiniBatch(g_BatchManager.m_miniBatchList, g_ResourceManager);
 
   CreateRenderPass();
@@ -165,7 +167,6 @@ void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDev
 }
 
 void CullingRenderPass::Cleanup() {
-
   // Basic
   vkDestroyImageView(m_pDevice, m_colourBufferImageView, nullptr);
   vkDestroyImage(m_pDevice, m_colourBufferImage, nullptr);
@@ -225,9 +226,10 @@ void CullingRenderPass::Update() {
   m_viewProjectionCPU.projection = m_pCamera->Proj();
 
   void* pData = nullptr;
-  vkMapMemory(m_pDevice, m_modelListUBOMemory, 0, sizeof(glm::mat4) * m_modelListCPU.size(), 0, &pData);
-  memcpy(pData, m_modelListCPU.data(), sizeof(glm::mat4) * m_modelListCPU.size());
-  vkUnmapMemory(m_pDevice, m_modelListUBOMemory);
+  vkMapMemory(m_pDevice, g_BatchManager.m_trasformListBufferMemory, 0, sizeof(glm::mat4) * g_BatchManager.m_trasformList.size(), 0,
+              &pData);
+  memcpy(pData, g_BatchManager.m_trasformList.data(), sizeof(glm::mat4) * g_BatchManager.m_trasformList.size());
+  vkUnmapMemory(m_pDevice, g_BatchManager.m_trasformListBufferMemory);
 
   vkMapMemory(m_pDevice, m_viewProjectionUBOMemory, 0, sizeof(ViewProjection), 0, &pData);
   memcpy(pData, &m_viewProjectionCPU, sizeof(ViewProjection));
@@ -424,7 +426,7 @@ void CullingRenderPass::CreateFramebuffer() {
 
   VkUtils::CreateImage2D(m_pDevice, m_pPhyscialDevice, m_width, m_height, &m_colourBufferImageMemory, &m_colourBufferImage,
                          colourImageFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, nullptr);
+                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
   VkUtils::CreateImageView(m_pDevice, m_colourBufferImage, &m_colourBufferImageView, colourImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 
   VkFormat depthImageFormat = VkUtils::ChooseSupportedFormat(
@@ -433,7 +435,7 @@ void CullingRenderPass::CreateFramebuffer() {
 
   VkUtils::CreateImage2D(m_pDevice, m_pPhyscialDevice, m_width, m_height, &m_depthStencilBufferImageMemory, &m_depthStencilBufferImage,
                          depthImageFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, nullptr);
+                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
   VkUtils::CreateImageView(m_pDevice, m_depthStencilBufferImage, &m_depthStencilBufferImageView, depthImageFormat,
                            VK_IMAGE_ASPECT_DEPTH_BIT);
 
@@ -459,7 +461,7 @@ void CullingRenderPass::CreateDepthFramebuffer() {
                          depthImageFormat,
                          VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                              VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, nullptr, HIZ_MIP_LEVEL);
+                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, HIZ_MIP_LEVEL);
 
   m_onlyDepthBufferImageViews.resize(HIZ_MIP_LEVEL + 1);
   m_depthFramebuffers.resize(HIZ_MIP_LEVEL);
@@ -534,9 +536,9 @@ void CullingRenderPass::CraeteGrahpicsPipeline() {
   attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;  // Format the data will take (also helps define size of data)
   attributeDescriptions[0].offset = offsetof(BasicVertex, pos);  // Where this attribute is defined in the data for a single vertex.
   // Colour Attribute
-  attributeDescriptions[1].binding = 0;                          // Which binding the data is at (should be same as above)
-  attributeDescriptions[1].location = 1;                         // Location in shader where data will be read from
-  attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;  // Format the data will take (also helps define size of data)
+  attributeDescriptions[1].binding = 0;                             // Which binding the data is at (should be same as above)
+  attributeDescriptions[1].location = 1;                            // Location in shader where data will be read from
+  attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;     // Format the data will take (also helps define size of data)
   attributeDescriptions[1].offset = offsetof(BasicVertex, normal);  // Where this attribute is defined in the data for a single vertex.
   // Texture Attribute
   attributeDescriptions[2].binding = 0;
@@ -629,13 +631,18 @@ void CullingRenderPass::CraeteGrahpicsPipeline() {
   colourBlendingCreateInfo.pAttachments = &colourState;
 
   // -- PIPELINE LAYOUT (It's like Root signature in D3D12) --
-  VkDescriptorSetLayout setLayouts[2] = {g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection"),
-                                         g_DescriptorManager.GetVkDescriptorSetLayout("ModelList")};
+  std::array<VkDescriptorSetLayout, 5> setLayouts = {
+      g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection"),     g_DescriptorManager.GetVkDescriptorSetLayout("Transform"),
+      g_DescriptorManager.GetVkDescriptorSetLayout("DiffuseTextureList"), g_DescriptorManager.GetVkDescriptorSetLayout("ObjectID"),
+      g_DescriptorManager.GetVkDescriptorSetLayout("SamplerList_ALL"),
+  };
 
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
   pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  pipelineLayoutCreateInfo.setLayoutCount = 2;
-  pipelineLayoutCreateInfo.pSetLayouts = setLayouts;
+  pipelineLayoutCreateInfo.setLayoutCount = setLayouts.size();
+  pipelineLayoutCreateInfo.pSetLayouts = setLayouts.data();
+  pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+  pipelineLayoutCreateInfo.pPushConstantRanges = &m_debugPushConstant;
 
   VK_CHECK(vkCreatePipelineLayout(m_pDevice, &pipelineLayoutCreateInfo, nullptr, &m_graphicsPipelineLayout));
 
@@ -720,9 +727,9 @@ void CullingRenderPass::CreateWireGraphicsPipeline() {
   attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;  // Format the data will take (also helps define size of data)
   attributeDescriptions[0].offset = offsetof(BasicVertex, pos);  // Where this attribute is defined in the data for a single vertex.
   // Colour Attribute
-  attributeDescriptions[1].binding = 0;                          // Which binding the data is at (should be same as above)
-  attributeDescriptions[1].location = 1;                         // Location in shader where data will be read from
-  attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;  // Format the data will take (also helps define size of data)
+  attributeDescriptions[1].binding = 0;                             // Which binding the data is at (should be same as above)
+  attributeDescriptions[1].location = 1;                            // Location in shader where data will be read from
+  attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;     // Format the data will take (also helps define size of data)
   attributeDescriptions[1].offset = offsetof(BasicVertex, normal);  // Where this attribute is defined in the data for a single vertex.
   // Texture Attribute
   attributeDescriptions[2].binding = 0;
@@ -887,9 +894,9 @@ void CullingRenderPass::CreateDepthGraphicsPipeline() {
   attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;  // Format the data will take (also helps define size of data)
   attributeDescriptions[0].offset = offsetof(BasicVertex, pos);  // Where this attribute is defined in the data for a single vertex.
   // Colour Attribute
-  attributeDescriptions[1].binding = 0;                          // Which binding the data is at (should be same as above)
-  attributeDescriptions[1].location = 1;                         // Location in shader where data will be read from
-  attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;  // Format the data will take (also helps define size of data)
+  attributeDescriptions[1].binding = 0;                             // Which binding the data is at (should be same as above)
+  attributeDescriptions[1].location = 1;                            // Location in shader where data will be read from
+  attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;     // Format the data will take (also helps define size of data)
   attributeDescriptions[1].offset = offsetof(BasicVertex, normal);  // Where this attribute is defined in the data for a single vertex.
   // Texture Attribute
   attributeDescriptions[2].binding = 0;
@@ -1083,6 +1090,7 @@ void CullingRenderPass::CreateOcclusionCullingComputePipeline() {
 void CullingRenderPass::CreateBuffers() {
   CreateUniformBuffers();
   CreateShaderStorageBuffers();
+  CreateBindlessResources();
 }
 
 void CullingRenderPass::CreateShaderStorageBuffers() {
@@ -1095,8 +1103,8 @@ void CullingRenderPass::CreateShaderStorageBuffers() {
     flattenCommands.insert(flattenCommands.end(), g_BatchManager.m_miniBatchList[i].m_drawIndexedCommands.begin(),
                            g_BatchManager.m_miniBatchList[i].m_drawIndexedCommands.end());
   }
-  VkUtils::CreateBuffer(
-      m_pDevice, m_pPhyscialDevice, indirectBufferSize, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+  VkUtils::CreateBuffer(m_pDevice, m_pPhyscialDevice, indirectBufferSize,
+                        VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                         &g_BatchManager.m_indirectDrawBuffer, &g_BatchManager.m_indirectDrawBufferMemory);
 
@@ -1105,9 +1113,10 @@ void CullingRenderPass::CreateShaderStorageBuffers() {
   vkUnmapMemory(m_pDevice, g_BatchManager.m_indirectDrawBufferMemory);
 
   VkDeviceSize aabbBufferSize = sizeof(AABB) * g_BatchManager.m_boundingBoxList.size();
-  VkUtils::CreateBuffer(
-      m_pDevice, m_pPhyscialDevice, aabbBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &g_BatchManager.m_boundingBoxListBuffer, &g_BatchManager.m_boundingBoxListBufferMemory);
+  VkUtils::CreateBuffer(m_pDevice, m_pPhyscialDevice, aabbBufferSize,
+                        VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                        &g_BatchManager.m_boundingBoxListBuffer, &g_BatchManager.m_boundingBoxListBufferMemory);
 
   vkMapMemory(m_pDevice, g_BatchManager.m_boundingBoxListBufferMemory, 0, aabbBufferSize, 0, &pData);
   memcpy(pData, g_BatchManager.m_boundingBoxList.data(), aabbBufferSize);
@@ -1125,13 +1134,13 @@ void CullingRenderPass::CreateShaderStorageBuffers() {
 
   VkDescriptorBufferInfo indirectBufferInfo = {};
   indirectBufferInfo.buffer = g_BatchManager.m_indirectDrawBuffer;  // Buffer to get data from
-  indirectBufferInfo.offset = 0;                     // Position of start of data
-  indirectBufferInfo.range = indirectBufferSize;     // size of data
+  indirectBufferInfo.offset = 0;                                    // Position of start of data
+  indirectBufferInfo.range = indirectBufferSize;                    // size of data
 
   VkDescriptorBufferInfo aabbIndirectInfo = {};
   aabbIndirectInfo.buffer = g_BatchManager.m_boundingBoxListBuffer;  // Buffer to get data from
-  aabbIndirectInfo.offset = 0;                 // Position of start of data
-  aabbIndirectInfo.range = aabbBufferSize;     // size of data
+  aabbIndirectInfo.offset = 0;                                       // Position of start of data
+  aabbIndirectInfo.range = aabbBufferSize;                           // size of data
 
   VkDescriptorBufferInfo cameraBoundingBoxInfo = {};
   cameraBoundingBoxInfo.buffer = m_cameraFrustumBuffer;  // Buffer to get data from
@@ -1144,10 +1153,10 @@ void CullingRenderPass::CreateShaderStorageBuffers() {
   viewProjectionBufferInfo.range = sizeof(ViewProjection);  // size of data
 
   VkUtils::DescriptorBuilder indirect = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
-  indirect.BindBuffer(0, &indirectBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
-  indirect.BindBuffer(1, &aabbIndirectInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
-  indirect.BindBuffer(2, &cameraBoundingBoxInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
-  indirect.BindBuffer(3, &viewProjectionBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
+  indirect.BindBuffer(0, &indirectBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+      .BindBuffer(1, &aabbIndirectInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+      .BindBuffer(2, &cameraBoundingBoxInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+      .BindBuffer(3, &viewProjectionBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 
 #ifdef _DEBUG  // NDEBUG is C++ standard Macro.
   VkDeviceSize fLODListSize = sizeof(float) * g_BatchManager.m_boundingBoxList.size();
@@ -1212,10 +1221,73 @@ void CullingRenderPass::CreateDesrciptorSets() {
   g_DescriptorManager.AddDescriptorSet(&depthOnlyImageBuilder, "DepthOnlyImage");
 }
 
+void CullingRenderPass::CreateBindlessResources() {
+  void* pData = nullptr;
+
+  // Transform
+  VkDeviceSize transformBufferSize = static_cast<uint64_t>(g_BatchManager.m_trasformList.size() * sizeof(Transform));
+  VkUtils::CreateBuffer(m_pDevice, m_pPhyscialDevice, transformBufferSize,
+                        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                        &g_BatchManager.m_trasformListBuffer, &g_BatchManager.m_trasformListBufferMemory);
+
+  vkMapMemory(m_pDevice, g_BatchManager.m_trasformListBufferMemory, 0, transformBufferSize, 0, &pData);
+  memcpy(pData, g_BatchManager.m_trasformList.data(), transformBufferSize);
+  vkUnmapMemory(m_pDevice, g_BatchManager.m_trasformListBufferMemory);
+
+  VkDescriptorBufferInfo transformUBOInfo = {};
+  transformUBOInfo.buffer = g_BatchManager.m_trasformListBuffer;  // Buffer to get data from
+  transformUBOInfo.offset = 0;                                    // Position of start of data
+  transformUBOInfo.range = transformBufferSize;                   // size of data
+
+  VkUtils::DescriptorBuilder transformBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
+  transformBuilder.BindBuffer(0, &transformUBOInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, true);
+
+  g_DescriptorManager.AddDescriptorSet(&transformBuilder, "Transform", true);
+
+  // ObjectID
+  VkDeviceSize idBufferSize = static_cast<uint64_t>(g_BatchManager.m_meshIDList.size() * sizeof(ObjectID));
+  VkUtils::CreateBuffer(m_pDevice, m_pPhyscialDevice, idBufferSize,
+                        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                        &g_BatchManager.m_objectIDListBuffer, &g_BatchManager.m_objectIDListBufferMemory);
+
+  vkMapMemory(m_pDevice, g_BatchManager.m_objectIDListBufferMemory, 0, idBufferSize, 0, &pData);
+  memcpy(pData, g_BatchManager.m_meshIDList.data(), idBufferSize);
+  vkUnmapMemory(m_pDevice, g_BatchManager.m_objectIDListBufferMemory);
+
+  VkDescriptorBufferInfo idUBOInfo = {};
+  idUBOInfo.buffer = g_BatchManager.m_objectIDListBuffer;  // Buffer to get data from
+  idUBOInfo.offset = 0;                                    // Position of start of data
+  idUBOInfo.range = idBufferSize;                          // size of data
+
+  VkUtils::DescriptorBuilder idBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
+  idBuilder.BindBuffer(0, &idUBOInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, true);
+  g_DescriptorManager.AddDescriptorSet(&idBuilder, "ObjectID", true);
+
+  VkDeviceSize imageListSize = 0;
+  for (VkDeviceSize& size : g_BatchManager.m_diffuseImageListSize) {
+    imageListSize += size;
+  }
+
+  std::vector<VkDescriptorImageInfo> imageInfos;
+  imageInfos.resize(g_BatchManager.m_diffuseImageViewList.size());
+  for (size_t i = 0; i < g_BatchManager.m_diffuseImageViewList.size(); ++i) {
+    imageInfos[i].imageView = g_BatchManager.m_diffuseImageViewList[i];
+    imageInfos[i].sampler = VK_NULL_HANDLE;
+    imageInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  }
+
+  VkUtils::DescriptorBuilder materialBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
+  materialBuilder.BindImage(0, imageInfos.data(), VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT, true,
+                            imageInfos.size());
+  g_DescriptorManager.AddDescriptorSet(&materialBuilder, "DiffuseTextureList", true);
+}
+
 void CullingRenderPass::CreatePushConstantRange() {
-  m_debugPushConstant.stageFlags = VK_SHADER_STAGE_ALL;                 // Shader stage push constant will go to
-  m_debugPushConstant.offset = 0;                               // Offset into given data to pass to push constant
-  m_debugPushConstant.size = sizeof(ShaderSetting);                     // Size of Data Being Passed
+  m_debugPushConstant.stageFlags = VK_SHADER_STAGE_ALL;  // Shader stage push constant will go to
+  m_debugPushConstant.offset = 0;                        // Offset into given data to pass to push constant
+  m_debugPushConstant.size = sizeof(ShaderSetting);      // Size of Data Being Passed
 }
 
 void CullingRenderPass::CreateSemaphores() {
@@ -1261,7 +1333,6 @@ void CullingRenderPass::RecordCommands() {
     throw std::runtime_error("Failed to start recording a Command Buffer!");
   }
 
-  
   vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipeline);
   vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 0, 1,
                           &g_DescriptorManager.GetVkDescriptorSet("ViewFrustumCulling_COMPUTE"), 0, nullptr);
@@ -1302,9 +1373,10 @@ void CullingRenderPass::RecordCommands() {
 
     vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 0, 1,
                             &g_DescriptorManager.GetVkDescriptorSet("ViewProjection"), 0, nullptr);
-
     vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 1, 1,
-                            &g_DescriptorManager.GetVkDescriptorSet("ModelList"), 0, nullptr);
+                            &g_DescriptorManager.GetVkDescriptorSet("Transform"), 0, nullptr);
+
+    vkCmdPushConstants(m_commandBuffer, m_graphicsPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting), &g_ShaderSetting);
 
     uint32_t drawCount = static_cast<uint32_t>(miniBatch.m_drawIndexedCommands.size());
     vkCmdDrawIndexedIndirect(m_commandBuffer, g_BatchManager.m_indirectDrawBuffer,
@@ -1312,8 +1384,11 @@ void CullingRenderPass::RecordCommands() {
                              drawCount,                            // drawCount
                              sizeof(VkDrawIndexedIndirectCommand)  // stride
     );
+
+    g_ShaderSetting.batchIdx += miniBatch.m_drawIndexedCommands.size();
   }
   vkCmdEndRenderPass(m_commandBuffer);
+  g_ShaderSetting.batchIdx = 0;
 
   if (g_RenderSetting.isOcclusionCulling) {
     VkImageMemoryBarrier barrier = {};
@@ -1425,8 +1500,8 @@ void CullingRenderPass::RecordCommands() {
     // Hi-Z Occlusion Culling
     //
     vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipeline);
-    vkCmdPushConstants(m_commandBuffer, m_occlusionCullingComputePipelineLayout, VK_SHADER_STAGE_ALL, 0,
-                       sizeof(ShaderSetting), &g_ShaderSetting);
+    vkCmdPushConstants(m_commandBuffer, m_occlusionCullingComputePipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting),
+                       &g_ShaderSetting);
 
     vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 0, 1,
                             &g_DescriptorManager.GetVkDescriptorSet("SamplerList_ALL"), 0, nullptr);
@@ -1437,8 +1512,7 @@ void CullingRenderPass::RecordCommands() {
 
     vkCmdDispatch(m_commandBuffer, 1000, 1, 1);
   }
-  
-  
+
   // Information about how to begin a render pass (only needed for graphical applications)
   VkRenderPassBeginInfo renderPassBeginInfo = {};
   renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -1447,7 +1521,7 @@ void CullingRenderPass::RecordCommands() {
   renderPassBeginInfo.renderArea.extent = {m_width, m_height};  // Size of region to run render pass on (starting at offset)
 
   std::array<VkClearValue, 2> clearValues = {};
-  clearValues[0].color = {0.0f, 1.0f, 1.0f, 1.0f};
+  clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.0f};
   clearValues[1].depthStencil.depth = 1.0f;
 
   renderPassBeginInfo.pClearValues = clearValues.data();  // List of clear values
@@ -1465,7 +1539,7 @@ void CullingRenderPass::RecordCommands() {
   //
   // mini-batch system
   //
-
+  g_ShaderSetting.batchIdx = 0;
   for (auto& miniBatch : g_BatchManager.m_miniBatchList) {
     // Bind the vertex buffer with the correct offset
     VkDeviceSize vertexOffset = 0;  // Always bind at offset 0 since indirect commands handle offsets
@@ -1476,18 +1550,27 @@ void CullingRenderPass::RecordCommands() {
 
     vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 0, 1,
                             &g_DescriptorManager.GetVkDescriptorSet("ViewProjection"), 0, nullptr);
-
     vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 1, 1,
-                            &g_DescriptorManager.GetVkDescriptorSet("ModelList"), 0, nullptr);
+                            &g_DescriptorManager.GetVkDescriptorSet("Transform"), 0, nullptr);
+
+    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 2, 1,
+                            &g_DescriptorManager.GetVkDescriptorSet("DiffuseTextureList"), 0, nullptr);
+    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 3, 1,
+                            &g_DescriptorManager.GetVkDescriptorSet("ObjectID"), 0, nullptr);
+    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 4, 1,
+                            &g_DescriptorManager.GetVkDescriptorSet("SamplerList_ALL"), 0, nullptr);
+
+    vkCmdPushConstants(m_commandBuffer, m_graphicsPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting), &g_ShaderSetting);
 
     uint32_t drawCount = static_cast<uint32_t>(miniBatch.m_drawIndexedCommands.size());
     vkCmdDrawIndexedIndirect(m_commandBuffer, g_BatchManager.m_indirectDrawBuffer,
-                             miniBatch.m_indirectCommandsOffset,                 // offset
+                             miniBatch.m_indirectCommandsOffset,   // offset
                              drawCount,                            // drawCount
                              sizeof(VkDrawIndexedIndirectCommand)  // stride
     );
-  }
 
+    g_ShaderSetting.batchIdx += miniBatch.m_drawIndexedCommands.size();
+  }
   // End Render Pass
   vkCmdEndRenderPass(m_commandBuffer);
 

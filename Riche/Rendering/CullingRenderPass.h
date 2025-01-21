@@ -45,6 +45,7 @@ class CullingRenderPass : public IRenderPass {
   void CreateShaderStorageBuffers();
   void CreateUniformBuffers();
   void CreateDesrciptorSets();
+  void CreateBindlessResources();
 
   void CreatePushConstantRange();
 
