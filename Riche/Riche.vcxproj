@@ -188,6 +188,7 @@
     <ClInclude Include="Utils\Singleton.h" />
     <ClInclude Include="Utils\StringUtil.h" />
     <ClInclude Include="Utils\TaskQueue.h" />
+    <ClInclude Include="Utils\TextureUtils.h" />
     <ClInclude Include="Utils\ThreadPool.h" />
     <ClInclude Include="VkUtils\DescriptorBuilder.h" />
     <ClInclude Include="pch.h" />

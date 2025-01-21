@@ -163,7 +163,6 @@ void VulkanRenderer::Draw() {
 }
 
 void VulkanRenderer::Cleanup() {
-
   // Wait Until no actions being run on device before destroying
   vkDeviceWaitIdle(mainDevice.logicalDevice);
 
@@ -217,6 +216,8 @@ void VulkanRenderer::Cleanup() {
     DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
   }
   vkDestroyInstance(instance, nullptr);
+
+  g_ThreadPool.Destroy();
 }
 
 void VulkanRenderer::CreateInstance() {
@@ -310,16 +311,24 @@ void VulkanRenderer::CreateLogicalDevice() {
 
     queueCreateInfos.push_back(queueCreateInfo);
   }
-
   VkPhysicalDeviceDescriptorIndexingFeaturesEXT indexingFeatures = {};
   indexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
   indexingFeatures.runtimeDescriptorArray = VK_TRUE;                     // 배열 크기 동적
   indexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;  // 동적 인덱싱
+  indexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
+  indexingFeatures.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
+  indexingFeatures.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE;
+  indexingFeatures.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+  indexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
   indexingFeatures.pNext = nullptr;
 
   VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
   deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-  deviceFeatures2.features = {};  // 원하는 일반 피처
+  deviceFeatures2.features.depthBiasClamp = VK_FALSE;
+  deviceFeatures2.features.samplerAnisotropy = VK_TRUE;
+  deviceFeatures2.features.multiDrawIndirect = VK_TRUE;
+  deviceFeatures2.features.drawIndirectFirstInstance = VK_TRUE;
+  deviceFeatures2.features.fillModeNonSolid = VK_TRUE;
   deviceFeatures2.pNext = &indexingFeatures;
 
   // Information to create logical device (someties called device)
@@ -330,17 +339,18 @@ void VulkanRenderer::CreateLogicalDevice() {
   deviceCreateInfo.enabledExtensionCount =
       static_cast<uint32_t>(deviceExtensions.size());                  // Number of enabled logical device extensions
   deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();  // List of enabled logical device extentions
-
-  // Pyhsical Device Features the logical device will be using
-  VkPhysicalDeviceFeatures deviceFeatures = {};
-  deviceFeatures.depthBiasClamp = VK_FALSE;  // Rasterizer에서 해당 기능을 지원할 것인지에 대한 여부
-  deviceFeatures.samplerAnisotropy = VK_TRUE;
-  deviceFeatures.multiDrawIndirect = VK_TRUE;
-  deviceFeatures.drawIndirectFirstInstance = VK_TRUE;
-  deviceFeatures.fillModeNonSolid = VK_TRUE;
-
-  deviceCreateInfo.pEnabledFeatures = &deviceFeatures;  // Physical device features logical device will use
   deviceCreateInfo.pNext = &deviceFeatures2;
+
+  //// Pyhsical Device Features the logical device will be using
+  // VkPhysicalDeviceFeatures deviceFeatures = {};
+  // deviceFeatures.depthBiasClamp = VK_FALSE;  // Rasterizer에서 해당 기능을 지원할 것인지에 대한 여부
+  // deviceFeatures.samplerAnisotropy = VK_TRUE;
+  // deviceFeatures.multiDrawIndirect = VK_TRUE;
+  // deviceFeatures.drawIndirectFirstInstance = VK_TRUE;
+  // deviceFeatures.fillModeNonSolid = VK_TRUE;
+
+  // deviceCreateInfo.pEnabledFeatures = nullptr;  // Physical device features logical device will use
+  // deviceCreateInfo.pNext = &deviceFeatures2;
 
   // Create the logical device for the given physical device
   VkResult result = vkCreateDevice(mainDevice.physicalDevice, &deviceCreateInfo, nullptr, &mainDevice.logicalDevice);
@@ -458,7 +468,7 @@ void VulkanRenderer::CreateSwapChain() {
     VkUtils::CreateImage2D(mainDevice.logicalDevice, mainDevice.physicalDevice, swapChainExtent.width, swapChainExtent.height,
                            &depthStencilImageMemory, &depthStencilImage.image, depthImageFormat,
                            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT,
-                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, nullptr);
+                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     VkUtils::CreateImageView(mainDevice.logicalDevice, depthStencilImage.image, &depthStencilImage.imageView, depthImageFormat,
                              VK_IMAGE_ASPECT_DEPTH_BIT);
 
@@ -847,7 +857,9 @@ void VulkanRenderer::FillOffScreenCommands(uint32_t currentImage) {
   renderPassBeginInfo.renderArea.extent = swapChainExtent;  // Size of region to run render pass on (starting at offset)
 
   std::array<VkClearValue, 2> clearValues = {};
-  clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.0f};
+  clearValues[0].color = {0.0f, 0.0f, 0.0f, 0.0f};  // 투명한 (검은)색
+  clearValues[0].depthStencil.depth = 0.0f;
+
   clearValues[1].depthStencil.depth = 1.0f;
 
   renderPassBeginInfo.pClearValues = clearValues.data();  // List of clear values
@@ -899,6 +911,10 @@ void VulkanRenderer::GetPhysicalDevice() {
       mainDevice.physicalDevice = device;
       break;
     }
+  }
+
+  if (mainDevice.physicalDevice == VK_NULL_HANDLE) {
+    throw std::runtime_error("Failed to find a suitable GPU!");
   }
 
   //// Get properties of our new device
@@ -1010,8 +1026,26 @@ bool VulkanRenderer::CheckDeviceSuitable(VkPhysicalDevice device) {
   vkGetPhysicalDeviceProperties(device, &deviceProperties);
   */
   // Information about what the device can do (geo shader, tess shader, wide lines, etc)
-  VkPhysicalDeviceFeatures deviceFeatures;
-  vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+  VkPhysicalDeviceDescriptorIndexingFeaturesEXT indexingFeatures = {};
+  indexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
+  indexingFeatures.runtimeDescriptorArray = VK_TRUE;                     // 배열 크기 동적
+  indexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;  // 동적 인덱싱
+  indexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
+  indexingFeatures.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
+  indexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
+  indexingFeatures.pNext = nullptr;
+
+  VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
+  deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+  deviceFeatures2.features.depthBiasClamp = VK_FALSE;
+  deviceFeatures2.features.samplerAnisotropy = VK_TRUE;
+  deviceFeatures2.features.multiDrawIndirect = VK_TRUE;
+  deviceFeatures2.features.drawIndirectFirstInstance = VK_TRUE;
+  deviceFeatures2.features.fillModeNonSolid = VK_TRUE;
+  deviceFeatures2.pNext = &indexingFeatures;
+
+  /*vkGetPhysicalDeviceFeatures(device, &deviceFeatures);*/
+  vkGetPhysicalDeviceFeatures2(device, &deviceFeatures2);
 
   bool extensionSupported = CheckDeviceExtensionSupport(device);
 
@@ -1024,7 +1058,7 @@ bool VulkanRenderer::CheckDeviceSuitable(VkPhysicalDevice device) {
   // Get the Queue family indices for the chosen physical device
   m_queueFamilyIndices = VkUtils::GetQueueFamilies(device, m_swapchainSurface);
 
-  return m_queueFamilyIndices.isVaild() && extensionSupported && swapChainValid && deviceFeatures.samplerAnisotropy;
+  return m_queueFamilyIndices.isVaild() && extensionSupported && swapChainValid && deviceFeatures2.features.samplerAnisotropy;
 }
 
 SwapChainDetails VulkanRenderer::GetSwapChainDetails(VkPhysicalDevice device) {

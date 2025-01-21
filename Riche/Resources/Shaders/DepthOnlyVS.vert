@@ -1,5 +1,6 @@
 #version 460	// Use GLSL 4.5
 #extension GL_ARB_shader_draw_parameters : enable
+#extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_debug_printf : enable
 
 #define MAX_OBJECTS 1000
@@ -13,12 +14,18 @@ layout(set = 0, binding = 0) uniform ViewProjectionUBO {
 	mat4 projection;
 } viewProjectionUBO;
 
-layout(set = 1, binding = 0) uniform ModelListUBO {
-	mat4 model[MAX_OBJECTS];
-} modelListUBO;
+layout(set = 1, binding = 0) buffer readonly Transform {
+	mat4 start_model[];
+	mat4 curr_model[];
+} transformUBO;
+
+layout(push_constant) uniform readonly ShaderSetting {
+	uint is_debugging;
+	uint batch_idx;
+} shaderSetting;
 
 void main() {
-	mat4 model = modelListUBO.model[gl_BaseInstanceARB];
-	debugPrintfEXT("gl_BaseInstance: %d\n", gl_BaseInstanceARB);
+	debugPrintfEXT("batch_idx : %d , Instance : %d \n", shaderSetting.batch_idx, gl_BaseInstanceARB);
+	mat4 model = nonuniformEXT(transformUBO.curr_model[shaderSetting.batch_idx + gl_BaseInstanceARB]);
 	gl_Position = viewProjectionUBO.projection * viewProjectionUBO.view * model * vec4(pos, 1.0);
 }

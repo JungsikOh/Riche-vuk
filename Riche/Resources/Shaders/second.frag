@@ -16,6 +16,7 @@ layout(location = 0) out vec4 colour;
 
 void main()
 {
-    vec4 color = texture(sampler2D(inputColour, linearWrapSS), fragTex.xy);                      // 텍스처 샘플링
-    colour = color;                                             // 출력
+    vec4 color = textureLod(sampler2D(inputColour, linearWrapSS), fragTex.xy, 0).rgba;                      // 텍스처 샘플링
+    vec4 finalColor = vec4(color.rgb, 1.0);
+    colour = finalColor;                                             // 출력
 }

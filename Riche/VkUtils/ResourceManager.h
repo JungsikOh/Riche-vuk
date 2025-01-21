@@ -2,6 +2,7 @@
 #include "QueueFamilyIndices.h"
 #include "Rendering/Core.h"
 #include "Utils/Singleton.h"
+#include "Utils/TextureUtils.h"
 
 namespace VkUtils {
 // TransferQueue를 이용해서 만들어야하는 Vulkan Object에 대해서 생성하는 클래스
@@ -35,6 +36,8 @@ class ResourceManager : public Singleton<ResourceManager> {
                               void* pInitData);
   VkResult CreateVertexBuffer(uint32_t vertexDataSize, VkDeviceMemory* pOutVertexBufferMemory, VkBuffer* pOutBuffer, void* pInitData);
   VkResult CreateIndexBuffer(uint32_t indexDataSize, VkDeviceMemory* pOutIndexBufferMemory, VkBuffer* pOutBuffer, void* pInitData);
+
+  VkResult CreateTexture(const std::string& filename, VkDeviceMemory* pOutImageMemory, VkImage* pOutImage, VkDeviceSize* pOutImageSize);
 };
 
 static uint32_t FindMemoryTypeIndex(VkPhysicalDevice physicalDevice, uint32_t allowedTypes, VkMemoryPropertyFlags properties) {
@@ -136,9 +139,64 @@ static void CopyBuffer(VkDevice device, VkQueue transferQueue, VkCommandPool tra
   vkFreeCommandBuffers(device, transferCommandPool, 1, &transferCommandBuffer);
 }
 
+static void CopyImage(VkDevice device, VkQueue transferQueue, VkCommandPool transferCommandPool, VkBuffer srcBuffer, VkImage dstImage,
+                      uint32_t width, uint32_t height) {
+  // Create Buffer
+  // Command buffer to hold transfer commands
+  VkCommandBuffer transferCommandBuffer;
+
+  // Command Buffer details
+  VkCommandBufferAllocateInfo allocInfo = {};
+  allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocInfo.commandPool = transferCommandPool;
+  allocInfo.commandBufferCount = 1;
+
+  // Allocate command buffer and pool
+  VK_CHECK(vkAllocateCommandBuffers(device, &allocInfo, &transferCommandBuffer));
+
+  // Information to begin the command buffer record
+  VkCommandBufferBeginInfo beginInfo = {};
+  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  beginInfo.flags =
+      VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;  // We're only using the command bufer once, so set up for one time submit.
+
+  // Begine recording transfer commands
+  vkBeginCommandBuffer(transferCommandBuffer, &beginInfo);
+
+  VkBufferImageCopy imageRegion = {};
+  imageRegion.bufferOffset = 0;                                         // Offset into data
+  imageRegion.bufferRowLength = 0;                                      // Row length of data to caclulate data spacing
+  imageRegion.bufferImageHeight = 0;                                    // Image height to caclulate data spacing
+  imageRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;  // Which aspect of image to copy
+  imageRegion.imageSubresource.mipLevel = 0;                            // Mipmap level to copy
+  imageRegion.imageSubresource.baseArrayLayer = 0;                      // Staring array layer (if array)
+  imageRegion.imageSubresource.layerCount = 1;                          // Number of layers to copy starting at baseArrayLayer
+  imageRegion.imageOffset = {0, 0, 0};                                  // Offset into image (as opposed to raw data in bufferOffset)
+  imageRegion.imageExtent = {width, height, 1};                         // Size of region to copy as (x, y, z) values
+
+  vkCmdCopyBufferToImage(transferCommandBuffer, srcBuffer, dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageRegion);
+
+  // End commands
+  vkEndCommandBuffer(transferCommandBuffer);
+
+  // Queue submission information
+  VkSubmitInfo submitInfo = {};
+  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submitInfo.commandBufferCount = 1;
+  submitInfo.pCommandBuffers = &transferCommandBuffer;
+
+  // Submit Transfer command to transfer queue and wait until it finishes
+  vkQueueSubmit(transferQueue, 1, &submitInfo, VK_NULL_HANDLE);
+  vkQueueWaitIdle(transferQueue);  // 큐가 Idle 상태가 될 때까지 기다린다. 여기서 Idle 상태란, 대기 상태에 있는 것을 이야기한다.
+
+  // Free Temporary command buffer back to pool
+  vkFreeCommandBuffers(device, transferCommandPool, 1, &transferCommandBuffer);
+}
+
 static VkResult CreateImage2D(VkDevice device, VkPhysicalDevice physicalDevice, uint32_t width, uint32_t height,
                               VkDeviceMemory* pOutImageMemory, VkImage* pOutVkImage, VkFormat format, VkImageUsageFlags usage,
-                              VkMemoryPropertyFlags propFlags, void* pInitImage, int numberOfMipLevls = 1) {
+                              VkMemoryPropertyFlags propFlags, int numberOfMipLevls = 1) {
   // CREATE IMAGE
   // Image creation info
   VkImageCreateInfo imageCreateInfo = {};
@@ -192,11 +250,11 @@ static VkResult CreateImageView(VkDevice device, VkImage image, VkImageView* pOu
   viewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
 
   // Subresources allow the view to view only a part of an image
-  viewCreateInfo.subresourceRange.aspectMask = aspectFlags;  // Which aspect of image to view (e.g. COLOR_BIT for viewing color)
-  viewCreateInfo.subresourceRange.baseMipLevel = baseMip;    // Start Mipmap level to view from
+  viewCreateInfo.subresourceRange.aspectMask = aspectFlags;    // Which aspect of image to view (e.g. COLOR_BIT for viewing color)
+  viewCreateInfo.subresourceRange.baseMipLevel = baseMip;      // Start Mipmap level to view from
   viewCreateInfo.subresourceRange.levelCount = maxLevelCount;  // Number of mipmap levels to view
-  viewCreateInfo.subresourceRange.baseArrayLayer = 0;        // Start array level to view from
-  viewCreateInfo.subresourceRange.layerCount = 1;            // Number of array levels to view
+  viewCreateInfo.subresourceRange.baseArrayLayer = 0;          // Start array level to view from
+  viewCreateInfo.subresourceRange.layerCount = 1;              // Number of array levels to view
 
   // Create Image view and return it
   VK_CHECK(vkCreateImageView(device, &viewCreateInfo, nullptr, pOutImageView));
@@ -388,6 +446,7 @@ static void CreateSampler(VkDevice device, VkSamplerAddressMode addressMode, VkF
 
   VK_CHECK(vkCreateSampler(device, &samplerCreateInfo, nullptr, pOutSampler));
 }
+
 }  // namespace VkUtils
 
 #define g_ResourceManager VkUtils::ResourceManager::Get()

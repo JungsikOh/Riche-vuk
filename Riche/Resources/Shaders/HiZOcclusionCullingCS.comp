@@ -31,7 +31,7 @@ layout(set = 1, binding = 0) buffer DrawIndexedCommands {
     IndircetDrawIndexedCommand drawIndexedCommands[];
 };
 layout(set = 1, binding = 1) uniform BoundingBoxes {
-    AABB boundingBoxList[1000];
+    AABB boundingBoxList[103];
 };
 layout(set = 1, binding = 2) uniform FrustumPlanes {
     vec4 planes[6];  // View Frustum의 6개 평면
@@ -42,7 +42,7 @@ layout(set = 1, binding = 3) uniform ViewProjectionUBO {
 } viewProjectionUBO;
 
 layout(set = 1, binding = 4) buffer fLODListSSBO {
-    float fLODList[1000];
+    float fLODList[103];
 };
 
 layout(set = 2, binding = 0) uniform texture2D DepthMapTextureLOD;
@@ -141,7 +141,7 @@ void main() {
             // 비교
             // depthMin(가장 앞 코너의 ndc.z) vs hizDepth
             // "샘플 위치에서 Hi-Z보다 앞에 있다면 -> 보인다"
-            if (depthMin <= hizDepth + 0.0025) {
+            if (depthMin <= hizDepth + 0.01) {
                 // 보이는 샘플 하나라도 발견 -> Draw
                 // => break out
                 break;

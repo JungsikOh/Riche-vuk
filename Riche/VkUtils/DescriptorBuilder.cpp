@@ -230,11 +230,11 @@ DescriptorBuilder DescriptorBuilder::Begin(DescriptorLayoutCache* layoutCache, D
 }
 
 DescriptorBuilder& DescriptorBuilder::BindBuffer(uint32_t binding, VkDescriptorBufferInfo* bufferInfo, VkDescriptorType type,
-                                                 VkShaderStageFlags stageFlags) {
+                                                 VkShaderStageFlags stageFlags, bool isBindless /*= false*/) {
   // create the descriptor binding for the layout
   VkDescriptorSetLayoutBinding newBinding{};
 
-  newBinding.descriptorCount = 1;
+  newBinding.descriptorCount = isBindless ? 1000 : 1;
   newBinding.descriptorType = type;
   newBinding.pImmutableSamplers = nullptr;
   newBinding.stageFlags = stageFlags;
@@ -257,11 +257,11 @@ DescriptorBuilder& DescriptorBuilder::BindBuffer(uint32_t binding, VkDescriptorB
 }
 
 DescriptorBuilder& DescriptorBuilder::BindImage(uint32_t binding, VkDescriptorImageInfo* imageInfo, VkDescriptorType type,
-                                                VkShaderStageFlags stageFlags) {
+                                                VkShaderStageFlags stageFlags, bool isBindless /*= false*/, int count) {
   // create the descriptor binding for the layout
   VkDescriptorSetLayoutBinding newBinding{};
 
-  newBinding.descriptorCount = 1;
+  newBinding.descriptorCount = isBindless ? 1000 : 1;
   newBinding.descriptorType = type;
   newBinding.pImmutableSamplers = nullptr;
   newBinding.stageFlags = stageFlags;
@@ -274,7 +274,7 @@ DescriptorBuilder& DescriptorBuilder::BindImage(uint32_t binding, VkDescriptorIm
   newWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
   newWrite.pNext = nullptr;
 
-  newWrite.descriptorCount = 1;
+  newWrite.descriptorCount = isBindless ? count : 1;
   newWrite.descriptorType = type;
   newWrite.pImageInfo = imageInfo;
   newWrite.dstBinding = binding;
@@ -293,23 +293,32 @@ bool DescriptorBuilder::Build(VkDescriptorSet& set, VkDescriptorSetLayout& layou
   layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
 
   VkDescriptorSetLayoutBindingFlagsCreateInfoEXT flagsCreateInfo{};
+  std::vector<VkDescriptorBindingFlags> bindingFlags;
   if (isBindless) {
-    VkDescriptorBindingFlagsEXT bindlessFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT |
-                                                VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT |
-                                                VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT;
+    // VkDescriptorBindingFlagsEXT bindlessFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT |
+    //                                             VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT |
+    //                                             VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT;
 
-    flagsCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT;
-    flagsCreateInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-    flagsCreateInfo.pBindingFlags = &bindlessFlags;
+    // flagsCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT;
+    // flagsCreateInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    // flagsCreateInfo.pBindingFlags = &bindlessFlags;
+
+    bindingFlags.resize(bindings.size(), VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
+                                             VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |
+                                             VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT);
+
+    flagsCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
+    flagsCreateInfo.bindingCount = static_cast<uint32_t>(bindingFlags.size());
+    flagsCreateInfo.pBindingFlags = bindingFlags.data();
 
     layoutInfo.pNext = &flagsCreateInfo;
-    layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
+    layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
   }
 
   layout = cache->CreateDescriptorLayout(&layoutInfo);
 
   // allocate descriptor
-  bool success = isBindless ? alloc->AllocateBindless(&set, layout, 3000) : alloc->Allocate(&set, layout);
+  bool success = isBindless ? alloc->AllocateBindless(&set, layout, 1000) : alloc->Allocate(&set, layout);
   if (!success) {
     return false;
   };

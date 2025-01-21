@@ -19,7 +19,8 @@ struct ShaderSetting {
 #else
   uint32_t isDebugging = false;
 #endif  // _DEBUG
-  float pad[3];
+  uint32_t batchIdx = 0;
+  float pad[2];
 };
 
 struct BasicVertex {
@@ -57,7 +58,8 @@ struct MaterialBufferManager {
 };
 
 struct COMPONENTS ObjectID {
-  uint64_t handle = uint64_t(-1);
+  int materialID = 0;
+  float dummy[3] = {0.0f};
 };
 
 struct COMPONENTS Transform {

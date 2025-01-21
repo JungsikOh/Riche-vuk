@@ -37,6 +37,8 @@
 #include "tiny_obj_loader.h"
 #include "tinygltf/tiny_gltf.h"
 
+#include <stb_image.h>
+
 #pragma warning(pop)
 
 

@@ -46,22 +46,21 @@ struct MiniBatch {
 };
 
 struct BatchManager : public Singleton<BatchManager> {
-
-  void Cleanup(VkDevice device) {
-    vkDestroyBuffer(device, m_indirectDrawBuffer, nullptr);
-    vkFreeMemory(device, m_indirectDrawBufferMemory, nullptr);
-
-    vkDestroyBuffer(device, m_boundingBoxListBuffer, nullptr);
-    vkFreeMemory(device, m_boundingBoxListBufferMemory, nullptr);
-  }
-
- public:
   std::vector<MiniBatch> m_miniBatchList;
   std::vector<ObjectID> m_meshIDList;
+  VkBuffer m_objectIDListBuffer;
+  VkDeviceMemory m_objectIDListBufferMemory;
 
+  // Model
   std::vector<Transform> m_trasformList;
   VkBuffer m_trasformListBuffer;
   VkDeviceMemory m_trasformListBufferMemory;
+
+  // Material
+  std::vector<VkImage> m_diffuseImageList;
+  std::vector<VkImageView> m_diffuseImageViewList;
+  std::vector<VkDeviceMemory> m_diffuseImageListMemory;
+  std::vector<VkDeviceSize> m_diffuseImageListSize; 
 
   // -- Indirect Draw Call
   VkBuffer m_indirectDrawBuffer;
@@ -71,6 +70,26 @@ struct BatchManager : public Singleton<BatchManager> {
   std::vector<AABB> m_boundingBoxList;
   VkBuffer m_boundingBoxListBuffer;
   VkDeviceMemory m_boundingBoxListBufferMemory;
+
+  void Cleanup(VkDevice device) {
+    vkDestroyBuffer(device, m_indirectDrawBuffer, nullptr);
+    vkFreeMemory(device, m_indirectDrawBufferMemory, nullptr);
+
+    vkDestroyBuffer(device, m_boundingBoxListBuffer, nullptr);
+    vkFreeMemory(device, m_boundingBoxListBufferMemory, nullptr);
+
+    vkDestroyBuffer(device, m_trasformListBuffer, nullptr);
+    vkFreeMemory(device, m_trasformListBufferMemory, nullptr);
+
+    vkDestroyBuffer(device, m_objectIDListBuffer, nullptr);
+    vkFreeMemory(device, m_objectIDListBufferMemory, nullptr);
+
+    for (int i = 0; i < m_diffuseImageList.size(); ++i) {
+      vkDestroyImageView(device, m_diffuseImageViewList[i], nullptr);
+      vkDestroyImage(device, m_diffuseImageList[i], nullptr);
+      vkFreeMemory(device, m_diffuseImageListMemory[i], nullptr);
+    }
+  }
 };
 
 static void AddDataToMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::ResourceManager& manager, const Mesh& mesh,

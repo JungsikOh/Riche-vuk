@@ -29,6 +29,8 @@ public:
 
     VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
+    int materialID = 0;
+
 public:
     Mesh() = default;
     ~Mesh() = default;
