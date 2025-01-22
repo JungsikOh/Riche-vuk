@@ -1227,7 +1227,7 @@ void CullingRenderPass::CreateBindlessResources() {
   // Transform
   VkDeviceSize transformBufferSize = static_cast<uint64_t>(g_BatchManager.m_trasformList.size() * sizeof(Transform));
   VkUtils::CreateBuffer(m_pDevice, m_pPhyscialDevice, transformBufferSize,
-                        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                         &g_BatchManager.m_trasformListBuffer, &g_BatchManager.m_trasformListBufferMemory);
 
@@ -1248,7 +1248,7 @@ void CullingRenderPass::CreateBindlessResources() {
   // ObjectID
   VkDeviceSize idBufferSize = static_cast<uint64_t>(g_BatchManager.m_meshIDList.size() * sizeof(ObjectID));
   VkUtils::CreateBuffer(m_pDevice, m_pPhyscialDevice, idBufferSize,
-                        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                         &g_BatchManager.m_objectIDListBuffer, &g_BatchManager.m_objectIDListBufferMemory);
 

@@ -3,18 +3,16 @@
 #extension GL_EXT_nonuniform_qualifier : require
 #extension GL_EXT_debug_printf : enable
 #extension GL_EXT_samplerless_texture_functions : require
+#extension GL_ARB_shading_language_include : enable
 
-struct ObjectID {
-    int materialId;
-    float dummy[3];
-};
+#include "CommonData.glsl"
 
-layout(set = 2, binding = 0) uniform texture2D diffuseTextureList[];
+layout(set = 2, binding = 0) uniform texture2D diffuseTextureList[];	// Bindless Textures
 
-layout(set = 3, binding = 0) buffer readonly MaterialIDd
+layout(set = 3, binding = 0) buffer readonly MaterialID
 {
-	ObjectID handle[];
-}materialIDd;
+	ObjectID handle[];													// SSBO
+}materialIdBuffer;
 
 layout(set = 4, binding = 0) uniform sampler linearWrapSS;
 layout(set = 4, binding = 1) uniform sampler linearClampSS;
@@ -35,10 +33,10 @@ layout(location = 2) flat in int idx;
 layout(location = 0) out vec4  outColour;	// Final output colour (must also have location)
 
 void main() {
-	int textureIdx = nonuniformEXT(materialIDd.handle[idx].materialId);
+	int textureIdx = nonuniformEXT(materialIdBuffer.handle[idx].materialId);
 	vec4 newColor = textureLod(sampler2D(nonuniformEXT(diffuseTextureList[textureIdx]), linearWrapSS), fragTex, 0);
 
 	float alpha = (length(newColor.rgb) < 0.001) ? 0.0 : 1.0;
 //	outColour = vec4(0.5, 0.8, 0, 1);
-	outColour = vec4(newColor.rgba);
+	outColour = newColor;
 }
