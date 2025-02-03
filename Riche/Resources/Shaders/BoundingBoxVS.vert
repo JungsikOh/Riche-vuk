@@ -1,4 +1,5 @@
-#version 460	// Use GLSL 4.5
+#version 460
+
 #extension GL_ARB_shading_language_include : enable
 #extension GL_ARB_shader_draw_parameters : enable
 #extension GL_EXT_nonuniform_qualifier : require
@@ -7,9 +8,8 @@
 
 #include "CommonData.glsl"
 
-layout(location = 0) in vec3 inPosition; // output colour for vertex (location is required)
-layout(location = 1) in vec3 inNormal;
-layout(location = 2) in vec2 inTexcoord;
+
+layout(location = 0) in vec3 inPosition;
 
 layout(set = 0, binding = 0) uniform U_Camera
 {

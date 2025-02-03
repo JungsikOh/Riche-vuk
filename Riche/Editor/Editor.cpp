@@ -187,11 +187,14 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer) {
   ImGui::Begin("Performance");
   ImGui::Text("Current FPS: %.1f", fps);
   ImGui::Text("Max FPS: %.1f | Average FPS: %.1f", maxFps, averageFps);
+  ImGui::Text("Number Of Rendering Object (Before Culling) : %d", g_RenderSetting.beforeCullingRenderingNum);
+  ImGui::Text("Number Of Rendering Object (After View Culling) : %d", g_RenderSetting.afterViewCullingRenderingNum);
   ImGui::End();
 
   ImGui::Begin("Rendering");
   ImGui::Checkbox("Wire Frame", &(g_RenderSetting.isWireRendering));
   ImGui::Checkbox("Occlusion Culling", &(g_RenderSetting.isOcclusionCulling));
+  ImGui::Checkbox("View BoundingBox", &(g_RenderSetting.isRenderBoundingBox));
   ImGui::End();
 
   // ImGui ·»´õ¸µ

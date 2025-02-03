@@ -170,7 +170,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />
-    <None Include="Resources\Shaders\HiZOcclusionCullingCS.comp" />
     <None Include="Resources\Shaders\compile_shaders.bat">
       <Filter>소스 파일</Filter>
     </None>
