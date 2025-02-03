@@ -155,8 +155,7 @@ VkResult ResourceManager::CreateIndexBuffer(uint32_t indexDataSize, VkDeviceMemo
   return VK_SUCCESS;
 }
 
-VkResult ResourceManager::CreateTexture(const std::string& filename, VkDeviceMemory* pOutImageMemory, VkImage* pOutImage,
-                                        VkDeviceSize* pOutImageSize) {
+VkResult ResourceManager::CreateTexture(const std::string& filename, VkDeviceMemory* pOutImageMemory, VkImage* pOutImage, VkDeviceSize* pOutImageSize) {
   // Load Image file
   int width, height;
   stbi_uc* imageData = LoadTextureFile(filename, &width, &height, pOutImageSize);
@@ -193,40 +192,6 @@ VkResult ResourceManager::CreateTexture(const std::string& filename, VkDeviceMem
   // Destroy Staging buffer
   vkDestroyBuffer(m_Device, imageStagingBuffer, nullptr);
   vkFreeMemory(m_Device, imageStagingBufferMemory, nullptr);
-
-  return VK_SUCCESS;
-}
-VkResult ResourceManager::CreateVkBuffer(VkDeviceSize bufferSize, VkBufferUsageFlags bufferUsage,
-                                         VkMemoryPropertyFlags bufferProperties, VkBuffer* pOutBuffer,
-                                         VkDeviceMemory* pOutBufferMemory) {
-  // CREATE VERTEX BUFFER
-  // Information to create a buffer (doesn't include assigning memory)
-  VkBufferCreateInfo bufferCreateInfo = {};
-  bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-  bufferCreateInfo.size = bufferSize;                        // size of buffer (size of 1 vertex * number of vertices)
-  bufferCreateInfo.usage = bufferUsage;                      // Multiple types of buffer possible, we want vertex buffer
-  bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;  // Similar to Swapchain images, can share vertex buffers
-
-  // In Vulkan Cookbook 166p, Buffers don't have their own memory.
-  VK_CHECK(vkCreateBuffer(m_Device, &bufferCreateInfo, nullptr, pOutBuffer));
-
-  // GET BUFFER MEMORY REQUIRMENTS
-  VkMemoryRequirements memRequirements;
-  vkGetBufferMemoryRequirements(m_Device, *pOutBuffer, &memRequirements);
-
-  // ALLOCATE MEMORY TO BUFFER
-  VkMemoryAllocateInfo memAllocInfo = {};
-  memAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  memAllocInfo.allocationSize = memRequirements.size;
-  memAllocInfo.memoryTypeIndex = FindMemoryTypeIndex(
-      m_PhysicalDevice, memRequirements.memoryTypeBits,  // Index of memory type on physical device that has required bit flags
-      bufferProperties);                                 // VK_MEMORY_.._HOST_VISIBLE_BIT : CPU can interact with memory(GPU)
-  // VK_MEMORY_.._HOST_COHERENT_BIT : Allows placement of data straight into buffer after mapping (otherwise would have to specify
-  // maually) Allocate Memory to VkDeviceMemory
-  VK_CHECK(vkAllocateMemory(m_Device, &memAllocInfo, nullptr, pOutBufferMemory));
-
-  // Bind memory to given vertex buffer
-  vkBindBufferMemory(m_Device, *pOutBuffer, *pOutBufferMemory, 0);
 
   return VK_SUCCESS;
 }

@@ -3,10 +3,8 @@
 #include "Rendering/Components.h"
 #include "Rendering/Mesh.h"
 #include "Rendering/VulkanRenderer.h"
-#include "BoundingBox.h"
 #include "Singleton.h"
 #include "ThreadPool.h"
-#include "VkUtils/ResourceManager.h"
 
 static entt::registry g_Registry;
 
@@ -351,16 +349,6 @@ static bool loadGltfModel(VkDevice device, const std::string& filepath, const st
     g_BatchManager.m_boundingBoxList.push_back(_aabb);
     g_Registry.emplace<AABB>(object, _aabb);
 
-    std::vector<glm::vec3> AABBvertex = CreateAABBVertexBuffer(_aabb);
-    std::vector<uint32_t> AABBIndics = CreateAABBIndexBuffer();
-
-    AABBBufferList _aabbBufferList;
-    g_ResourceManager.CreateVertexBuffer(AABBvertex.size() * sizeof(glm::vec3), &_aabbBufferList.vertexBufferMemory,
-                                         &_aabbBufferList.vertexBuffer, AABBvertex.data());
-    g_ResourceManager.CreateIndexBuffer(AABBIndics.size() * sizeof(uint32_t), &_aabbBufferList.indexBufferMemory,
-                                        &_aabbBufferList.indexBuffer, AABBIndics.data());
-    g_BatchManager.m_boundingBoxBufferList.push_back(_aabbBufferList);
-
     outMeshes.push_back(std::move(partial));
   }
 
@@ -611,18 +599,6 @@ static bool loadSeqGltfModel(VkDevice device, const std::string& filepath, const
       AABB _aabb = ComputeAABB(data.vertices);  // 사용자 정의 AABB 계산 함수
       g_BatchManager.m_boundingBoxList.push_back(_aabb);
       g_Registry.emplace<AABB>(object, _aabb);
-
-      
-    std::vector<glm::vec3> AABBvertex = CreateAABBVertexBuffer(_aabb);
-      std::vector<uint32_t> AABBIndics = CreateAABBIndexBuffer();
-
-      AABBBufferList _aabbBufferList;
-      size_t temp = AABBvertex.size() * sizeof(glm::vec3);
-      g_ResourceManager.CreateVertexBuffer(AABBvertex.size() * sizeof(glm::vec3), &_aabbBufferList.vertexBufferMemory,
-                                           &_aabbBufferList.vertexBuffer, AABBvertex.data());
-      g_ResourceManager.CreateIndexBuffer(AABBIndics.size() * sizeof(uint32_t), &_aabbBufferList.indexBufferMemory,
-                                          &_aabbBufferList.indexBuffer, AABBIndics.data());
-      g_BatchManager.m_boundingBoxBufferList.push_back(_aabbBufferList);
 
       // outMeshes에 생성한 Mesh 데이터 추가
       outMeshes.push_back(std::move(data));

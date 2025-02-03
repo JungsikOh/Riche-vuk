@@ -1,9 +1,6 @@
 #version 460
-#extension GL_ARB_shading_language_include : enable
-#extension GL_ARB_shader_draw_parameters : enable
-#extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_debug_printf : enable
-#extension GL_EXT_samplerless_texture_functions : enable
+#extension GL_KHR_vulkan_glsl : enable
 
 layout(set = 0, binding = 0) uniform sampler linearWrapSS;
 layout(set = 0, binding = 1) uniform sampler linearClampSS;
@@ -13,13 +10,13 @@ layout(set = 0, binding = 4) uniform sampler pointClampSS;
 
 layout(set = 1, binding = 0) uniform texture2D inputColour;
 
-layout(location = 0) in vec2 inFragTexcoord;
+layout(location = 0) in vec2 fragTex;
 
-layout(location = 0) out vec4 outColour;
+layout(location = 0) out vec4 colour;
 
 void main()
 {
-    vec4 color = textureLod(sampler2D(inputColour, linearWrapSS), inFragTexcoord.xy, 0).rgba;
+    vec4 color = textureLod(sampler2D(inputColour, linearWrapSS), fragTex.xy, 0).rgba;                      // 텍스처 샘플링
     vec4 finalColor = vec4(color.rgb, 1.0);
-    outColour = finalColor;
+    colour = finalColor;                                             // 출력
 }
