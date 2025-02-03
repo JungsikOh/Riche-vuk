@@ -2,17 +2,27 @@
 #include "BatchSystem.h"
 #include "Components.h"
 #include "Editor/Editor.h"
-#include "RenderSetting.h"
 #include "Mesh.h"
+#include "RenderSetting.h"
 #include "Swapchain.h"
 #include "VkUtils/DescriptorBuilder.h"
 #include "VkUtils/DescriptorManager.h"
 #include "VkUtils/QueueFamilyIndices.h"
 #include "VkUtils/ResourceManager.h"
 
+#define VK_BIND_SET_MVP_TEST(commandBuffer, pipelineLayout, baseBinding, batchIndex)                                             \
+  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, baseBinding, 1,       \
+                          &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL"), 0, nullptr);           \
+  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, (baseBinding) + 1, 1, \
+                          &g_DescriptorManager.GetVkDescriptorSet("Transform" + std::to_string(batchIndex)), 0, nullptr)
+
+#define VK_BIND_SET_MVP(commandBuffer, pipelineLayout, baseBinding)                                 \
+  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, baseBinding, 1,       \
+                          &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL"), 0, nullptr);           \
+  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, (baseBinding) + 1, 1, \
+                          &g_DescriptorManager.GetVkDescriptorSet("Transform_ALL"), 0, nullptr)
 
 static const int OBJECT_COUNT = 1000;
-
 
 class Camera;
 class Mesh;
@@ -40,7 +50,7 @@ class VulkanRenderer {
 
   //
   // Vulkan Components
-  // 
+  //
   // - Main
   VkInstance instance;
   struct {
@@ -84,6 +94,11 @@ class VulkanRenderer {
   VkPipeline m_offScreenPipeline;
   VkPipelineLayout m_offScreenPipelineLayout;
 
+  // Camera Buffer
+  ViewProjection m_viewProjectionCPU;
+  VkBuffer m_viewProjectionUBO;
+  VkDeviceMemory m_viewProjectionUBOMemory;
+
   // - Rendering Pipelines
   std::shared_ptr<CullingRenderPass> m_pCullingRenderPass;
 
@@ -108,13 +123,14 @@ class VulkanRenderer {
   void CreateInstance();
   void CreateLogicalDevice();
   void SetupDebugMessnger();
-  
+
   //
   // For Swapchains
   //
   void CreateSurface();
   void CreateSwapChain();
   void CreateSwapchainFrameBuffers();
+
   //
   // Rendering Pipeline
   //
@@ -124,6 +140,11 @@ class VulkanRenderer {
   void CreatePipeline();
 
   void CreatePushConstantRange();
+
+  // Buffer & Descriptor Set
+  void CreateBuffers();
+  void CreateSamplerBuffers();
+  void CreateCameraBuffers();
 
   //
   // Command Queue

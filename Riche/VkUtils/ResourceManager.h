@@ -37,7 +37,11 @@ class ResourceManager : public Singleton<ResourceManager> {
   VkResult CreateVertexBuffer(uint32_t vertexDataSize, VkDeviceMemory* pOutVertexBufferMemory, VkBuffer* pOutBuffer, void* pInitData);
   VkResult CreateIndexBuffer(uint32_t indexDataSize, VkDeviceMemory* pOutIndexBufferMemory, VkBuffer* pOutBuffer, void* pInitData);
 
-  VkResult CreateTexture(const std::string& filename, VkDeviceMemory* pOutImageMemory, VkImage* pOutImage, VkDeviceSize* pOutImageSize);
+  VkResult CreateTexture(const std::string& filename, VkDeviceMemory* pOutImageMemory, VkImage* pOutImage,
+                         VkDeviceSize* pOutImageSize);
+
+  VkResult CreateVkBuffer(VkDeviceSize bufferSize, VkBufferUsageFlags bufferUsage, VkMemoryPropertyFlags bufferProperties,
+                        VkBuffer* pOutBuffer, VkDeviceMemory* pOutBufferMemory);
 };
 
 static uint32_t FindMemoryTypeIndex(VkPhysicalDevice physicalDevice, uint32_t allowedTypes, VkMemoryPropertyFlags properties) {

@@ -40,12 +40,15 @@ class CullingRenderPass : public IRenderPass {
   void CreateDepthGraphicsPipeline();
   void CraeteViewCullingComputePipeline();
   void CreateOcclusionCullingComputePipeline();
+  void CreateViewingBoundingBoxPipeline();
+
 
   virtual void CreateBuffers();
   void CreateShaderStorageBuffers();
   void CreateUniformBuffers();
   void CreateDesrciptorSets();
   void CreateBindlessResources();
+  void CreateBatchDescriptorSets();
 
   void CreatePushConstantRange();
 
@@ -72,6 +75,7 @@ class CullingRenderPass : public IRenderPass {
 
   // -- Debugging (wireframe)
   VkPipeline m_wireGraphicsPipeline;
+  VkPipeline m_boundingBoxPipeline;
 
   VkImage m_colourBufferImage;
   VkDeviceMemory m_colourBufferImageMemory;
@@ -112,15 +116,6 @@ class CullingRenderPass : public IRenderPass {
   VkDeviceMemory m_fLODListBufferMemory;
 
   VkPushConstantRange m_debugPushConstant;
-
-  // -- Descriptor Set
-  ViewProjection m_viewProjectionCPU;
-  VkBuffer m_viewProjectionUBO;
-  VkDeviceMemory m_viewProjectionUBOMemory;
-
-  std::vector<glm::mat4> m_modelListCPU;
-  VkBuffer m_modelListUBO;
-  VkDeviceMemory m_modelListUBOMemory;
 
   VkBuffer m_cameraFrustumBuffer;
   VkDeviceMemory m_cameraFrustumBufferMemory;

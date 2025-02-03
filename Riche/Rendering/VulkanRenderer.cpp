@@ -55,24 +55,7 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
     g_DescriptorLayoutCache.Initialize(mainDevice.logicalDevice);
     g_ResourceManager.Initialize(mainDevice.logicalDevice, mainDevice.physicalDevice, m_transferQueue, m_queueFamilyIndices);
 
-    VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_FILTER_LINEAR, &m_linearWrapSS, false);
-    VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_FILTER_LINEAR, &m_linearClampSS, false);
-    VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_FILTER_LINEAR, &m_linearBorderSS,
-                           false);
-    VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_FILTER_NEAREST, &m_pointWrapSS, false);
-    VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_FILTER_NEAREST, &m_pointClampSS, false);
-
-    VkUtils::DescriptorBuilder samplerListBuilder =
-        VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
-    std::vector<VkDescriptorImageInfo> samplerDescriptorInfos = {{m_linearWrapSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED},
-                                                                 {m_linearClampSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED},
-                                                                 {m_linearBorderSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED},
-                                                                 {m_pointWrapSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED},
-                                                                 {m_pointClampSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED}};
-    for (int i = 0; i < samplerDescriptorInfos.size(); ++i) {
-      samplerListBuilder.BindImage(i, &samplerDescriptorInfos[i], VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_ALL);
-    }
-    g_DescriptorManager.AddDescriptorSet(&samplerListBuilder, "SamplerList_ALL");
+    CreateBuffers();
 
     /// Editor Pipeline
     m_pEditor = std::make_shared<Editor>();
@@ -98,7 +81,16 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
   return;
 }
 
-void VulkanRenderer::Update() { m_camera->Update(); }
+void VulkanRenderer::Update() {
+  void* pData = nullptr;
+
+  m_camera->Update();
+  m_viewProjectionCPU.view = m_camera->View();
+  m_viewProjectionCPU.projection = m_camera->Proj();
+  vkMapMemory(mainDevice.logicalDevice, m_viewProjectionUBOMemory, 0, sizeof(ViewProjection), 0, &pData);
+  memcpy(pData, &m_viewProjectionCPU, sizeof(ViewProjection));
+  vkUnmapMemory(mainDevice.logicalDevice, m_viewProjectionUBOMemory);
+}
 
 void VulkanRenderer::Draw() {
   // Get next available image to draw to and set something to signal when we're finished with the image (a semaphore)
@@ -165,6 +157,9 @@ void VulkanRenderer::Draw() {
 void VulkanRenderer::Cleanup() {
   // Wait Until no actions being run on device before destroying
   vkDeviceWaitIdle(mainDevice.logicalDevice);
+
+  vkDestroyBuffer(mainDevice.logicalDevice, m_viewProjectionUBO, nullptr);
+  vkFreeMemory(mainDevice.logicalDevice, m_viewProjectionUBOMemory, nullptr);
 
   g_ResourceManager.Cleanup();
   g_DescriptorLayoutCache.Cleanup();
@@ -329,6 +324,7 @@ void VulkanRenderer::CreateLogicalDevice() {
   deviceFeatures2.features.multiDrawIndirect = VK_TRUE;
   deviceFeatures2.features.drawIndirectFirstInstance = VK_TRUE;
   deviceFeatures2.features.fillModeNonSolid = VK_TRUE;
+  deviceFeatures2.features.wideLines = VK_TRUE;
   deviceFeatures2.pNext = &indexingFeatures;
 
   // Information to create logical device (someties called device)
@@ -627,11 +623,54 @@ void VulkanRenderer::CreatePushConstantRange() {
   pushConstantRange.size = sizeof(Model);                     // Size of Data Being Passed
 }
 
+void VulkanRenderer::CreateBuffers() {
+  CreateCameraBuffers();
+  CreateSamplerBuffers();
+}
+
+void VulkanRenderer::CreateSamplerBuffers() {
+  VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_FILTER_LINEAR, &m_linearWrapSS, false);
+  VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_FILTER_LINEAR, &m_linearClampSS, false);
+  VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, VK_FILTER_LINEAR, &m_linearBorderSS,
+                         false);
+  VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_FILTER_NEAREST, &m_pointWrapSS, false);
+  VkUtils::CreateSampler(mainDevice.logicalDevice, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_FILTER_NEAREST, &m_pointClampSS, false);
+
+  VkUtils::DescriptorBuilder samplerListBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
+  std::vector<VkDescriptorImageInfo> samplerDescriptorInfos = {{m_linearWrapSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED},
+                                                               {m_linearClampSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED},
+                                                               {m_linearBorderSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED},
+                                                               {m_pointWrapSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED},
+                                                               {m_pointClampSS, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED}};
+  for (int i = 0; i < samplerDescriptorInfos.size(); ++i) {
+    samplerListBuilder.BindImage(i, &samplerDescriptorInfos[i], VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_ALL);
+  }
+  g_DescriptorManager.AddDescriptorSet(&samplerListBuilder, "SamplerList_ALL");
+}
+
+void VulkanRenderer::CreateCameraBuffers() {
+  VkDeviceSize vpBufferSize = sizeof(ViewProjection);
+  VkUtils::CreateBuffer(mainDevice.logicalDevice, mainDevice.physicalDevice, vpBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &m_viewProjectionUBO,
+                        &m_viewProjectionUBOMemory);
+
+  // VIEW PROJECTION DESCRIPTOR
+  // Buffer Info and data offset info
+  VkDescriptorBufferInfo uboViewProjectionBufferInfo = {};
+  uboViewProjectionBufferInfo.buffer = m_viewProjectionUBO;    // Buffer to get data from
+  uboViewProjectionBufferInfo.offset = 0;                      // Position of start of data
+  uboViewProjectionBufferInfo.range = sizeof(ViewProjection);  // size of data
+
+  VkUtils::DescriptorBuilder vpBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
+  vpBuilder.BindBuffer(0, &uboViewProjectionBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL);
+  g_DescriptorManager.AddDescriptorSet(&vpBuilder, "ViewProjection_ALL");
+}
+
 void VulkanRenderer::CreatePipeline() {
   // Create Second Pass Pipeline
   // Second pass shaders
-  auto vertexShaderCode = VkUtils::ReadFile("Resources/Shaders/second_vert.spv");
-  auto fragmentShaderCode = VkUtils::ReadFile("Resources/Shaders/second_frag.spv");
+  auto vertexShaderCode = VkUtils::ReadFile("Resources/Shaders/RenderingQuadVS.spv");
+  auto fragmentShaderCode = VkUtils::ReadFile("Resources/Shaders/RenderingQuadPS.spv");
 
   // Build Shaders
   VkShaderModule vertexShaderModule = VkUtils::CreateShaderModule(mainDevice.logicalDevice, vertexShaderCode);

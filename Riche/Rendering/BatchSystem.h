@@ -21,10 +21,6 @@ struct MiniBatch {
   VkBuffer m_indexBuffer = VK_NULL_HANDLE;
   VkDeviceMemory m_indexBufferMemory;
 
-  // Mesh
-  std::vector<ObjectID> m_meshIDList;
-  std::vector<Transform> m_trasfromCPUList;
-
   std::vector<VkImage> m_imageGPU;
   VkDeviceMemory m_imageGPUMemory;
   std::vector<VkImageView> m_imageViewGPU;
@@ -60,16 +56,18 @@ struct BatchManager : public Singleton<BatchManager> {
   std::vector<VkImage> m_diffuseImageList;
   std::vector<VkImageView> m_diffuseImageViewList;
   std::vector<VkDeviceMemory> m_diffuseImageListMemory;
-  std::vector<VkDeviceSize> m_diffuseImageListSize; 
+  std::vector<VkDeviceSize> m_diffuseImageListSize;
 
   // -- Indirect Draw Call
   VkBuffer m_indirectDrawBuffer;
   VkDeviceMemory m_indirectDrawBufferMemory;
+  VkDeviceSize m_indirectDrawCommandSize;
 
   // -- Bounding Box
   std::vector<AABB> m_boundingBoxList;
   VkBuffer m_boundingBoxListBuffer;
   VkDeviceMemory m_boundingBoxListBufferMemory;
+  std::vector<AABBBufferList> m_boundingBoxBufferList;
 
   void Cleanup(VkDevice device) {
     vkDestroyBuffer(device, m_indirectDrawBuffer, nullptr);
@@ -88,6 +86,14 @@ struct BatchManager : public Singleton<BatchManager> {
       vkDestroyImageView(device, m_diffuseImageViewList[i], nullptr);
       vkDestroyImage(device, m_diffuseImageList[i], nullptr);
       vkFreeMemory(device, m_diffuseImageListMemory[i], nullptr);
+    }
+
+    for (int i = 0; i < m_boundingBoxBufferList.size(); ++i) {
+      vkDestroyBuffer(device, m_boundingBoxBufferList[i].vertexBuffer, nullptr);
+      vkFreeMemory(device, m_boundingBoxBufferList[i].vertexBufferMemory, nullptr);
+
+      vkDestroyBuffer(device, m_boundingBoxBufferList[i].indexBuffer, nullptr);
+      vkFreeMemory(device, m_boundingBoxBufferList[i].indexBufferMemory, nullptr);
     }
   }
 };
@@ -114,6 +120,7 @@ static void AddDataToMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::Res
   drawCommand.firstInstance = accumulatedMeshIndex++;
 
   currentBatch->m_drawIndexedCommands.push_back(drawCommand);
+  currentBatch->m_transfromListCPU.push_back(Transform());
 
   // 누적된 데이터에 현재 메쉬 추가
   accumulatedVertices.insert(accumulatedVertices.end(), mesh.vertices.begin(), mesh.vertices.end());
@@ -139,6 +146,10 @@ static void AddDataToMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::Res
         static_cast<uint64_t>(currentBatch->m_drawIndexedCommands.size() * sizeof(VkDrawIndexedIndirectCommand));
 
     std::cout << "New mini-batch created with size: " << currentBatch->m_currentBatchSize << " bytes." << std::endl;
+    currentBatch->m_transformBufferSize = static_cast<VkDeviceSize>(currentBatch->m_transfromListCPU.size() * sizeof(Transform));
+    manager.CreateVkBuffer(currentBatch->m_transformBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                         &currentBatch->m_transformListBuffer, &currentBatch->m_transformListBufferMemory);
 
     miniBatches.emplace_back();
 
@@ -172,6 +183,11 @@ static void FlushMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::Resourc
   currentBatch->m_indirectCommandsOffset = accumulatedIndirectOffset;
 
   std::cout << "Flushed mini-batch with size: " << currentBatch->m_currentBatchSize << " bytes." << std::endl;
+
+  currentBatch->m_transformBufferSize = static_cast<VkDeviceSize>(currentBatch->m_transfromListCPU.size() * sizeof(Transform));
+  manager.CreateVkBuffer(currentBatch->m_transformBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                       &currentBatch->m_transformListBuffer, &currentBatch->m_transformListBufferMemory);
 
   // 누적된 데이터 초기화
   accumulatedVertices.clear();
