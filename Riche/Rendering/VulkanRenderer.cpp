@@ -320,6 +320,16 @@ void VulkanRenderer::CreateLogicalDevice() {
 
     queueCreateInfos.push_back(queueCreateInfo);
   }
+  VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures = {};
+  accelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+  accelerationStructureFeatures.accelerationStructure = VK_TRUE;
+  accelerationStructureFeatures.descriptorBindingAccelerationStructureUpdateAfterBind = VK_TRUE;
+
+  VkPhysicalDeviceRayTracingPipelineFeaturesKHR raytracingFeatures = {};
+  raytracingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+  raytracingFeatures.rayTracingPipeline = VK_TRUE;
+  raytracingFeatures.pNext = &accelerationStructureFeatures;
+
   VkPhysicalDeviceDescriptorIndexingFeaturesEXT indexingFeatures = {};
   indexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
   indexingFeatures.runtimeDescriptorArray = VK_TRUE;                     // 배열 크기 동적
@@ -329,7 +339,7 @@ void VulkanRenderer::CreateLogicalDevice() {
   indexingFeatures.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE;
   indexingFeatures.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
   indexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
-  indexingFeatures.pNext = nullptr;
+  indexingFeatures.pNext = &raytracingFeatures;
 
   VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
   deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
