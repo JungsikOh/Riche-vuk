@@ -137,7 +137,7 @@ void main() {
             // 비교
             // depthMin(가장 앞 코너의 ndc.z) vs hizDepth
             // "샘플 위치에서 Hi-Z보다 앞에 있다면 -> 보인다"
-            if (depthMin <= hizDepth + 0.025) {
+            if (depthMin <= hizDepth + 0.05) {
                 // 보이는 샘플 하나라도 발견 -> Draw
                 // => break out
                 break;
