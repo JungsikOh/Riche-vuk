@@ -14,6 +14,7 @@ float deltaTime = 0.0f;
 double lastX = 0.0, lastY = 0.0;  // 이전 프레임의 마우스 좌표
 bool firstMouse = true;           // 초기 마우스 위치 확인을 위한 플래그
 bool rightButtonPressed = false;
+bool leftButtonPressed = false;
 
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) { g_camera.OnKeyInput(deltaTime, key); }
 
@@ -22,10 +23,18 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
     if (action == GLFW_PRESS) {             // 누를 때
       rightButtonPressed = true;
       firstMouse = true;  // 마우스를 누를 때마다 초기화
-      std::cout << "Right Mouse Button Pressed" << std::endl;
     } else if (action == GLFW_RELEASE) {  // 뗄 때
       rightButtonPressed = false;
-      std::cout << "Right Mouse Button Released" << std::endl;
+    }
+  }
+
+  if (button == GLFW_MOUSE_BUTTON_LEFT) {  // 마우스 오른쪽 버튼일 경우
+    if (action == GLFW_PRESS) {             // 누를 때
+      leftButtonPressed = true;
+      g_camera.isMousePressed = true;
+    } else if (action == GLFW_RELEASE) {  // 뗄 때
+      leftButtonPressed = false;
+      g_camera.isMousePressed = false;
     }
   }
 }
@@ -48,6 +57,10 @@ void CursorPositionCallback(GLFWwindow* window, double xpos, double ypos) {
     lastY = ypos;
 
     g_camera.OnMouseInput(deltaX, deltaY);
+  }
+
+  if (leftButtonPressed) {
+    g_camera.SetMousePosition(glm::vec2(float(xpos), float(ypos)));
   }
 }
 

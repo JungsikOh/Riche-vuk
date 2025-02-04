@@ -1,10 +1,13 @@
 #include "Editor.h"
 
+#include "Rendering/BatchSystem.h"
+#include "Rendering/Camera.h"
 #include "VkUtils/ChooseFunc.h"
 
 void Editor::Initialize(GLFWwindow* window, VkInstance instance, VkDevice device, VkPhysicalDevice physicalDevice,
-                        VkUtils::QueueFamilyIndices queueFamily, VkQueue graphicsQueue) {
+                        VkUtils::QueueFamilyIndices queueFamily, VkQueue graphicsQueue, Camera* camera) {
   m_Window = window;
+  m_pCamera = camera;
 
   m_Instance = instance;
   mainDevice.logicalDevice = device;
@@ -197,9 +200,55 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer) {
   ImGui::Checkbox("View BoundingBox", &(g_RenderSetting.isRenderBoundingBox));
   ImGui::End();
 
+  ImGuizmo::BeginFrame();
+
+  // 2) 설정 : 뷰포트 크기, 정사영 사용 여부 등
+  ImGuizmo::SetOrthographic(false);  // Persp / Ortho 설정
+  ImGuizmo::Enable(true);
+
+  // 뷰포트 크기
+  float width = ImGui::GetIO().DisplaySize.x;
+  float height = ImGui::GetIO().DisplaySize.y;
+  ImGuizmo::SetRect(0, 0, width, height);
+
+  // 카메라 View/Proj 행렬 가져오기
+  glm::mat4 viewMat = m_pCamera->View();
+  glm::mat4 projMat = m_pCamera->Proj();
+
+  // float[16]로 변환
+  float view[16];
+  float proj[16];
+  memcpy(view, &viewMat[0][0], 16 * sizeof(float));
+  memcpy(proj, &projMat[0][0], 16 * sizeof(float));
+
+  if (m_selectedIndex >= 0 && m_selectedIndex < (int)g_BatchManager.m_trasformList.size()) {
+    // 선택된 오브젝트의 modelMatrix
+    glm::mat4& objMat = g_BatchManager.m_trasformList[m_selectedIndex].currentTransform;
+
+    float model[16];
+    memcpy(model, &objMat[0][0], 16 * sizeof(float));
+
+    // Manipulate
+    ImGuizmo::Manipulate(view, proj,
+                         ImGuizmo::OPERATION::TRANSLATE,  // 예: Translate 모드
+                         ImGuizmo::MODE::WORLD,           // WORLD / LOCAL
+                         model);
+
+    // Gizmo를 실제로 드래그해 움직였으면, model이 변경됨
+    if (ImGuizmo::IsUsing()) {
+      // 변경된 float[16] -> glm::mat4로 다시 복사
+      memcpy(&objMat[0][0], model, 16 * sizeof(float));
+    }
+  }
+
   // ImGui 렌더링
   ImGui::Render();
   ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+}
+
+void Editor::OnLeftMouseClick() {
+  if (m_pCamera->isMousePressed) {
+  }
 }
 
 void Editor::CreateImGuiDescriptorPool() {

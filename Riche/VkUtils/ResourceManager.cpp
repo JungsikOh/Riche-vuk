@@ -196,6 +196,127 @@ VkResult ResourceManager::CreateTexture(const std::string& filename, VkDeviceMem
 
   return VK_SUCCESS;
 }
+
+glm::vec4 ResourceManager::ReadPixelFromImage(VkImage image, uint32_t width, uint32_t height, int mouseX, int mouseY) {
+  // 0) 좌표 변환 (Vulkan은 보통 원점이 하단)
+  //    만약 윈도우 좌표가 상단(0,0) -> 하단(screenHeight)이라면 뒤집기
+  //    아래에서는 "mouseY" 뒤집는 예시
+  int flippedY = (height - 1) - mouseY;
+
+  // 경계 체크
+  if (mouseX < 0 || mouseY < 0 || mouseX >= (int)width || mouseY >= (int)height) {
+    std::cerr << "[ReadPixel] Invalid mouse pos" << std::endl;
+    return {-1, 0, 0, 0};  // 범위를 벗어났으니 0
+  }
+  flippedY = mouseY;
+
+
+  // 1) Staging Buffer 만들기 (1픽셀 = 4바이트 RGBA)
+  VkBuffer stagingBuffer;
+  VkDeviceMemory stagingMemory;
+  VkUtils::CreateBuffer(m_Device, m_PhysicalDevice,
+                        4 * sizeof(float),  // 4 bytes
+                        VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                        &stagingBuffer, &stagingMemory);
+
+  VkCommandBuffer transferCommandBuffer;
+
+  // Command Buffer details
+  VkCommandBufferAllocateInfo allocInfo = {};
+  allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocInfo.commandPool = m_TransferCommandPool;
+  allocInfo.commandBufferCount = 1;
+
+  // Allocate command buffer and pool
+  VK_CHECK(vkAllocateCommandBuffers(m_Device, &allocInfo, &transferCommandBuffer));
+
+  // Information to begin the command buffer record
+  VkCommandBufferBeginInfo beginInfo = {};
+  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  beginInfo.flags =
+      VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;  // We're only using the command bufer once, so set up for one time submit.
+
+  // Begine recording transfer commands
+  vkBeginCommandBuffer(transferCommandBuffer, &beginInfo);
+
+  // 3) Image Layout 전환: PRESENT_SRC_KHR -> TRANSFER_SRC_OPTIMAL
+  //    (pipelineBarrier 혹은 imageMemoryBarrier)
+  VkImageMemoryBarrier barrier{};
+  barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.image = image;
+  barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  barrier.subresourceRange.baseMipLevel = 0;
+  barrier.subresourceRange.levelCount = 1;
+  barrier.subresourceRange.baseArrayLayer = 0;
+  barrier.subresourceRange.layerCount = 1;
+
+  // src Access/Stage
+  barrier.srcAccessMask = 0;
+  barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+  vkCmdPipelineBarrier(transferCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
+                       nullptr, 1, &barrier);
+
+  // 4) vkCmdCopyImageToBuffer (1x1 크기만 복사)
+  VkBufferImageCopy region{};
+  region.bufferOffset = 0;
+  // 아래 rowLength, imageHeight가 0이면 "타이트"하게 복사
+  region.bufferRowLength = 0;
+  region.bufferImageHeight = 0;
+  region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  region.imageSubresource.mipLevel = 0;
+  region.imageSubresource.baseArrayLayer = 0;
+  region.imageSubresource.layerCount = 1;
+  region.imageOffset = {mouseX, flippedY, 0};
+  region.imageExtent = {1, 1, 1};  // 1픽셀
+
+  vkCmdCopyImageToBuffer(transferCommandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer, 1, &region);
+
+   // 5) 다시 Layout 전환: TRANSFER_SRC_OPTIMAL -> PRESENT_SRC_KHR (필요시)
+  barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+  barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+  barrier.dstAccessMask = 0;
+
+  vkCmdPipelineBarrier(transferCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0,
+                       nullptr, 1,
+                       &barrier);
+
+  // End commands
+  vkEndCommandBuffer(transferCommandBuffer);
+
+  // Queue submission information
+  VkSubmitInfo submitInfo = {};
+  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submitInfo.commandBufferCount = 1;
+  submitInfo.pCommandBuffers = &transferCommandBuffer;
+
+  // Submit Transfer command to transfer queue and wait until it finishes
+  vkQueueSubmit(m_transferQueue, 1, &submitInfo, VK_NULL_HANDLE);
+  vkQueueWaitIdle(m_transferQueue);  // 큐가 Idle 상태가 될 때까지 기다린다. 여기서 Idle 상태란, 대기 상태에 있는 것을 이야기한다.
+
+  // Free Temporary command buffer back to pool
+  vkFreeCommandBuffers(m_Device, m_TransferCommandPool, 1, &transferCommandBuffer);
+
+  // 7) Staging Buffer를 map 해서 픽셀 읽기
+  float resultColor[4];
+  void* pData;
+  vkMapMemory(m_Device, stagingMemory, 0, 4 * sizeof(float), 0, &pData);
+  std::memcpy(&resultColor, pData, 4 * sizeof(float));
+  vkUnmapMemory(m_Device, stagingMemory);
+
+  // 8) 스테이징 버퍼/메모리 정리
+  vkDestroyBuffer(m_Device, stagingBuffer, nullptr);
+  vkFreeMemory(m_Device, stagingMemory, nullptr);
+
+  return glm::vec4(resultColor[0], resultColor[1], resultColor[2], resultColor[3]);
+}
+
 VkResult ResourceManager::CreateVkBuffer(VkDeviceSize bufferSize, VkBufferUsageFlags bufferUsage,
                                          VkMemoryPropertyFlags bufferProperties, VkBuffer* pOutBuffer,
                                          VkDeviceMemory* pOutBufferMemory) {

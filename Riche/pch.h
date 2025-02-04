@@ -23,6 +23,7 @@
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
+#include "ImGuizmo.h"
 #include "imgui_impl_vulkan.h"
 #include "imgui_impl_glfw.h"  // if use GLFW.
 

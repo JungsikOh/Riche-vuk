@@ -147,6 +147,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\ThirdParty\imgui\imgui.cpp" />
+    <ClCompile Include="..\ThirdParty\imgui\ImGuizmo.cpp" />
     <ClCompile Include="..\ThirdParty\imgui\imgui_demo.cpp" />
     <ClCompile Include="..\ThirdParty\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\ThirdParty\imgui\imgui_impl_glfw.cpp" />
@@ -154,6 +155,7 @@
     <ClCompile Include="..\ThirdParty\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\ThirdParty\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Editor\Editor.cpp" />
+    <ClCompile Include="Rendering\BasicLightingPass.cpp" />
     <ClCompile Include="Rendering\Camera.cpp" />
     <ClCompile Include="Rendering\CullingRenderPass.cpp" />
     <ClCompile Include="Rendering\Mesh.cpp" />
@@ -168,6 +170,7 @@
   <ItemGroup>
     <ClInclude Include="..\ThirdParty\imgui\imconfig.h" />
     <ClInclude Include="..\ThirdParty\imgui\imgui.h" />
+    <ClInclude Include="..\ThirdParty\imgui\ImGuizmo.h" />
     <ClInclude Include="..\ThirdParty\imgui\imgui_impl_glfw.h" />
     <ClInclude Include="..\ThirdParty\imgui\imgui_impl_vulkan.h" />
     <ClInclude Include="..\ThirdParty\imgui\imgui_internal.h" />
@@ -175,6 +178,7 @@
     <ClInclude Include="..\ThirdParty\imgui\imstb_textedit.h" />
     <ClInclude Include="..\ThirdParty\imgui\imstb_truetype.h" />
     <ClInclude Include="Editor\Editor.h" />
+    <ClInclude Include="Rendering\BasicLightingPass.h" />
     <ClInclude Include="Rendering\BatchSystem.h" />
     <ClInclude Include="Rendering\Camera.h" />
     <ClInclude Include="Rendering\IRenderPass.h" />
@@ -185,6 +189,7 @@
     <ClInclude Include="Rendering\Swapchain.h" />
     <ClInclude Include="Utils\BoundingBox.h" />
     <ClInclude Include="Utils\ModelLoader.h" />
+    <ClInclude Include="Utils\RayCastUtils.h" />
     <ClInclude Include="Utils\Singleton.h" />
     <ClInclude Include="Utils\StringUtil.h" />
     <ClInclude Include="Utils\TaskQueue.h" />

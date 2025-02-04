@@ -8,13 +8,13 @@ const static int HIZ_MIP_LEVEL = 3;
 static ShaderSetting g_ShaderSetting = {};
 
 class Camera;
-
 class CullingRenderPass : public IRenderPass {
  public:
   CullingRenderPass() = default;
   ~CullingRenderPass() = default;
-
+  
   virtual void Initialize(VkDevice device, VkPhysicalDevice physicalDevice, VkQueue queue, VkCommandPool commandPool, Camera* camera,
+                          Editor* editor,
                           const uint32_t width, const uint32_t height);
   virtual void Cleanup();
 
@@ -22,8 +22,7 @@ class CullingRenderPass : public IRenderPass {
 
   virtual void Draw(VkSemaphore renderAvailable);
 
-  VkImageView& GetFrameBufferImageView() { return m_colourBufferImageView; };
-  VkImageView& GetDepthStencilImageView() { return m_depthStencilBufferImageView; };
+  VkImageView& GetFrameBufferImageView() { return m_onlyDepthBufferImageViews[0]; };
   VkSemaphore& GetSemaphore() { return m_renderAvailable; };
 
  private:
@@ -34,21 +33,17 @@ class CullingRenderPass : public IRenderPass {
   virtual void CreateFramebuffer();
   void CreateDepthFramebuffer();
 
+  virtual void CreatePipelineLayout();
   virtual void CreatePipeline();
-  void CraeteGrahpicsPipeline();
-  void CreateWireGraphicsPipeline();
   void CreateDepthGraphicsPipeline();
   void CraeteViewCullingComputePipeline();
   void CreateOcclusionCullingComputePipeline();
-  void CreateViewingBoundingBoxPipeline();
 
 
   virtual void CreateBuffers();
   void CreateShaderStorageBuffers();
   void CreateUniformBuffers();
   void CreateDesrciptorSets();
-  void CreateBindlessResources();
-  void CreateBatchDescriptorSets();
 
   void CreatePushConstantRange();
 
@@ -68,25 +63,6 @@ class CullingRenderPass : public IRenderPass {
   Camera* m_pCamera;
 
   // - Rendering Graphics Pipeline
-  VkRenderPass m_renderPass;
-
-  VkPipeline m_graphicsPipeline;
-  VkPipelineLayout m_graphicsPipelineLayout;
-
-  // -- Debugging (wireframe)
-  VkPipeline m_wireGraphicsPipeline;
-  VkPipeline m_boundingBoxPipeline;
-
-  VkImage m_colourBufferImage;
-  VkDeviceMemory m_colourBufferImageMemory;
-  VkImageView m_colourBufferImageView;
-
-  VkImage m_depthStencilBufferImage;
-  VkDeviceMemory m_depthStencilBufferImageMemory;
-  VkImageView m_depthStencilBufferImageView;
-
-  VkFramebuffer m_framebuffer;
-
   VkCommandPool m_pGraphicsCommandPool;
   VkCommandBuffer m_commandBuffer;
 
@@ -97,6 +73,7 @@ class CullingRenderPass : public IRenderPass {
   VkRenderPass m_depthRenderPass;
 
   VkPipeline m_depthGraphicePipeline;   // Use a same GraphicsPipelineLayout
+  VkPipelineLayout m_graphicsPipelineLayout;
 
   VkImage m_onlyDepthBufferImage;
   VkDeviceMemory m_onlyDepthBufferImageMemory;

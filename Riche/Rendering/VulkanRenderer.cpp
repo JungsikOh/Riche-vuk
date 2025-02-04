@@ -2,6 +2,7 @@
 
 #include <random>
 
+#include "BasicLightingPass.h"
 #include "Camera.h"
 #include "Core.h"
 #include "CullingRenderPass.h"
@@ -60,12 +61,15 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
     /// Editor Pipeline
     m_pEditor = std::make_shared<Editor>();
     m_pEditor->Initialize(window, instance, mainDevice.logicalDevice, mainDevice.physicalDevice, m_queueFamilyIndices,
-                          m_graphicsQueue);
+                          m_graphicsQueue, m_camera);
 
     /// Culling Pipeline
     m_pCullingRenderPass = std::make_shared<CullingRenderPass>();
     m_pCullingRenderPass->Initialize(mainDevice.logicalDevice, mainDevice.physicalDevice, m_graphicsQueue, m_graphicsCommandPool,
-                                     m_camera, swapChainExtent.width, swapChainExtent.height);
+                                     m_camera, m_pEditor.get(), swapChainExtent.width, swapChainExtent.height);
+    m_pLightingRenderPass = std::make_shared<BasicLightingPass>();
+    m_pLightingRenderPass->Initialize(mainDevice.logicalDevice, mainDevice.physicalDevice, m_graphicsQueue, m_graphicsCommandPool,
+                                      m_camera, m_pEditor.get(), swapChainExtent.width, swapChainExtent.height);
 
     /// OffScreen Pipeline
     CreateRenderPass();
@@ -90,6 +94,11 @@ void VulkanRenderer::Update() {
   vkMapMemory(mainDevice.logicalDevice, m_viewProjectionUBOMemory, 0, sizeof(ViewProjection), 0, &pData);
   memcpy(pData, &m_viewProjectionCPU, sizeof(ViewProjection));
   vkUnmapMemory(mainDevice.logicalDevice, m_viewProjectionUBOMemory);
+
+  m_pCullingRenderPass->Update();
+  m_pLightingRenderPass->Update();
+
+  m_pEditor->OnLeftMouseClick();
 }
 
 void VulkanRenderer::Draw() {
@@ -108,6 +117,9 @@ void VulkanRenderer::Draw() {
   m_pCullingRenderPass->Update();
   m_pCullingRenderPass->Draw(imageAvailable[imageIndex]);
 
+  m_pLightingRenderPass->Update();
+  m_pLightingRenderPass->Draw(m_pCullingRenderPass->GetSemaphore());
+
   RecordCommands(imageIndex);
 
   // 2. Submit command buffer to queue for execution, making sure it waits for the image to be signalled as available before drawing
@@ -117,8 +129,7 @@ void VulkanRenderer::Draw() {
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submitInfo.waitSemaphoreCount = 1;  // Number of semaphores to wait on
   submitInfo.pWaitSemaphores =
-      &m_pCullingRenderPass.get()
-           ->GetSemaphore();  // List of semaphores to wait on, Command buffer가 실행하기전 대기해야하는 semaphores
+      &m_pLightingRenderPass->GetSemaphore();  // List of semaphores to wait on, Command buffer가 실행하기전 대기해야하는 semaphores
   // 즉, 이 semphore가 signaled 상태가 될 때까지 대기하고, 그 후에 Command buffer를 실행한다.
   VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
   submitInfo.pWaitDstStageMask = waitStages;                            // Stages to check semaphores at
@@ -167,6 +178,8 @@ void VulkanRenderer::Cleanup() {
 
   m_pEditor->Cleanup();
   m_pCullingRenderPass->Cleanup();
+  m_pLightingRenderPass->Cleanup();
+
   for (auto& batch : g_BatchManager.m_miniBatchList) {
     batch.Cleanup(mainDevice.logicalDevice);
   }
@@ -601,12 +614,12 @@ void VulkanRenderer::CreateOffScrrenDescriptorSet() {
   // CREATE INPUT ATTACHMENT IMAGE DESCRIPTOR SET LAYOUT
   VkDescriptorImageInfo colourAttachmentDescriptor = {};
   colourAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-  colourAttachmentDescriptor.imageView = m_pCullingRenderPass->GetFrameBufferImageView();
+  colourAttachmentDescriptor.imageView = m_pLightingRenderPass->GetFrameBufferImageView();
   colourAttachmentDescriptor.sampler = VK_NULL_HANDLE;
 
   VkDescriptorImageInfo depthAttachmentDescriptor = {};
   depthAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-  depthAttachmentDescriptor.imageView = m_pCullingRenderPass->GetDepthStencilImageView();
+  depthAttachmentDescriptor.imageView = m_pLightingRenderPass->GetDepthStencilImageView();
   depthAttachmentDescriptor.sampler = VK_NULL_HANDLE;
 
   VkUtils::DescriptorBuilder inputOffScreen = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);

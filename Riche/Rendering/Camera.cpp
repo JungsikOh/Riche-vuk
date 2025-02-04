@@ -67,8 +67,9 @@ void Camera::OnMouseInput(float dx, float dy)
 	Update();
 }
 
-void Camera::SetPosition(glm::vec3 const& pos)
-{
+void Camera::SetMousePosition(glm::vec2 pos) { m_currentMousePos = pos; }
+
+void Camera::SetPosition(glm::vec3 const& pos) {
 	m_Position = pos;
 	Update();
 }

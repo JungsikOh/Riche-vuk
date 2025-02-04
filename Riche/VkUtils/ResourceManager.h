@@ -39,6 +39,7 @@ class ResourceManager : public Singleton<ResourceManager> {
 
   VkResult CreateTexture(const std::string& filename, VkDeviceMemory* pOutImageMemory, VkImage* pOutImage,
                          VkDeviceSize* pOutImageSize);
+  glm::vec4 ReadPixelFromImage(VkImage image, uint32_t width, uint32_t height, int mouseX, int mouseY);
 
   VkResult CreateVkBuffer(VkDeviceSize bufferSize, VkBufferUsageFlags bufferUsage, VkMemoryPropertyFlags bufferProperties,
                         VkBuffer* pOutBuffer, VkDeviceMemory* pOutBufferMemory);

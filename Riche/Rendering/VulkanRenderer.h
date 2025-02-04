@@ -27,6 +27,7 @@ static const int OBJECT_COUNT = 1000;
 class Camera;
 class Mesh;
 class CullingRenderPass;
+class BasicLightingPass;
 
 class VulkanRenderer {
  public:
@@ -101,6 +102,7 @@ class VulkanRenderer {
 
   // - Rendering Pipelines
   std::shared_ptr<CullingRenderPass> m_pCullingRenderPass;
+  std::shared_ptr<BasicLightingPass> m_pLightingRenderPass; 
 
   entt::registry m_registry;
 

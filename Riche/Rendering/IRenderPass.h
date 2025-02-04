@@ -1,10 +1,12 @@
 #pragma once
 
 class Camera;
+class Editor;
 
 class IRenderPass {
  public:
   virtual void Initialize(VkDevice device, VkPhysicalDevice physicalDevice, VkQueue queue, VkCommandPool commandPool, Camera* camera,
+                          Editor* editor,
                           const uint32_t width, const uint32_t height) = 0;
   virtual void Cleanup() = 0;
 
@@ -18,6 +20,7 @@ class IRenderPass {
   virtual void CreateRenderPass() = 0;
 
   virtual void CreatePipeline() = 0;
+  virtual void CreatePipelineLayout() = 0;
   virtual void CreateBuffers() = 0;
 
   virtual void CreateCommandBuffers() = 0;
