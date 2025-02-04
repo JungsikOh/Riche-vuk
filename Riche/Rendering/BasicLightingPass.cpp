@@ -42,7 +42,16 @@ void BasicLightingPass::Cleanup() {
   vkDestroyImage(m_pDevice, m_depthStencilBufferImage, nullptr);
   vkFreeMemory(m_pDevice, m_depthStencilBufferImageMemory, nullptr);
 
+  vkDestroyImageView(m_pDevice, m_objectIdBufferImageView, nullptr);
+  vkDestroyImage(m_pDevice, m_objectIdColourBufferImage, nullptr);
+  vkFreeMemory(m_pDevice, m_objectIdBufferImageMemory, nullptr);
+
+  vkDestroyImageView(m_pDevice, m_objectIdDepthStencilBufferImageView, nullptr);
+  vkDestroyImage(m_pDevice, m_objectIdDepthStencilBufferImage, nullptr);
+  vkFreeMemory(m_pDevice, m_objectIdDepthStencilBufferImageMemory, nullptr);
+
   vkDestroyFramebuffer(m_pDevice, m_framebuffer, nullptr);
+  vkDestroyFramebuffer(m_pDevice, m_objectIdFramebuffer, nullptr);
 
   vkDestroySemaphore(m_pDevice, m_renderAvailable, nullptr);
   vkDestroyFence(m_pDevice, m_fence, nullptr);
@@ -51,8 +60,11 @@ void BasicLightingPass::Cleanup() {
   vkDestroyPipeline(m_pDevice, m_graphicsPipeline, nullptr);
   vkDestroyPipeline(m_pDevice, m_wireGraphicsPipeline, nullptr);
   vkDestroyPipeline(m_pDevice, m_boundingBoxPipeline, nullptr);
+  vkDestroyPipeline(m_pDevice, m_objectIDPipeline, nullptr);
   vkDestroyPipelineLayout(m_pDevice, m_graphicsPipelineLayout, nullptr);
+
   vkDestroyRenderPass(m_pDevice, m_renderPass, nullptr);
+  vkDestroyRenderPass(m_pDevice, m_objectIdRenderPass, nullptr);
 }
 
 void BasicLightingPass::Update() {
@@ -294,8 +306,7 @@ void BasicLightingPass::CreateFramebuffer() {
 
 void BasicLightingPass::CreateObjectIdFramebuffer() {
   VkFormat colourImageFormat = VkUtils::ChooseSupportedFormat(m_pPhyscialDevice, {VK_FORMAT_R32G32B32A32_SFLOAT},
-                                                              VK_IMAGE_TILING_OPTIMAL,
-                                                              VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT);
+                                                              VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT);
 
   VkUtils::CreateImage2D(m_pDevice, m_pPhyscialDevice, m_width, m_height, &m_objectIdBufferImageMemory, &m_objectIdColourBufferImage,
                          colourImageFormat,
@@ -318,7 +329,7 @@ void BasicLightingPass::CreateObjectIdFramebuffer() {
 
   VkFramebufferCreateInfo framebufferCreateInfo = {};
   framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-  framebufferCreateInfo.renderPass = m_renderPass;  // Render pass layout the framebuffer will be used with
+  framebufferCreateInfo.renderPass = m_objectIdRenderPass;  // Render pass layout the framebuffer will be used with
   framebufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
   framebufferCreateInfo.pAttachments = attachments.data();  // List of attachments (1:1 with render pass)
   framebufferCreateInfo.width = m_width;                    // framebuffer width
@@ -1170,7 +1181,7 @@ void BasicLightingPass::RecordCommands() {
     // Bind the index buffer with the correct offset
     vkCmdBindIndexBuffer(m_commandBuffer, miniBatch.m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-    VK_BIND_SET_MVP(m_commandBuffer, m_graphicsPipelineLayout, 0);
+    VK_BIND_SET_MVP_GRAPHICS(m_commandBuffer, m_graphicsPipelineLayout, 0);
     vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 2, 1,
                             &g_DescriptorManager.GetVkDescriptorSet("SamplerList_ALL"), 0, nullptr);
     vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 3, 1,
@@ -1193,7 +1204,7 @@ void BasicLightingPass::RecordCommands() {
   ///////////////////////////////////////////
   // BoundingBox Render
   ///////////////////////////////////////////
-
+  g_ShaderSetting.batchIdx = 0;
   if (g_RenderSetting.isRenderBoundingBox) {
     vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_boundingBoxPipeline);
 
@@ -1204,9 +1215,11 @@ void BasicLightingPass::RecordCommands() {
       // Bind the index buffer with the correct offset
       vkCmdBindIndexBuffer(m_commandBuffer, g_BatchManager.m_boundingBoxBufferList[i].indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-      VK_BIND_SET_MVP(m_commandBuffer, m_graphicsPipelineLayout, 0);
+      VK_BIND_SET_MVP_GRAPHICS(m_commandBuffer, m_graphicsPipelineLayout, 0);
+      vkCmdPushConstants(m_commandBuffer, m_graphicsPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting), &g_ShaderSetting);
 
       vkCmdDrawIndexed(m_commandBuffer, 24, 1, 0, 0, 0);
+      g_ShaderSetting.batchIdx += 1;
     }
   }
 
@@ -1250,7 +1263,7 @@ void BasicLightingPass::RecordCommands() {
     // Bind the index buffer with the correct offset
     vkCmdBindIndexBuffer(m_commandBuffer, miniBatch.m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-    VK_BIND_SET_MVP(m_commandBuffer, m_graphicsPipelineLayout, 0);
+    VK_BIND_SET_MVP_GRAPHICS(m_commandBuffer, m_graphicsPipelineLayout, 0);
 
     vkCmdPushConstants(m_commandBuffer, m_graphicsPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting), &g_ShaderSetting);
 

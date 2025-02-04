@@ -9,23 +9,33 @@
 
 layout(local_size_x = 1) in;
 
+layout(set = 0, binding = 0) readonly uniform U_Camera
+{
+	mat4 view;
+	mat4 projection;
+}u_Camera;
 
-layout(set = 0, binding = 0) buffer SSBO_DrawIndexedCommands {
+layout(set = 1, binding = 0) readonly buffer SSBO_Model
+{
+	Transform transform[];
+}ssbo_Model;
+
+layout(set = 2, binding = 0) buffer SSBO_DrawIndexedCommands {
     IndircetDrawIndexedCommand drawIndexedCommands[];
 }ssbo_DrawIndexedCommands;
 
-layout(set = 0, binding = 1) buffer readonly SSBO_BoundingBoxBuffer {
+layout(set = 2, binding = 1) buffer readonly SSBO_BoundingBoxBuffer {
     AABB boundingBoxList[];
 };
 
-layout(set = 0, binding = 2) uniform FrustumPlanes {
+layout(set = 2, binding = 2) uniform FrustumPlanes {
     vec4 planes[6];  // View Frustum의 6개 평면
 };
 
-bool IsAABBInFrustum(AABB aabb) 
+bool IsAABBInFrustum(AABB aabb, uint index) 
 {
-    vec4 newMinPos = aabb.minPos;
-    vec4 newMaxPos = aabb.maxPos;
+    vec4 newMinPos = ssbo_Model.transform[index].currentModel * aabb.minPos;
+    vec4 newMaxPos = ssbo_Model.transform[index].currentModel * aabb.maxPos;
     
     for (int i = 0; i < 6; ++i) 
     {
@@ -53,7 +63,7 @@ void main() {
     uint idx = gl_GlobalInvocationID.x;
     
     // 각 AABB를 Frustum에 대해 검사하고, 포함된 경우 Indirect Draw 명령을 설정
-    if (IsAABBInFrustum(boundingBoxList[idx])) 
+    if (IsAABBInFrustum(boundingBoxList[idx], idx)) 
     {
         ssbo_DrawIndexedCommands.drawIndexedCommands[idx].instanceCount = 1;
     }

@@ -24,6 +24,6 @@ layout(set = 1, binding = 0) readonly buffer SSBO_Model
 
 
 void main() {
-	mat4 model = nonuniformEXT(ssbo_Model.transform[u_ShaderSetting.batchIdx + gl_BaseInstanceARB].currentModel);
+	mat4 model = nonuniformEXT(ssbo_Model.transform[u_ShaderSetting.batchIdx].currentModel);
 	gl_Position = u_Camera.projection * u_Camera.view * model * vec4(inPosition, 1.0);
 }

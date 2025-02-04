@@ -89,6 +89,7 @@ void VulkanRenderer::Update() {
   void* pData = nullptr;
 
   m_camera->Update();
+
   m_viewProjectionCPU.view = m_camera->View();
   m_viewProjectionCPU.projection = m_camera->Proj();
   vkMapMemory(mainDevice.logicalDevice, m_viewProjectionUBOMemory, 0, sizeof(ViewProjection), 0, &pData);
@@ -98,7 +99,7 @@ void VulkanRenderer::Update() {
   m_pCullingRenderPass->Update();
   m_pLightingRenderPass->Update();
 
-  m_pEditor->OnLeftMouseClick();
+  m_pEditor->Update();
 }
 
 void VulkanRenderer::Draw() {

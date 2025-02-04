@@ -29,7 +29,7 @@ void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDev
   std::vector<Mesh> test;
   // loadObjModel(m_pDevice, "Resources/Models/sponza (1)/", "sponza.obj", test);
   // loadObjModel(m_pDevice, "Resources/Models/Sponza-master/", "sponza.obj", test);
-  loadGltfModel(m_pDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", test);
+  loadGltfModel(m_pDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", test, 0.1f);
 
   FlushMiniBatch(g_BatchManager.m_miniBatchList, g_ResourceManager);
 
@@ -85,9 +85,9 @@ void CullingRenderPass::Cleanup() {
 
 void CullingRenderPass::Update() {
   void* pData = nullptr;
-  vkMapMemory(m_pDevice, g_BatchManager.m_trasformListBufferMemory, 0, sizeof(glm::mat4) * g_BatchManager.m_trasformList.size(), 0,
+  vkMapMemory(m_pDevice, g_BatchManager.m_trasformListBufferMemory, 0, g_BatchManager.m_transformListSize, 0,
               &pData);
-  memcpy(pData, g_BatchManager.m_trasformList.data(), sizeof(glm::mat4) * g_BatchManager.m_trasformList.size());
+  memcpy(pData, g_BatchManager.m_trasformList.data(), g_BatchManager.m_transformListSize);
   vkUnmapMemory(m_pDevice, g_BatchManager.m_trasformListBufferMemory);
 
   VkDeviceSize aabbBufferSize = sizeof(AABB) * g_BatchManager.m_boundingBoxList.size();
@@ -265,8 +265,9 @@ void CullingRenderPass::CreatePipelineLayout() {
   VK_CHECK(vkCreatePipelineLayout(m_pDevice, &grahpicsPipelineLayoutCreateInfo, nullptr, &m_graphicsPipelineLayout));
 
   // Hi-z Occlusion Culling
-  std::array<VkDescriptorSetLayout, 4> setCullingLayouts = {g_DescriptorManager.GetVkDescriptorSetLayout("SamplerList_ALL"),
+  std::array<VkDescriptorSetLayout, 5> setCullingLayouts = {g_DescriptorManager.GetVkDescriptorSetLayout("SamplerList_ALL"),
                                                             g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL"),
+                                                            g_DescriptorManager.GetVkDescriptorSetLayout("Transform_ALL"),
                                                             g_DescriptorManager.GetVkDescriptorSetLayout("ViewFrustumCulling_COMPUTE"),
                                                             g_DescriptorManager.GetVkDescriptorSetLayout("DepthOnlyImage")};
 
@@ -279,11 +280,17 @@ void CullingRenderPass::CreatePipelineLayout() {
 
   VK_CHECK(vkCreatePipelineLayout(m_pDevice, &pipelineLayoutInfo, nullptr, &m_occlusionCullingComputePipelineLayout));
 
+  std::array<VkDescriptorSetLayout, 3> setViewCullingLayouts = {
+      g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL"),
+      g_DescriptorManager.GetVkDescriptorSetLayout("Transform_ALL"),
+      g_DescriptorManager.GetVkDescriptorSetLayout("ViewFrustumCulling_COMPUTE"),
+  };
+
   // View Frustum culling
   pipelineLayoutInfo = {};
   pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  pipelineLayoutInfo.setLayoutCount = 1;
-  pipelineLayoutInfo.pSetLayouts = &g_DescriptorManager.GetVkDescriptorSetLayout("ViewFrustumCulling_COMPUTE");
+  pipelineLayoutInfo.setLayoutCount = setViewCullingLayouts.size();
+  pipelineLayoutInfo.pSetLayouts = setViewCullingLayouts.data();
   pipelineLayoutInfo.pushConstantRangeCount = 1;
   pipelineLayoutInfo.pPushConstantRanges = &m_debugPushConstant;
 
@@ -513,6 +520,7 @@ void CullingRenderPass::CreateShaderStorageBuffers() {
 
   // Transform
   VkDeviceSize transformBufferSize = static_cast<uint64_t>(g_BatchManager.m_trasformList.size() * sizeof(Transform));
+  g_BatchManager.m_transformListSize = transformBufferSize;
   VkUtils::CreateBuffer(m_pDevice, m_pPhyscialDevice, transformBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                         &g_BatchManager.m_trasformListBuffer, &g_BatchManager.m_trasformListBufferMemory);
@@ -675,7 +683,8 @@ void CullingRenderPass::RecordCommands() {
   }
 
   vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipeline);
-  vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 0, 1,
+  VK_BIND_SET_MVP_COMPUTE(m_commandBuffer, m_viewCullingComputePipelineLayout, 0);
+  vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 2, 1,
                           &g_DescriptorManager.GetVkDescriptorSet("ViewFrustumCulling_COMPUTE"), 0, nullptr);
 
   vkCmdDispatch(m_commandBuffer, 1000, 1, 1);
@@ -713,7 +722,7 @@ void CullingRenderPass::RecordCommands() {
     // Bind the index buffer with the correct offset
     vkCmdBindIndexBuffer(m_commandBuffer, miniBatch.m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-    VK_BIND_SET_MVP(m_commandBuffer, m_graphicsPipelineLayout, 0);
+    VK_BIND_SET_MVP_GRAPHICS(m_commandBuffer, m_graphicsPipelineLayout, 0);
 
     vkCmdPushConstants(m_commandBuffer, m_graphicsPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting), &g_ShaderSetting);
 
@@ -843,11 +852,10 @@ void CullingRenderPass::RecordCommands() {
 
     vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 0, 1,
                             &g_DescriptorManager.GetVkDescriptorSet("SamplerList_ALL"), 0, nullptr);
-    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 1, 1,
-                            &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL"), 0, nullptr);
-    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 2, 1,
-                            &g_DescriptorManager.GetVkDescriptorSet("ViewFrustumCulling_COMPUTE"), 0, nullptr);
+    VK_BIND_SET_MVP_COMPUTE(m_commandBuffer, m_occlusionCullingComputePipelineLayout, 1);
     vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 3, 1,
+                            &g_DescriptorManager.GetVkDescriptorSet("ViewFrustumCulling_COMPUTE"), 0, nullptr);
+    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 4, 1,
                             &g_DescriptorManager.GetVkDescriptorSet("DepthOnlyImage"), 0, nullptr);
 
     vkCmdDispatch(m_commandBuffer, 1000, 1, 1);

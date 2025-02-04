@@ -342,8 +342,8 @@ static bool loadGltfModel(VkDevice device, const std::string& filepath, const st
     g_Registry.emplace<ObjectID>(object, _id);
 
     Transform _transform = {};
-    _transform.startTransform = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f));
-    _transform.currentTransform = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f));
+    _transform.startTransform = glm::scale(glm::mat4(1.0f), glm::vec3(scale));
+    _transform.currentTransform = glm::scale(glm::mat4(1.0f), glm::vec3(scale));
     g_BatchManager.m_trasformList.push_back(_transform);
     g_Registry.emplace<Transform>(object, _transform);
 

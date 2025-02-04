@@ -51,6 +51,7 @@ struct BatchManager : public Singleton<BatchManager> {
   std::vector<Transform> m_trasformList;
   VkBuffer m_trasformListBuffer;
   VkDeviceMemory m_trasformListBufferMemory;
+  VkDeviceSize m_transformListSize;
 
   // Material
   std::vector<VkImage> m_diffuseImageList;

@@ -1,5 +1,5 @@
+#include <cstdlib>  // std::system
 #include <filesystem>
-#include <cstdlib>     // std::system
 #include <string_view>
 
 #include "Rendering/Camera.h"
@@ -15,6 +15,7 @@ double lastX = 0.0, lastY = 0.0;  // 이전 프레임의 마우스 좌표
 bool firstMouse = true;           // 초기 마우스 위치 확인을 위한 플래그
 bool rightButtonPressed = false;
 bool leftButtonPressed = false;
+bool hasLeftButtonPressed = false;
 
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) { g_camera.OnKeyInput(deltaTime, key); }
 
@@ -22,20 +23,29 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
   if (button == GLFW_MOUSE_BUTTON_RIGHT) {  // 마우스 오른쪽 버튼일 경우
     if (action == GLFW_PRESS) {             // 누를 때
       rightButtonPressed = true;
-      firstMouse = true;  // 마우스를 누를 때마다 초기화
+      firstMouse = true;                  // 마우스를 누를 때마다 초기화
     } else if (action == GLFW_RELEASE) {  // 뗄 때
       rightButtonPressed = false;
     }
   }
 
-  if (button == GLFW_MOUSE_BUTTON_LEFT) {  // 마우스 오른쪽 버튼일 경우
-    if (action == GLFW_PRESS) {             // 누를 때
-      leftButtonPressed = true;
-      g_camera.isMousePressed = true;
-    } else if (action == GLFW_RELEASE) {  // 뗄 때
-      leftButtonPressed = false;
-      g_camera.isMousePressed = false;
-    }
+  if (ImGui::GetIO().WantCaptureMouse) {
+    return;  // early out
+  }
+
+  if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+    leftButtonPressed = true;
+    hasLeftButtonPressed = false;
+    g_camera.isMousePressed = true;
+
+    double xpos, ypos;
+    glfwGetCursorPos(window, &xpos, &ypos);
+    g_camera.SetMousePosition(glm::vec2(float(xpos), float(ypos)));
+
+  } else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
+    leftButtonPressed = false;
+    hasLeftButtonPressed = false;  // 다음 드래그를 위해 풀어줌
+    g_camera.isMousePressed = false;
   }
 }
 
@@ -58,10 +68,6 @@ void CursorPositionCallback(GLFWwindow* window, double xpos, double ypos) {
 
     g_camera.OnMouseInput(deltaX, deltaY);
   }
-
-  if (leftButtonPressed) {
-    g_camera.SetMousePosition(glm::vec2(float(xpos), float(ypos)));
-  }
 }
 
 void InitWindow(std::string wName = "Test Window", const int w = 800, const int h = 600) {
@@ -76,7 +82,6 @@ void InitWindow(std::string wName = "Test Window", const int w = 800, const int 
 }
 
 int main() {
-
   // Create Window
   InitWindow("Test Widnow", 1920, 1080);
 
@@ -85,14 +90,14 @@ int main() {
   glfwSetCursorPosCallback(window, CursorPositionCallback);
 
   CameraParameters cameraParams = {};
-  cameraParams.speed = 300.0f;
+  cameraParams.speed = 30.0f;
   cameraParams.sensitivity = 0.2f;
   cameraParams.position = glm::vec3(0.0f, 0.0f, 2.0f);
   cameraParams.lootAt = glm::vec3(0.0f, 0.0f, -1.0f);
   cameraParams.fov = 45.0f;
   cameraParams.aspectRatio = 1920.0f / 1080.0f;
-  cameraParams.nearPlane = 0.5f;
-  cameraParams.farPlane = 5000.0f;
+  cameraParams.nearPlane = 0.05f;
+  cameraParams.farPlane = 500.0f;
   g_camera.Initialize(cameraParams);
 
   // Create Vulkan Renderer Instance
@@ -112,20 +117,6 @@ int main() {
     float now = glfwGetTime();
     deltaTime = now - lastTime;
     lastTime = now;
-
-    angle += 10.0f * deltaTime;
-    if (angle > 360.0f) {
-      angle -= 360.0f;
-    }
-
-    glm::mat4 firstModel(1.0f);
-    glm::mat4 secondModel(1.0f);
-
-    firstModel = glm::translate(firstModel, glm::vec3(-2.0f, 0.0f, -1.0f));
-    firstModel = glm::rotate(firstModel, glm::radians(angle), glm::vec3(0.0f, 0.0f, 1.0f));
-
-    secondModel = glm::translate(secondModel, glm::vec3(-1.0f, 0.0f, -1.0f));
-    secondModel = glm::rotate(secondModel, glm::radians(angle * 50), glm::vec3(0.0f, 0.0f, 1.0f));
 
     vulkanRenderer.Update();
 

@@ -12,6 +12,7 @@ class Editor {
   GLFWwindow* m_Window;
   Camera* m_pCamera;
   int m_selectedIndex = -1;
+  int m_gizmoType = -1;
 
   VkInstance m_Instance;
   struct {
@@ -31,10 +32,14 @@ class Editor {
                   VkUtils::QueueFamilyIndices queueFamily, VkQueue graphicsQueue, Camera* camera);
   void Cleanup();
 
+  void Update();
+
   void RenderImGui(VkCommandBuffer commandBuffer);
 
   void OnLeftMouseClick();
 
  private:
   void CreateImGuiDescriptorPool();
+
+  void UpdateKeyboard();
 };

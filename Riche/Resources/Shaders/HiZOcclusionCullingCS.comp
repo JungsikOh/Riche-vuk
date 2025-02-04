@@ -21,24 +21,29 @@ layout(set = 1, binding = 0) readonly uniform U_Camera
 	mat4 projection;
 }u_Camera;
 
+layout(set = 2, binding = 0) readonly buffer SSBO_Model
+{
+	Transform transform[];
+}ssbo_Model;
+
 ///////////////////////////////////
 // ViewFrustumCulling_COMPUTE
 ///////////////////////////////////
 
-layout(set = 2, binding = 0) buffer DrawIndexedCommands {
+layout(set = 3, binding = 0) buffer DrawIndexedCommands {
     IndircetDrawIndexedCommand drawIndexedCommands[];
 };
-layout(set = 2, binding = 1) buffer readonly BoundingBoxes {
+layout(set = 3, binding = 1) buffer readonly BoundingBoxes {
     AABB boundingBoxList[];
 };
-layout(set = 2, binding = 2) uniform FrustumPlanes {
+layout(set = 3, binding = 2) uniform FrustumPlanes {
     vec4 planes[6];  // View Frustum의 6개 평면
 };
-layout(set = 2, binding = 3) buffer fLODListSSBO {
+layout(set = 3, binding = 3) buffer fLODListSSBO {
     float fLODList[];
 };
 
-layout(set = 3, binding = 0) uniform texture2D u_DepthMapTextureLOD;
+layout(set = 4, binding = 0) uniform texture2D u_DepthMapTextureLOD;
 
 void main() {
     uint idx = gl_GlobalInvocationID.x;
@@ -69,7 +74,7 @@ void main() {
 
     // AABB의 모든 코너 검사
     for (uint i = 0; i < 8; ++i) {
-        vec4 clipPos = u_Camera.projection * u_Camera.view * vec4(corners[i], 1.0);
+        vec4 clipPos = u_Camera.projection * u_Camera.view * ssbo_Model.transform[idx].currentModel * vec4(corners[i], 1.0);
         vec3 ndcPos = clipPos.xyz / clipPos.w;
 
         // NDC -> 화면 좌표 (0 ~ 1)
@@ -132,7 +137,7 @@ void main() {
             // 비교
             // depthMin(가장 앞 코너의 ndc.z) vs hizDepth
             // "샘플 위치에서 Hi-Z보다 앞에 있다면 -> 보인다"
-            if (depthMin <= hizDepth + 0.005) {
+            if (depthMin <= hizDepth + 0.025) {
                 // 보이는 샘플 하나라도 발견 -> Draw
                 // => break out
                 break;

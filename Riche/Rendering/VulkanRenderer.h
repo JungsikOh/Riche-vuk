@@ -10,13 +10,13 @@
 #include "VkUtils/QueueFamilyIndices.h"
 #include "VkUtils/ResourceManager.h"
 
-#define VK_BIND_SET_MVP_TEST(commandBuffer, pipelineLayout, baseBinding, batchIndex)                                             \
-  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, baseBinding, 1,       \
+#define VK_BIND_SET_MVP_COMPUTE(commandBuffer, pipelineLayout, baseBinding)                                    \
+  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, baseBinding, 1,       \
                           &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL"), 0, nullptr);           \
-  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, (baseBinding) + 1, 1, \
-                          &g_DescriptorManager.GetVkDescriptorSet("Transform" + std::to_string(batchIndex)), 0, nullptr)
+  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, (baseBinding) + 1, 1, \
+                          &g_DescriptorManager.GetVkDescriptorSet("Transform_ALL"), 0, nullptr)
 
-#define VK_BIND_SET_MVP(commandBuffer, pipelineLayout, baseBinding)                                 \
+#define VK_BIND_SET_MVP_GRAPHICS(commandBuffer, pipelineLayout, baseBinding)                                 \
   vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, baseBinding, 1,       \
                           &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL"), 0, nullptr);           \
   vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, (baseBinding) + 1, 1, \
