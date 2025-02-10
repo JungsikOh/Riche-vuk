@@ -317,6 +317,11 @@ glm::vec4 ResourceManager::ReadPixelFromImage(VkImage image, uint32_t width, uin
   return glm::vec4(resultColor[0], resultColor[1], resultColor[2], resultColor[3]);
 }
 
+VkResult ResourceManager::CreateAccelerationStructure(VkAccelerationStructureKHR as, VkAccelerationStructureTypeKHR type,
+                                                      VkAccelerationStructureBuildSizesInfoKHR& info) {
+  return VkResult();
+}
+
 VkResult ResourceManager::CreateVkBuffer(VkDeviceSize bufferSize, VkBufferUsageFlags bufferUsage,
                                          VkMemoryPropertyFlags bufferProperties, VkBuffer* pOutBuffer,
                                          VkDeviceMemory* pOutBufferMemory) {

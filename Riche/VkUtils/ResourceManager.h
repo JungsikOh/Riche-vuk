@@ -41,8 +41,11 @@ class ResourceManager : public Singleton<ResourceManager> {
                          VkDeviceSize* pOutImageSize);
   glm::vec4 ReadPixelFromImage(VkImage image, uint32_t width, uint32_t height, int mouseX, int mouseY);
 
+  VkResult CreateAccelerationStructure(VkAccelerationStructureKHR as, VkAccelerationStructureTypeKHR type,
+                                       VkAccelerationStructureBuildSizesInfoKHR& info);
+
   VkResult CreateVkBuffer(VkDeviceSize bufferSize, VkBufferUsageFlags bufferUsage, VkMemoryPropertyFlags bufferProperties,
-                        VkBuffer* pOutBuffer, VkDeviceMemory* pOutBufferMemory);
+                          VkBuffer* pOutBuffer, VkDeviceMemory* pOutBufferMemory);
 };
 
 static uint32_t FindMemoryTypeIndex(VkPhysicalDevice physicalDevice, uint32_t allowedTypes, VkMemoryPropertyFlags properties) {
@@ -63,7 +66,8 @@ static uint32_t FindMemoryTypeIndex(VkPhysicalDevice physicalDevice, uint32_t al
 }
 
 static void CreateBuffer(VkDevice device, VkPhysicalDevice physicalDevice, VkDeviceSize bufferSize, VkBufferUsageFlags bufferUsage,
-                         VkMemoryPropertyFlags bufferProperties, VkBuffer* pOutBuffer, VkDeviceMemory* pOutBufferMemory) {
+                         VkMemoryPropertyFlags bufferProperties, VkBuffer* pOutBuffer, VkDeviceMemory* pOutBufferMemory,
+                         bool deviceAddressFlag = false) {
   // CREATE VERTEX BUFFER
   // Information to create a buffer (doesn't include assigning memory)
   VkBufferCreateInfo bufferCreateInfo = {};
@@ -79,6 +83,10 @@ static void CreateBuffer(VkDevice device, VkPhysicalDevice physicalDevice, VkDev
   VkMemoryRequirements memRequirements;
   vkGetBufferMemoryRequirements(device, *pOutBuffer, &memRequirements);
 
+  VkMemoryAllocateFlagsInfo memoryAllocateFlagsInfo = {};
+  memoryAllocateFlagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
+  memoryAllocateFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+
   // ALLOCATE MEMORY TO BUFFER
   VkMemoryAllocateInfo memAllocInfo = {};
   memAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -88,6 +96,7 @@ static void CreateBuffer(VkDevice device, VkPhysicalDevice physicalDevice, VkDev
       bufferProperties);                               // VK_MEMORY_.._HOST_VISIBLE_BIT : CPU can interact with memory(GPU)
   // VK_MEMORY_.._HOST_COHERENT_BIT : Allows placement of data straight into buffer after mapping (otherwise would have to specify
   // maually) Allocate Memory to VkDeviceMemory
+  memAllocInfo.pNext = deviceAddressFlag ? &memoryAllocateFlagsInfo : VK_NULL_HANDLE;
   VK_CHECK(vkAllocateMemory(device, &memAllocInfo, nullptr, pOutBufferMemory));
 
   // Bind memory to given vertex buffer
@@ -450,6 +459,33 @@ static void CreateSampler(VkDevice device, VkSamplerAddressMode addressMode, VkF
   samplerCreateInfo.maxLod = 8.0f;
 
   VK_CHECK(vkCreateSampler(device, &samplerCreateInfo, nullptr, pOutSampler));
+}
+
+static void CreateAccelerationStructureBuffer(VkDevice device, VkPhysicalDevice physicalDevice, VkAccelerationStructureKHR handle,
+                                              uint64_t deviceAddress, VkDeviceMemory memory, VkBuffer buffer,
+                                              VkAccelerationStructureBuildSizesInfoKHR buildSizeInfo) {
+  VkBufferCreateInfo bufferCreateInfo{};
+  bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+  bufferCreateInfo.size = buildSizeInfo.accelerationStructureSize;
+  bufferCreateInfo.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+  VK_CHECK(vkCreateBuffer(device, &bufferCreateInfo, nullptr, &buffer));
+
+  VkMemoryRequirements memoryRequirements{};
+  vkGetBufferMemoryRequirements(device, buffer, &memoryRequirements);
+
+  VkMemoryAllocateFlagsInfo memoryAllocateFlagsInfo{};
+  memoryAllocateFlagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
+  memoryAllocateFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+
+  VkMemoryAllocateInfo memoryAllocateInfo{};
+  memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+  memoryAllocateInfo.pNext = &memoryAllocateFlagsInfo;
+  memoryAllocateInfo.allocationSize = memoryRequirements.size;
+  memoryAllocateInfo.memoryTypeIndex =
+      FindMemoryTypeIndex(physicalDevice, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+  VK_CHECK(vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &memory));
+  VK_CHECK(vkBindBufferMemory(device, buffer, memory, 0));
 }
 
 }  // namespace VkUtils
