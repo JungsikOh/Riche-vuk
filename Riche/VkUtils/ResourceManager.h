@@ -5,6 +5,7 @@
 #include "Utils/TextureUtils.h"
 
 namespace VkUtils {
+
 // TransferQueue를 이용해서 만들어야하는 Vulkan Object에 대해서 생성하는 클래스
 class ResourceManager : public Singleton<ResourceManager> {
   friend class Singleton<ResourceManager>;
@@ -32,6 +33,9 @@ class ResourceManager : public Singleton<ResourceManager> {
   void Initialize(VkDevice device, VkPhysicalDevice physicalDevice, VkQueue queue, QueueFamilyIndices indices);
   void Cleanup();
 
+  VkCommandBuffer CreateAndBeginCommandBuffer();
+  void EndAndSummitCommandBuffer(VkCommandBuffer commandbuffer);
+
   VkResult CreateVertexBuffer(uint32_t sizePerVertex, uint32_t vertexNum, VkDeviceMemory* pOutVertexBufferMemory, VkBuffer* pOutBuffer,
                               void* pInitData);
   VkResult CreateVertexBuffer(uint32_t vertexDataSize, VkDeviceMemory* pOutVertexBufferMemory, VkBuffer* pOutBuffer, void* pInitData);
@@ -40,9 +44,6 @@ class ResourceManager : public Singleton<ResourceManager> {
   VkResult CreateTexture(const std::string& filename, VkDeviceMemory* pOutImageMemory, VkImage* pOutImage,
                          VkDeviceSize* pOutImageSize);
   glm::vec4 ReadPixelFromImage(VkImage image, uint32_t width, uint32_t height, int mouseX, int mouseY);
-
-  VkResult CreateAccelerationStructure(VkAccelerationStructureKHR as, VkAccelerationStructureTypeKHR type,
-                                       VkAccelerationStructureBuildSizesInfoKHR& info);
 
   VkResult CreateVkBuffer(VkDeviceSize bufferSize, VkBufferUsageFlags bufferUsage, VkMemoryPropertyFlags bufferProperties,
                           VkBuffer* pOutBuffer, VkDeviceMemory* pOutBufferMemory);
@@ -459,33 +460,6 @@ static void CreateSampler(VkDevice device, VkSamplerAddressMode addressMode, VkF
   samplerCreateInfo.maxLod = 8.0f;
 
   VK_CHECK(vkCreateSampler(device, &samplerCreateInfo, nullptr, pOutSampler));
-}
-
-static void CreateAccelerationStructureBuffer(VkDevice device, VkPhysicalDevice physicalDevice, VkAccelerationStructureKHR handle,
-                                              uint64_t deviceAddress, VkDeviceMemory memory, VkBuffer buffer,
-                                              VkAccelerationStructureBuildSizesInfoKHR buildSizeInfo) {
-  VkBufferCreateInfo bufferCreateInfo{};
-  bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-  bufferCreateInfo.size = buildSizeInfo.accelerationStructureSize;
-  bufferCreateInfo.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-  VK_CHECK(vkCreateBuffer(device, &bufferCreateInfo, nullptr, &buffer));
-
-  VkMemoryRequirements memoryRequirements{};
-  vkGetBufferMemoryRequirements(device, buffer, &memoryRequirements);
-
-  VkMemoryAllocateFlagsInfo memoryAllocateFlagsInfo{};
-  memoryAllocateFlagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
-  memoryAllocateFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
-
-  VkMemoryAllocateInfo memoryAllocateInfo{};
-  memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  memoryAllocateInfo.pNext = &memoryAllocateFlagsInfo;
-  memoryAllocateInfo.allocationSize = memoryRequirements.size;
-  memoryAllocateInfo.memoryTypeIndex =
-      FindMemoryTypeIndex(physicalDevice, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-  VK_CHECK(vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &memory));
-  VK_CHECK(vkBindBufferMemory(device, buffer, memory, 0));
 }
 
 }  // namespace VkUtils

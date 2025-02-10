@@ -26,6 +26,49 @@ void ResourceManager::Cleanup() {
   CleanupFence();
 }
 
+VkCommandBuffer ResourceManager::CreateAndBeginCommandBuffer() {
+  VkCommandBuffer transferCommandBuffer;
+
+  // Command Buffer details
+  VkCommandBufferAllocateInfo allocInfo = {};
+  allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocInfo.commandPool = m_TransferCommandPool;
+  allocInfo.commandBufferCount = 1;
+
+  // Allocate command buffer and pool
+  VK_CHECK(vkAllocateCommandBuffers(m_Device, &allocInfo, &transferCommandBuffer));
+
+  // Information to begin the command buffer record
+  VkCommandBufferBeginInfo beginInfo = {};
+  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  beginInfo.flags =
+      VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;  // We're only using the command bufer once, so set up for one time submit.
+
+  // Begine recording transfer commands
+  vkBeginCommandBuffer(transferCommandBuffer, &beginInfo);
+
+  return transferCommandBuffer;
+}
+
+void ResourceManager::EndAndSummitCommandBuffer(VkCommandBuffer commandbuffer) {
+  // End commands
+  vkEndCommandBuffer(commandbuffer);
+
+  // Queue submission information
+  VkSubmitInfo submitInfo = {};
+  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submitInfo.commandBufferCount = 1;
+  submitInfo.pCommandBuffers = &commandbuffer;
+
+  // Submit Transfer command to transfer queue and wait until it finishes
+  vkQueueSubmit(m_transferQueue, 1, &submitInfo, VK_NULL_HANDLE);
+  vkQueueWaitIdle(m_transferQueue);  // 큐가 Idle 상태가 될 때까지 기다린다. 여기서 Idle 상태란, 대기 상태에 있는 것을 이야기한다.
+
+  // Free Temporary command buffer back to pool
+  vkFreeCommandBuffers(m_Device, m_TransferCommandPool, 1, &commandbuffer);
+}
+
 ResourceManager::ResourceManager() {}
 
 ResourceManager::~ResourceManager() {}
@@ -315,11 +358,6 @@ glm::vec4 ResourceManager::ReadPixelFromImage(VkImage image, uint32_t width, uin
   vkFreeMemory(m_Device, stagingMemory, nullptr);
 
   return glm::vec4(resultColor[0], resultColor[1], resultColor[2], resultColor[3]);
-}
-
-VkResult ResourceManager::CreateAccelerationStructure(VkAccelerationStructureKHR as, VkAccelerationStructureTypeKHR type,
-                                                      VkAccelerationStructureBuildSizesInfoKHR& info) {
-  return VkResult();
 }
 
 VkResult ResourceManager::CreateVkBuffer(VkDeviceSize bufferSize, VkBufferUsageFlags bufferUsage,
