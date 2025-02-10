@@ -15,6 +15,8 @@ layout(set = 0, binding = 0) uniform U_Camera
 {
 	mat4 view;
 	mat4 projection;
+    mat4 viewInverse;
+    mat4 projInverse;
 } u_Camera;
 
 layout(set = 1, binding = 0) readonly buffer SSBO_Model
