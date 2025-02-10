@@ -1,6 +1,5 @@
 #pragma once
 #include "Rendering/RenderSetting.h"
-#include "Utils/RayCastUtils.h"
 #include "VkUtils/DescriptorBuilder.h"
 #include "VkUtils/DescriptorManager.h"
 #include "VkUtils/QueueFamilyIndices.h"

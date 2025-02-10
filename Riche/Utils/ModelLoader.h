@@ -1,9 +1,9 @@
 #pragma once
 
+#include "BoundingBox.h"
 #include "Rendering/Components.h"
 #include "Rendering/Mesh.h"
 #include "Rendering/VulkanRenderer.h"
-#include "BoundingBox.h"
 #include "Singleton.h"
 #include "ThreadPool.h"
 #include "VkUtils/ResourceManager.h"
@@ -383,7 +383,6 @@ static bool loadGltfModel(VkDevice device, const std::string& filepath, const st
           // 경로에 '\\' 등이 들어 있을 수 있으므로 교체
           std::replace(texturePath.begin(), texturePath.end(), '\\', '/');
 
-
           if (texturePath.find(":") == std::string::npos) {
             texturePath = filepath + texturePath;
           }
@@ -410,7 +409,7 @@ static bool loadGltfModel(VkDevice device, const std::string& filepath, const st
 }
 
 static bool loadSeqGltfModel(VkDevice device, const std::string& filepath, const std::string& gltfName, std::vector<Mesh>& outMeshes,
-                          float scale = 1.0f) {
+                             float scale = 1.0f) {
   tinygltf::TinyGLTF loader;
   tinygltf::Model model;
   std::string warn, err;
@@ -612,8 +611,7 @@ static bool loadSeqGltfModel(VkDevice device, const std::string& filepath, const
       g_BatchManager.m_boundingBoxList.push_back(_aabb);
       g_Registry.emplace<AABB>(object, _aabb);
 
-      
-    std::vector<glm::vec3> AABBvertex = CreateAABBVertexBuffer(_aabb);
+      std::vector<glm::vec3> AABBvertex = CreateAABBVertexBuffer(_aabb);
       std::vector<uint32_t> AABBIndics = CreateAABBIndexBuffer();
 
       AABBBufferList _aabbBufferList;

@@ -27,6 +27,9 @@
 #include "imgui_impl_vulkan.h"
 #include "imgui_impl_glfw.h"  // if use GLFW.
 
+#include <vulkan/vulkan.h>
+#include <vulkan/vulkan_core.h>
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>

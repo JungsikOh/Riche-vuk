@@ -158,6 +158,7 @@
     <ClCompile Include="Rendering\BasicLightingPass.cpp" />
     <ClCompile Include="Rendering\Camera.cpp" />
     <ClCompile Include="Rendering\CullingRenderPass.cpp" />
+    <ClCompile Include="Rendering\IRenderPass.cpp" />
     <ClCompile Include="Rendering\Mesh.cpp" />
     <ClCompile Include="Utils\ModelLoader.cpp" />
     <ClCompile Include="VkUtils\ChooseFunc.h" />
@@ -189,7 +190,6 @@
     <ClInclude Include="Rendering\Swapchain.h" />
     <ClInclude Include="Utils\BoundingBox.h" />
     <ClInclude Include="Utils\ModelLoader.h" />
-    <ClInclude Include="Utils\RayCastUtils.h" />
     <ClInclude Include="Utils\Singleton.h" />
     <ClInclude Include="Utils\StringUtil.h" />
     <ClInclude Include="Utils\TaskQueue.h" />
@@ -200,8 +200,8 @@
     <ClInclude Include="Rendering\Components.h" />
     <ClInclude Include="VkUtils\DescriptorManager.h" />
     <ClInclude Include="Rendering\VulkanRenderer.h" />
-    <ClInclude Include="VkUtils\ResourceManager.h" />
     <ClInclude Include="VkUtils\QueueFamilyIndices.h" />
+    <ClInclude Include="VkUtils\ResourceManager.h" />
     <ClInclude Include="VkUtils\ShaderModule.h" />
   </ItemGroup>
   <ItemGroup>

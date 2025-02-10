@@ -69,6 +69,15 @@
     <ClCompile Include="Utils\ModelLoader.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="..\ThirdParty\imgui\ImGuizmo.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Rendering\BasicLightingPass.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Rendering\IRenderPass.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="VkUtils\DescriptorBuilder.h">
@@ -84,9 +93,6 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="VkUtils\DescriptorManager.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="VkUtils\ResourceManager.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="VkUtils\QueueFamilyIndices.h">
@@ -165,6 +171,15 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="Utils\TextureUtils.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ThirdParty\imgui\ImGuizmo.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Rendering\BasicLightingPass.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="VkUtils\ResourceManager.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
