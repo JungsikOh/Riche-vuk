@@ -11,6 +11,7 @@ class Camera;
 class CullingRenderPass : public IRenderPass {
  public:
   CullingRenderPass() = default;
+  CullingRenderPass(VkDevice device, VkPhysicalDevice physicalDevice);
   ~CullingRenderPass() = default;
   
   virtual void Initialize(VkDevice device, VkPhysicalDevice physicalDevice, VkQueue queue, VkCommandPool commandPool, Camera* camera,

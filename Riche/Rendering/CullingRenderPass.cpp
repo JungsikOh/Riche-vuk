@@ -13,6 +13,8 @@
 #include "VkUtils/ShaderModule.h"
 #include "VulkanRenderer.h"
 
+CullingRenderPass::CullingRenderPass(VkDevice device, VkPhysicalDevice physicalDevice) {}
+
 void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDevice, VkQueue queue, VkCommandPool commandPool,
                                    Camera* camera, Editor* editor, const uint32_t width, const uint32_t height) {
   m_pDevice = device;
@@ -25,13 +27,6 @@ void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDev
   m_pCamera = camera;
 
   m_pGraphicsCommandPool = commandPool;
-
-  std::vector<Mesh> test;
-  // loadObjModel(m_pDevice, "Resources/Models/sponza (1)/", "sponza.obj", test);
-  // loadObjModel(m_pDevice, "Resources/Models/Sponza-master/", "sponza.obj", test);
-  loadGltfModel(m_pDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", test, 0.1f);
-
-  FlushMiniBatch(g_BatchManager.m_miniBatchList, g_ResourceManager);
 
   CreateRenderPass();
 

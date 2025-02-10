@@ -43,6 +43,8 @@ struct MiniBatch {
 
 struct BatchManager : public Singleton<BatchManager> {
   std::vector<MiniBatch> m_miniBatchList;
+  
+  // Material ID
   std::vector<ObjectID> m_meshIDList;
   VkBuffer m_objectIDListBuffer;
   VkDeviceMemory m_objectIDListBufferMemory;
@@ -70,6 +72,21 @@ struct BatchManager : public Singleton<BatchManager> {
   VkDeviceMemory m_boundingBoxListBufferMemory;
   std::vector<AABBBufferList> m_boundingBoxBufferList;
 
+  //////////////////////
+  // Ray Tracing
+  //////////////////////
+
+  std::vector<BasicVertex> m_allMeshVertices;
+  VkBuffer m_vertiesBuffer;
+  VkDeviceMemory m_vertiesBufferMemory;
+  VkDeviceSize m_vertiesBufferSize;
+
+  std::vector<uint32_t> m_allMeshIndices;
+  VkBuffer m_indicesBuffer;
+  VkDeviceMemory m_indicesBufferMemory;
+  VkDeviceSize m_indicesBufferSize;
+
+
   void Cleanup(VkDevice device) {
     vkDestroyBuffer(device, m_indirectDrawBuffer, nullptr);
     vkFreeMemory(device, m_indirectDrawBufferMemory, nullptr);
@@ -96,6 +113,12 @@ struct BatchManager : public Singleton<BatchManager> {
       vkDestroyBuffer(device, m_boundingBoxBufferList[i].indexBuffer, nullptr);
       vkFreeMemory(device, m_boundingBoxBufferList[i].indexBufferMemory, nullptr);
     }
+
+    vkDestroyBuffer(device, m_vertiesBuffer, nullptr);
+    vkFreeMemory(device, m_vertiesBufferMemory, nullptr);
+
+    vkDestroyBuffer(device, m_indicesBuffer, nullptr);
+    vkFreeMemory(device, m_indicesBufferMemory, nullptr);
   }
 };
 

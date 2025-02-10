@@ -7,6 +7,7 @@
 #include "Core.h"
 #include "CullingRenderPass.h"
 #include "Mesh.h"
+#include "Utils/ModelLoader.h"
 #include "Utils/StringUtil.h"
 #include "Utils/ThreadPool.h"
 #include "VkUtils/ChooseFunc.h"
@@ -56,18 +57,31 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
     g_DescriptorLayoutCache.Initialize(mainDevice.logicalDevice);
     g_ResourceManager.Initialize(mainDevice.logicalDevice, mainDevice.physicalDevice, m_transferQueue, m_queueFamilyIndices);
 
+    std::vector<Mesh> outMeshes;
+    loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f);
+    FlushMiniBatch(g_BatchManager.m_miniBatchList, g_ResourceManager);
+
+    for (Mesh& mesh : outMeshes) {
+      for (BasicVertex& vertex : mesh.vertices) {
+        g_BatchManager.m_allMeshVertices.push_back(vertex);
+      }
+      for (uint32_t& index : mesh.indices) {
+        g_BatchManager.m_allMeshIndices.push_back(index);
+      }
+    }
+
     CreateBuffers();
 
     /// Editor Pipeline
     m_pEditor = std::make_shared<Editor>();
-    m_pEditor->Initialize(window, instance, mainDevice.logicalDevice, mainDevice.physicalDevice, m_queueFamilyIndices,
-                          m_graphicsQueue, m_camera);
+    m_pEditor->Initialize(window, instance, mainDevice.logicalDevice, mainDevice.physicalDevice, m_queueFamilyIndices, m_graphicsQueue,
+                          m_camera);
 
     /// Culling Pipeline
     m_pCullingRenderPass = std::make_shared<CullingRenderPass>();
     m_pCullingRenderPass->Initialize(mainDevice.logicalDevice, mainDevice.physicalDevice, m_graphicsQueue, m_graphicsCommandPool,
                                      m_camera, m_pEditor.get(), swapChainExtent.width, swapChainExtent.height);
-    m_pLightingRenderPass = std::make_shared<BasicLightingPass>();
+    m_pLightingRenderPass = std::make_shared<BasicLightingPass>(mainDevice.logicalDevice, mainDevice.physicalDevice);
     m_pLightingRenderPass->Initialize(mainDevice.logicalDevice, mainDevice.physicalDevice, m_graphicsQueue, m_graphicsCommandPool,
                                       m_camera, m_pEditor.get(), swapChainExtent.width, swapChainExtent.height);
 
@@ -320,10 +334,21 @@ void VulkanRenderer::CreateLogicalDevice() {
 
     queueCreateInfos.push_back(queueCreateInfo);
   }
+
+  VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
+  deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+
+  vkGetPhysicalDeviceFeatures2(mainDevice.physicalDevice, &deviceFeatures2);
+
+  VkPhysicalDeviceBufferDeviceAddressFeaturesKHR bufferDeviceAddressFeatures = {};
+  bufferDeviceAddressFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR;
+  bufferDeviceAddressFeatures.bufferDeviceAddress = VK_TRUE;
+
   VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures = {};
   accelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
   accelerationStructureFeatures.accelerationStructure = VK_TRUE;
   accelerationStructureFeatures.descriptorBindingAccelerationStructureUpdateAfterBind = VK_TRUE;
+  accelerationStructureFeatures.pNext = &bufferDeviceAddressFeatures;
 
   VkPhysicalDeviceRayTracingPipelineFeaturesKHR raytracingFeatures = {};
   raytracingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
@@ -341,8 +366,6 @@ void VulkanRenderer::CreateLogicalDevice() {
   indexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
   indexingFeatures.pNext = &raytracingFeatures;
 
-  VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
-  deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
   deviceFeatures2.features.depthBiasClamp = VK_FALSE;
   deviceFeatures2.features.samplerAnisotropy = VK_TRUE;
   deviceFeatures2.features.multiDrawIndirect = VK_TRUE;
@@ -1045,6 +1068,7 @@ bool VulkanRenderer::CheckDeviceExtensionSupport(VkPhysicalDevice device) {
     for (const auto& extension : extensions) {
       if (strcmp(deviceExtension, extension.extensionName) == 0) {
         hasExtension = true;
+        std::cout << extension.extensionName << std::endl;
         break;
       }
     }
@@ -1088,15 +1112,26 @@ bool VulkanRenderer::CheckDeviceSuitable(VkPhysicalDevice device) {
   VkPhysicalDeviceProperties deviceProperties;
   vkGetPhysicalDeviceProperties(device, &deviceProperties);
   */
-  // Information about what the device can do (geo shader, tess shader, wide lines, etc)
+  VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures = {};
+  accelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+  accelerationStructureFeatures.accelerationStructure = VK_TRUE;
+  accelerationStructureFeatures.descriptorBindingAccelerationStructureUpdateAfterBind = VK_TRUE;
+
+  VkPhysicalDeviceRayTracingPipelineFeaturesKHR raytracingFeatures = {};
+  raytracingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+  raytracingFeatures.rayTracingPipeline = VK_TRUE;
+  raytracingFeatures.pNext = &accelerationStructureFeatures;
+
   VkPhysicalDeviceDescriptorIndexingFeaturesEXT indexingFeatures = {};
   indexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
   indexingFeatures.runtimeDescriptorArray = VK_TRUE;                     // 배열 크기 동적
   indexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;  // 동적 인덱싱
   indexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
   indexingFeatures.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
+  indexingFeatures.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE;
+  indexingFeatures.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
   indexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
-  indexingFeatures.pNext = nullptr;
+  indexingFeatures.pNext = &raytracingFeatures;
 
   VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
   deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;

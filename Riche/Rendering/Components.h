@@ -11,6 +11,8 @@ struct Model {
 struct ViewProjection {
   glm::mat4 view;
   glm::mat4 projection;
+  glm::mat4 viewInverse;
+  glm::mat4 projInverse;
 };
 
 struct ShaderSetting {
