@@ -1,3 +1,4 @@
+#pragma once
 
 namespace VkUtils {
 static VkFormat ChooseSupportedFormat(VkPhysicalDevice physicalDevice, const std::vector<VkFormat>& formats, VkImageTiling tiling,
@@ -18,4 +19,13 @@ static VkFormat ChooseSupportedFormat(VkPhysicalDevice physicalDevice, const std
 
   throw std::runtime_error("Failed to find a matching format!");
 }
-} // namespace VkUtils
+
+static VkDeviceAddress getVkDeviceAddress(VkDevice device, VkBuffer buffer) {
+  VkBufferDeviceAddressInfoKHR bufferDeviceAddressInfo = {};
+  bufferDeviceAddressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO_KHR;
+  bufferDeviceAddressInfo.buffer = buffer;
+
+  VkDeviceAddress address = vkGetBufferDeviceAddress(device, &bufferDeviceAddressInfo);
+  return address;
+}
+}  // namespace VkUtils
