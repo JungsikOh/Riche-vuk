@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Utils/Singleton.h"
 #include "Utils/BoundingBox.h"
 
 #define COMPONENTS
@@ -15,7 +16,7 @@ struct ViewProjection {
   glm::mat4 projInverse;
 };
 
-struct ShaderSetting {
+struct ShaderSetting : public Singleton<ShaderSetting> {
 #ifdef _DEBUG
   uint32_t isDebugging = true;
 #else
@@ -23,7 +24,11 @@ struct ShaderSetting {
 #endif  // _DEBUG
   uint32_t batchIdx = 0;
   float pad[2];
+
+  glm::vec4 lightPos = glm::vec4(0.0f, 3.0f, 0.0f, 1.0f);
 };
+
+#define g_ShaderSetting ShaderSetting::Get()
 
 struct BasicVertex {
   glm::vec3 pos;     // Vertex pos (x, y, z)
@@ -31,6 +36,13 @@ struct BasicVertex {
   glm::vec2 tex;     // Texture Coords (u, v)
 
   bool operator==(const BasicVertex& other) const { return pos == other.pos && normal == other.normal && tex == other.tex; }
+};
+
+struct RayTracingVertex {
+  glm::vec4 pos;     // Vertex pos (x, y, z)
+  glm::vec4 normal;  // Vertex colour (r, g, b)
+  glm::vec2 tex;     // Texture Coords (u, v)
+  float padd[2];
 };
 
 struct COMPONENTS MaterialCPU {

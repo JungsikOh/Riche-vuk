@@ -51,6 +51,28 @@ VkDeviceAddress IRenderPass::GetVkDeviceAddress(VkDevice device, VkBuffer buffer
   return address;
 }
 
+VkStridedDeviceAddressRegionKHR IRenderPass::GetSbtEntryStridedDeviceAddressRegion(VkDevice device, VkBuffer buffer,
+                                                                                   uint32_t handleCount) {
+  const uint32_t handleSizeAligned =
+      VkUtils::alignedSize(rayTracingPipelineProperties.shaderGroupHandleSize, rayTracingPipelineProperties.shaderGroupHandleAlignment);
+  VkStridedDeviceAddressRegionKHR stridedDeviceAddressRegionKHR{};
+  stridedDeviceAddressRegionKHR.deviceAddress = GetVkDeviceAddress(device, buffer);
+  stridedDeviceAddressRegionKHR.stride = handleSizeAligned;
+  stridedDeviceAddressRegionKHR.size = handleCount * handleSizeAligned;
+  return stridedDeviceAddressRegionKHR;
+}
+
+void IRenderPass::CreateShaderBindingTable(VkDevice device, VkPhysicalDevice physicalDevice, ShaderBindingTable& shaderBindingTable,
+                                           uint32_t handleCount) {
+  shaderBindingTable.size = rayTracingPipelineProperties.shaderGroupHandleSize * handleCount;
+  VkUtils::CreateBuffer(device, physicalDevice, shaderBindingTable.size,
+                        VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &shaderBindingTable.buffer,
+                        &shaderBindingTable.memory, true);
+  shaderBindingTable.stridedDeviceAddressRegion =
+      GetSbtEntryStridedDeviceAddressRegion(device, shaderBindingTable.buffer, handleCount);
+}
+
 void IRenderPass::CreateAccelerationStructure(VkDevice device, VkPhysicalDevice physicalDevice,
                                               AccelerationStructure& accelerationStructure, VkAccelerationStructureTypeKHR type,
                                               VkAccelerationStructureBuildSizesInfoKHR buildSizeInfo) {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "VkUtils/ChooseFunc.h"
 #include "VkUtils/ResourceManager.h"
 
 // Holds information for a ray tracing scratch buffer that is used as a temporary storage
@@ -15,6 +16,13 @@ struct AccelerationStructure {
   uint64_t deviceAddress = 0;
   VkDeviceMemory memory;
   VkBuffer buffer;
+};
+
+struct ShaderBindingTable {
+  VkBuffer buffer;
+  VkDeviceMemory memory;
+  VkDeviceSize size;
+  VkStridedDeviceAddressRegionKHR stridedDeviceAddressRegion{};
 };
 
 class Camera;
@@ -49,6 +57,10 @@ class IRenderPass {
   virtual void Draw(VkSemaphore renderAvailable) = 0;
 
   VkDeviceAddress GetVkDeviceAddress(VkDevice device, VkBuffer buffer);
+  VkStridedDeviceAddressRegionKHR GetSbtEntryStridedDeviceAddressRegion(VkDevice device, VkBuffer buffer, uint32_t handleCount);
+
+  void CreateShaderBindingTable(VkDevice device, VkPhysicalDevice physicalDevice, ShaderBindingTable& shaderBindingTable,
+                                uint32_t handleCount);
 
   void CreateAccelerationStructure(VkDevice device, VkPhysicalDevice physicalDevice, AccelerationStructure& accelerationStructure,
                                    VkAccelerationStructureTypeKHR type, VkAccelerationStructureBuildSizesInfoKHR buildSizeInfo);
