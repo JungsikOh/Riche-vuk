@@ -61,16 +61,28 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
     loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f);
     FlushMiniBatch(g_BatchManager.m_miniBatchList, g_ResourceManager);
 
+    uint32_t globalVertexOffset = 0;
+    int rayCount = 0, count = 0;
     for (Mesh& mesh : outMeshes) {
       for (BasicVertex& vertex : mesh.vertices) {
-        g_BatchManager.m_allMeshVertices.push_back(vertex);
+        RayTracingVertex v;
+        v.pos = glm::vec4(vertex.pos, 1.0f);
+        v.normal = glm::vec4(vertex.normal, 1.0f);
+        v.tex = vertex.tex;
+        g_BatchManager.m_allMeshVertices.push_back(v);
       }
       for (uint32_t& index : mesh.indices) {
-        g_BatchManager.m_allMeshIndices.push_back(index);
+        g_BatchManager.m_allMeshIndices.push_back(index + globalVertexOffset);
       }
+      rayCount += mesh.ray_vertices.size();
+      count += mesh.vertices.size();
+      globalVertexOffset += static_cast<uint32_t>(mesh.vertices.size());
     }
 
+    std::cout << "Ray : " << rayCount << " Non : " << count << std::endl;
+
     CreateBuffers();
+
 
     /// Editor Pipeline
     m_pEditor = std::make_shared<Editor>();
@@ -106,6 +118,8 @@ void VulkanRenderer::Update() {
 
   m_viewProjectionCPU.view = m_camera->View();
   m_viewProjectionCPU.projection = m_camera->Proj();
+  m_viewProjectionCPU.viewInverse = m_camera->InvView();
+  m_viewProjectionCPU.projInverse = m_camera->InvProj();
   vkMapMemory(mainDevice.logicalDevice, m_viewProjectionUBOMemory, 0, sizeof(ViewProjection), 0, &pData);
   memcpy(pData, &m_viewProjectionCPU, sizeof(ViewProjection));
   vkUnmapMemory(mainDevice.logicalDevice, m_viewProjectionUBOMemory);
@@ -823,8 +837,10 @@ void VulkanRenderer::CreatePipeline() {
   colourBlendingCreateInfo.attachmentCount = 1;
   colourBlendingCreateInfo.pAttachments = &colourState;
 
-  std::array<VkDescriptorSetLayout, 2> setLayouts = {g_DescriptorManager.GetVkDescriptorSetLayout("SamplerList_ALL"),
-                                                     g_DescriptorManager.GetVkDescriptorSetLayout("OffScreenInput")};
+  std::vector<VkDescriptorSetLayout> setLayouts = {g_DescriptorManager.GetVkDescriptorSetLayout("SamplerList_ALL"),
+                                                     g_DescriptorManager.GetVkDescriptorSetLayout("OffScreenInput"),
+                                                     g_DescriptorManager.GetVkDescriptorSetLayout("ShadowTexture_ALL")
+  };
 
   // -- PIPELINE LAYOUT (It's like Root signature in D3D12) --
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
@@ -966,6 +982,9 @@ void VulkanRenderer::FillOffScreenCommands(uint32_t currentImage) {
                           &g_DescriptorManager.GetVkDescriptorSet("SamplerList_ALL"), 0, nullptr);
   vkCmdBindDescriptorSets(m_swapchainCommandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_offScreenPipelineLayout, 1, 1,
                           &g_DescriptorManager.GetVkDescriptorSet("OffScreenInput"), 0, nullptr);
+  vkCmdBindDescriptorSets(m_swapchainCommandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_offScreenPipelineLayout, 2, 1,
+                          &g_DescriptorManager.GetVkDescriptorSet("ShadowTexture_ALL"), 0, nullptr);
+
 
   vkCmdDraw(m_swapchainCommandBuffers[currentImage], 3, 1, 0, 0);
 
