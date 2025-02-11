@@ -34,8 +34,8 @@ layout(location = 0) out vec4  outColour;	// Final output colour (must also have
 void main() {
 	int textureIdx = nonuniformEXT(ssbo_TextureID.handle[inIndex].materialID);
 	vec4 newColor = textureLod(sampler2D(nonuniformEXT(u_DiffuseTextureList[textureIdx]), linearWrapSS), inFragTexcoord, 0);
-	vec4 shadow = textureLod(sampler2D(u_ShadowTexture, linearClampSS), inFragTexcoord, 0);
-
+//	vec4 shadow = textureLod(sampler2D(u_ShadowTexture, linearClampSS), inFragTexcoord, 0);
+//
 	outColour = newColor;
 //	outColour.xyz *= (1.0 - shadow.r);
 }
