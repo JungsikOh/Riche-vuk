@@ -71,4 +71,6 @@ class Camera {
   glm::mat4 View() { return m_ViewMat; }
   glm::mat4 Proj() { return m_ProjMat; }
   glm::mat4 ViewProj() { return m_ProjMat * m_ViewMat; }
+  glm::mat4 InvView() { return glm::inverse(m_ViewMat); }
+  glm::mat4 InvProj() { return glm::inverse(m_ProjMat); }
 };
