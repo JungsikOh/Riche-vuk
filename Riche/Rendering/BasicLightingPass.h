@@ -1,9 +1,15 @@
 #pragma once
 
 #include "BatchSystem.h"
+#include "Camera.h"
 #include "Components.h"
 #include "CullingRenderPass.h"
+#include "Editor/Editor.h"
 #include "IRenderPass.h"
+#include "VkUtils/ChooseFunc.h"
+#include "VkUtils/DescriptorManager.h"
+#include "VkUtils/ResourceManager.h"
+#include "VkUtils/ShaderModule.h"
 #include "VulkanRenderer.h"
 
 class Camera;
@@ -11,6 +17,7 @@ class Editor;
 class BasicLightingPass : public IRenderPass {
  public:
   BasicLightingPass() = default;
+  BasicLightingPass(VkDevice device, VkPhysicalDevice physicalDevice);
   ~BasicLightingPass() = default;
 
   virtual void Initialize(VkDevice device, VkPhysicalDevice physicalDevice, VkQueue queue, VkCommandPool commandPool, Camera* camera,
@@ -29,19 +36,29 @@ class BasicLightingPass : public IRenderPass {
   // - Rendering Pipeline
   virtual void CreateRenderPass();
   void CreateObjectIdRenderPass();
+  void CreateRaytracingRenderPass();
 
   virtual void CreateFramebuffer();
   void CreateObjectIdFramebuffer();
+  void CreateRaytracingFramebuffer();
 
   virtual void CreatePipelineLayout();
+  void CreateRaytracingPipelineLayout();
+
   virtual void CreatePipeline();
   void CraeteGraphicsPipeline();
   void CreateWireGraphicsPipeline();
   void CreateBoundingBoxPipeline();
   void CreateObjectIDPipeline();
+  void CreateRaytracingPipeline();
 
   virtual void CreateBuffers();
   void CreateBindlessResources();
+  void CreateRaytracingBuffers();
+  void CreateRaytracingDescriptorSets();
+  void CreateBLAS();
+  void CreateTLAS();
+  void CreateShaderBindingTables();
 
   void CreatePushConstantRange();
 
@@ -65,6 +82,7 @@ class BasicLightingPass : public IRenderPass {
   // - Rendering Graphics Pipeline
   VkRenderPass m_renderPass;
   VkRenderPass m_objectIdRenderPass;
+  VkRenderPass m_raytracingRenderPass;
 
   VkPipeline m_graphicsPipeline;
   VkPipeline m_wireGraphicsPipeline;  // Debugging (wireframe)
@@ -89,8 +107,36 @@ class BasicLightingPass : public IRenderPass {
   VkDeviceMemory m_objectIdDepthStencilBufferImageMemory;
   VkImageView m_objectIdDepthStencilBufferImageView;
 
+  // For Raytracing
+  AccelerationStructure m_bottomLevelAS;
+  AccelerationStructure m_topLevelAS;
+
+  VkPipeline m_raytracingPipeline;
+  VkPipelineLayout m_raytracingPipelineLayout;
+
+  std::vector<VkRayTracingShaderGroupCreateInfoKHR> shaderGroups{};
+
+  struct ShaderBindingTables {
+    ShaderBindingTable raygen;
+    ShaderBindingTable miss;
+    ShaderBindingTable hit;
+  } shaderBindingTables;
+
+  VkDescriptorPool m_raytracingPool;
+  VkDescriptorSet m_raytracingSet;
+  VkDescriptorSetLayout m_raytracingSetLayout;
+
+  VkImage m_raytracingImage;
+  VkDeviceMemory m_raytracingImageMemory;
+  VkImageView m_raytracingImageView;
+
+  VkImage m_rayDepthStencilBufferImage;
+  VkDeviceMemory m_rayDepthStencilBufferImageMemory;
+  VkImageView m_rayDepthStencilBufferImageView;
+
   VkFramebuffer m_framebuffer;
   VkFramebuffer m_objectIdFramebuffer;
+  VkFramebuffer m_raytracingFramebuffer;
 
   VkCommandPool m_pGraphicsCommandPool;
   VkCommandBuffer m_commandBuffer;

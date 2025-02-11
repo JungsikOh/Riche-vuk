@@ -5,7 +5,6 @@
 #include "IRenderPass.h"
 
 const static int HIZ_MIP_LEVEL = 3;
-static ShaderSetting g_ShaderSetting = {};
 
 class Camera;
 class CullingRenderPass : public IRenderPass {

@@ -72,11 +72,10 @@ struct BatchManager : public Singleton<BatchManager> {
   VkDeviceMemory m_boundingBoxListBufferMemory;
   std::vector<AABBBufferList> m_boundingBoxBufferList;
 
-  //////////////////////
-  // Ray Tracing
-  //////////////////////
-
-  std::vector<BasicVertex> m_allMeshVertices;
+  /*
+    Ray Tracing
+  */
+  std::vector<RayTracingVertex> m_allMeshVertices;
   VkBuffer m_vertiesBuffer;
   VkDeviceMemory m_vertiesBufferMemory;
   VkDeviceSize m_vertiesBufferSize;

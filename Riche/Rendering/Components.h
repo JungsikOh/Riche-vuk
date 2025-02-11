@@ -42,7 +42,7 @@ struct RayTracingVertex {
   glm::vec4 pos;     // Vertex pos (x, y, z)
   glm::vec4 normal;  // Vertex colour (r, g, b)
   glm::vec2 tex;     // Texture Coords (u, v)
-  float padd[2];
+  float padd[2] = {999.0f, 999.0f};
 };
 
 struct COMPONENTS MaterialCPU {

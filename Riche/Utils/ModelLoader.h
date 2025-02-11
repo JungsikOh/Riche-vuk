@@ -197,12 +197,6 @@ static bool loadGltfModel(VkDevice device, const std::string& filepath, const st
             // 그 외 형식은 여기서 예외 처리 혹은 무시
             std::cerr << "[tinygltf] Unsupported index component type.\n";
           }
-        } else {
-          // 인덱스가 없는 경우, primitive가 삼각형 형태라면
-          // vertices를 그냥 순서대로 참조 가능 (draco 압축 등은 고려하지 않은 단순 예시)
-          // 필요 시 primitive.mode (POINTS, TRIANGLES 등)에 따라 처리
-          // 여기서는 TRIANGLES라 가정하고 Accessor로부터 개수만큼 push_back
-          // 또는, 별도 로직 ...
         }
 
         // POSITION, NORMAL, TEXCOORD_0 등 Attribute 처리
@@ -210,6 +204,7 @@ static bool loadGltfModel(VkDevice device, const std::string& filepath, const st
         std::vector<glm::vec3> positions;
         std::vector<glm::vec3> normals;
         std::vector<glm::vec2> texcoords;
+        std::vector<glm::vec4> colors;
 
         // glTF의 attributes는 std::map<std::string, int> 형태
         auto itPos = primitive.attributes.find("POSITION");
@@ -258,25 +253,87 @@ static bool loadGltfModel(VkDevice device, const std::string& filepath, const st
           }
         }
 
-        auto itTex = primitive.attributes.find("TEXCOORD_0");
-        if (itTex != primitive.attributes.end()) {
-          const tinygltf::Accessor& accessor = model.accessors[itTex->second];
-          const tinygltf::BufferView& view = model.bufferViews[accessor.bufferView];
-          const tinygltf::Buffer& buffer = model.buffers[view.buffer];
+        {
+          auto itTex = primitive.attributes.find("TEXCOORD_0");
+          if (itTex != primitive.attributes.end()) {
+            const tinygltf::Accessor& accessor = model.accessors[itTex->second];
+            const tinygltf::BufferView& view = model.bufferViews[accessor.bufferView];
+            const tinygltf::Buffer& buffer = model.buffers[view.buffer];
 
-          const size_t accessorCount = accessor.count;
-          texcoords.reserve(accessorCount);
+            const size_t accessorCount = accessor.count;
+            texcoords.reserve(accessorCount);
 
-          const uint8_t* dataPtr = buffer.data.data() + view.byteOffset + accessor.byteOffset;
-          size_t stride = accessor.ByteStride(view);
-          if (!stride) {
-            stride = tinygltf::GetNumComponentsInType(accessor.type) * tinygltf::GetComponentSizeInBytes(accessor.componentType);
+            const uint8_t* dataPtr = buffer.data.data() + view.byteOffset + accessor.byteOffset;
+            size_t stride = accessor.ByteStride(view);
+            if (!stride) {
+              stride = tinygltf::GetNumComponentsInType(accessor.type) * tinygltf::GetComponentSizeInBytes(accessor.componentType);
+            }
+
+            for (size_t i = 0; i < accessorCount; ++i) {
+              const float* elem = reinterpret_cast<const float*>(dataPtr + stride * i);
+              glm::vec2 uv = glm::vec2(elem[0], elem[1]);
+              texcoords.push_back(uv);
+            }
           }
+        }
 
-          for (size_t i = 0; i < accessorCount; ++i) {
-            const float* elem = reinterpret_cast<const float*>(dataPtr + stride * i);
-            glm::vec2 uv = glm::vec2(elem[0], elem[1]);
-            texcoords.push_back(uv);
+        {
+          auto itColor = primitive.attributes.find("COLOR_0");
+          if (itColor != primitive.attributes.end()) {
+            const tinygltf::Accessor& accessor = model.accessors[itColor->second];
+            const tinygltf::BufferView& view = model.bufferViews[accessor.bufferView];
+            const tinygltf::Buffer& buffer = model.buffers[view.buffer];
+
+            size_t accessorCount = accessor.count;
+            colors.reserve(accessorCount);
+
+            const uint8_t* dataPtr = buffer.data.data() + view.byteOffset + accessor.byteOffset;
+            size_t stride = accessor.ByteStride(view);
+            if (!stride) {
+              stride = tinygltf::GetNumComponentsInType(accessor.type) * tinygltf::GetComponentSizeInBytes(accessor.componentType);
+            }
+
+            // glTF에서 COLOR_0는 보통 VEC3 or VEC4
+            int numComponents = tinygltf::GetNumComponentsInType(accessor.type);
+
+            // componentType이 FLOAT / UNSIGNED_BYTE / UNSIGNED_SHORT 등이 가능
+            // 여기서는 FLOAT, UNSIGNED_BYTE(정규화)만 예시
+            if (accessor.componentType == TINYGLTF_PARAMETER_TYPE_FLOAT) {
+              for (size_t i = 0; i < accessorCount; ++i) {
+                const float* elem = reinterpret_cast<const float*>(dataPtr + stride * i);
+                if (numComponents == 3) {
+                  colors.push_back(glm::vec4(elem[0], elem[1], elem[2], 1.0f));
+                } else {
+                  // VEC4
+                  colors.push_back(glm::vec4(elem[0], elem[1], elem[2], elem[3]));
+                }
+              }
+            } else if (accessor.componentType == TINYGLTF_PARAMETER_TYPE_UNSIGNED_BYTE) {
+              // glTF는 "normalized" 플래그가 true인 경우가 많으므로
+              // 0~255 범위를 0~1로 변환
+              bool normalized = accessor.normalized;  // tinygltf Accessor에서 normalized 여부
+              for (size_t i = 0; i < accessorCount; ++i) {
+                const uint8_t* elem = reinterpret_cast<const uint8_t*>(dataPtr + stride * i);
+                if (numComponents == 3) {
+                  if (normalized) {
+                    colors.push_back(glm::vec4(elem[0] / 255.0f, elem[1] / 255.0f, elem[2] / 255.0f, 1.0f));
+                  } else {
+                    // 비정규화 -> 그냥 0~255로 사용하려면, 필요에 따라 처리
+                    colors.push_back(glm::vec4(elem[0], elem[1], elem[2], 1.0f));
+                  }
+                } else {
+                  // numComponents == 4
+                  if (normalized) {
+                    colors.push_back(glm::vec4(elem[0] / 255.0f, elem[1] / 255.0f, elem[2] / 255.0f, elem[3] / 255.0f));
+                  } else {
+                    colors.push_back(glm::vec4(elem[0], elem[1], elem[2], elem[3]));
+                  }
+                }
+              }
+            } else {
+              // 필요하다면 다른 componentType (e.g. UNSIGNED_SHORT) 처리
+              std::cerr << "[tinygltf] Unsupported COLOR_0 component type.\n";
+            }
           }
         }
 
@@ -311,6 +368,7 @@ static bool loadGltfModel(VkDevice device, const std::string& filepath, const st
             v.normal = (i < normals.size()) ? normals[i] : glm::vec3(0, 0, 0);
             v.tex = (i < texcoords.size()) ? texcoords[i] : glm::vec2(0, 0);
             data.vertices.push_back(v);
+
             data.indices.push_back(static_cast<uint32_t>(i));
           }
         }

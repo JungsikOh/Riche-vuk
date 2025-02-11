@@ -422,10 +422,9 @@ static void CmdImageBarrier(VkCommandBuffer commandBuffer, VkImage image, VkImag
     srcStage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
     // dstStage: 셰이더 단계에서 읽어야 하므로 프래그먼트 셰이더에 맞추어 설정합니다.
     dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-  } else if (oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
+  } else if (oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL || oldLayout == VK_IMAGE_LAYOUT_GENERAL) {
     // Depth attachment로 쓰일 때 접근 권한: Depth attachment에 대한 읽기 및 쓰기 접근이 필요합니다.
     imageMemBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    // Shader read-only 레이아웃으로 전환 후에는 셰이더 단계에서 읽기만 필요합니다.
     imageMemBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
     // srcStage: Color attachment에 쓰는 단계인 color attachment output 단계에서 접근할 수 있도록 설정합니다.
@@ -433,6 +432,34 @@ static void CmdImageBarrier(VkCommandBuffer commandBuffer, VkImage image, VkImag
     // dstStage: 프래그먼트 셰이더에서 읽기 위해 프래그먼트 셰이더 단계로 설정합니다.
     dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
   }
+
+  vkCmdPipelineBarrier(commandBuffer, srcStage, dstStage,  // Pipeline Stages (match to src and dst AccessMasks)
+                       0,                                  // Dependency flags
+                       0, nullptr,                         // Memory Barreir count + data
+                       0, nullptr,                         // Buffer Memory Barrier count + data
+                       1, &imageMemBarrier                 // Image Memory Barrier count + data
+  );
+}
+
+static void CmdImageBarrier(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout,
+                            VkImageAspectFlags aspectFlag, VkAccessFlags srcAccessFlag, VkAccessFlags dstAccessFlag,
+                            VkPipelineStageFlags srcStage, VkPipelineStageFlags dstStage) {
+  VkImageMemoryBarrier imageMemBarrier = {};
+  imageMemBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  imageMemBarrier.oldLayout = oldLayout;                          // Layout to transition from
+  imageMemBarrier.newLayout = newLayout;                          // Layout to transition to
+  imageMemBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;  // Queue family to transition from
+  imageMemBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;  // Queue family to transition to
+  imageMemBarrier.image = image;                                  // image being aceesed and modified as part of barrier
+  imageMemBarrier.subresourceRange.aspectMask = aspectFlag;       // Aspect of Image being altered
+  imageMemBarrier.subresourceRange.baseMipLevel = 0;              // First mip level to start alterations on
+  imageMemBarrier.subresourceRange.levelCount = 1;                // number of mip levels to alter starting from base mip level
+  imageMemBarrier.subresourceRange.baseArrayLayer = 0;            // First layer to start alterations on
+  imageMemBarrier.subresourceRange.layerCount = 1;                // number of layers to alter starting from base array layer
+
+  imageMemBarrier.srcAccessMask = srcAccessFlag;
+  // Shader read-only 레이아웃으로 전환 후에는 셰이더 단계에서 읽기만 필요합니다.
+  imageMemBarrier.dstAccessMask = dstAccessFlag;
 
   vkCmdPipelineBarrier(commandBuffer, srcStage, dstStage,  // Pipeline Stages (match to src and dst AccessMasks)
                        0,                                  // Dependency flags

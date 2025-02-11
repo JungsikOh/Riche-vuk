@@ -28,4 +28,10 @@ static VkDeviceAddress getVkDeviceAddress(VkDevice device, VkBuffer buffer) {
   VkDeviceAddress address = vkGetBufferDeviceAddress(device, &bufferDeviceAddressInfo);
   return address;
 }
+
+static uint32_t alignedSize(uint32_t size, uint32_t alignment) {
+  // alignment보다 큰 값으로 크기를 정렬
+  return (size + alignment - 1) & ~(alignment - 1);
+}
+
 }  // namespace VkUtils
