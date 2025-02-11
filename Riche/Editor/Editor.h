@@ -1,5 +1,8 @@
 #pragma once
+
+#include "Rendering/Components.h"
 #include "Rendering/RenderSetting.h"
+#include "Rendering/CullingRenderPass.h"
 #include "VkUtils/DescriptorBuilder.h"
 #include "VkUtils/DescriptorManager.h"
 #include "VkUtils/QueueFamilyIndices.h"
