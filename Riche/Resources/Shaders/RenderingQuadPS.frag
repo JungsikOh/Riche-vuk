@@ -12,6 +12,7 @@ layout(set = 0, binding = 3) uniform sampler pointWrapSS;
 layout(set = 0, binding = 4) uniform sampler pointClampSS;
 
 layout(set = 1, binding = 0) uniform texture2D inputColour;
+layout(set = 2, binding = 0) uniform texture2D u_ShadowTexture;
 
 layout(location = 0) in vec2 inFragTexcoord;
 
@@ -19,7 +20,10 @@ layout(location = 0) out vec4 outColour;
 
 void main()
 {
+    vec4 shadow = textureLod(sampler2D(u_ShadowTexture, linearClampSS), inFragTexcoord.xy, 0);
     vec4 color = textureLod(sampler2D(inputColour, linearWrapSS), inFragTexcoord.xy, 0).rgba;
+
     vec4 finalColor = vec4(color.rgb, 1.0);
+    finalColor.rgb *= shadow.r;
     outColour = finalColor;
 }

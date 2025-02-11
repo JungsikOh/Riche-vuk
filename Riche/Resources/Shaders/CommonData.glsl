@@ -33,4 +33,7 @@ layout(push_constant) uniform readonly U_ShaderSetting
 {
 	uint isDebugging;
 	uint batchIdx;
+    float padd[2];
+
+    vec4 lightPos;
 }u_ShaderSetting;

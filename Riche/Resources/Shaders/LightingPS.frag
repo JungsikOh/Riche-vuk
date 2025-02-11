@@ -5,6 +5,7 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_debug_printf : enable
 #extension GL_EXT_samplerless_texture_functions : enable
+#extension GL_EXT_shader_image_load_formatted : require
 
 #include "CommonData.glsl"
 
@@ -25,6 +26,7 @@ layout(set = 3, binding = 0) buffer readonly SSBO_TextureID
 	ObjectID handle[];													// SSBO
 }ssbo_TextureID;
 layout(set = 4, binding = 0) uniform texture2D u_DiffuseTextureList[];	// Bindless Textures
+layout(set = 5, binding = 0) uniform texture2D u_ShadowTexture;
 
 
 layout(location = 0) out vec4  outColour;	// Final output colour (must also have location)
@@ -32,6 +34,8 @@ layout(location = 0) out vec4  outColour;	// Final output colour (must also have
 void main() {
 	int textureIdx = nonuniformEXT(ssbo_TextureID.handle[inIndex].materialID);
 	vec4 newColor = textureLod(sampler2D(nonuniformEXT(u_DiffuseTextureList[textureIdx]), linearWrapSS), inFragTexcoord, 0);
+	vec4 shadow = textureLod(sampler2D(u_ShadowTexture, linearClampSS), inFragTexcoord, 0);
 
 	outColour = newColor;
+//	outColour.xyz *= (1.0 - shadow.r);
 }
