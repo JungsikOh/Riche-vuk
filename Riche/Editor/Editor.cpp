@@ -209,6 +209,7 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer) {
   ImGuizmo::BeginFrame();
 
   if (m_selectedIndex >= 0 && m_selectedIndex < (int)g_BatchManager.m_trasformList.size() && m_gizmoType != -1) {
+    g_RenderSetting.changeFlag = true;
     ImGuizmo::SetOrthographic(false);  // Persp / Ortho ¼³Á¤
     ImGuizmo::Enable(true);
 

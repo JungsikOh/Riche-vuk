@@ -1,7 +1,13 @@
 #include "ResourceManager.h"
 
 namespace VkUtils {
-void ResourceManager::CreateFence() {}
+void ResourceManager::CreateFence() {
+  // Create Fence for synchronization
+  VkFenceCreateInfo fenceCreateInfo{};
+  fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+  fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+  VK_CHECK(vkCreateFence(m_Device, &fenceCreateInfo, nullptr, &m_fence));
+}
 
 void ResourceManager::CleanupFence() {}
 
@@ -13,6 +19,14 @@ void ResourceManager::CreateCommandPool() {
 
   // Create a Graphics Queue family Command Pool
   VK_CHECK(vkCreateCommandPool(m_Device, &poolInfo, nullptr, &m_TransferCommandPool));
+
+  poolInfo = {};
+  poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+  poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+  poolInfo.queueFamilyIndex = m_queueFamilyIndices.computeFamily;  // Queue family type that buffers from this command pool will use
+
+  // Create a Graphics Queue family Command Pool
+  VK_CHECK(vkCreateCommandPool(m_Device, &poolInfo, nullptr, &m_commputeCommandPool));
 }
 
 void ResourceManager::CleanupCommandPool() { vkDestroyCommandPool(m_Device, m_TransferCommandPool, nullptr); }
@@ -24,6 +38,17 @@ void ResourceManager::WaitForFenceValue() {
 void ResourceManager::Cleanup() {
   CleanupCommandPool();
   CleanupFence();
+}
+
+void ResourceManager::CreateCommandBuffer() {
+  VkCommandBufferAllocateInfo allocInfo = {};
+  allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocInfo.commandPool = m_TransferCommandPool;
+  allocInfo.commandBufferCount = 1;
+
+  // Allocate command buffer and pool
+  VK_CHECK(vkAllocateCommandBuffers(m_Device, &allocInfo, &m_transferCommandBuffer));
 }
 
 VkCommandBuffer ResourceManager::CreateAndBeginCommandBuffer() {
@@ -61,24 +86,53 @@ void ResourceManager::EndAndSummitCommandBuffer(VkCommandBuffer commandbuffer) {
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &commandbuffer;
 
+  // Create Fence for synchronization
+  VkFence fence;
+  VkFenceCreateInfo fenceCreateInfo{};
+  fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+  VK_CHECK(vkCreateFence(m_Device, &fenceCreateInfo, nullptr, &fence));
+
   // Submit Transfer command to transfer queue and wait until it finishes
-  vkQueueSubmit(m_transferQueue, 1, &submitInfo, VK_NULL_HANDLE);
+  vkQueueSubmit(m_transferQueue, 1, &submitInfo, fence);
+
+  vkWaitForFences(m_Device, 1, &fence, VK_TRUE, UINT64_MAX);
+
   vkQueueWaitIdle(m_transferQueue);  // 큐가 Idle 상태가 될 때까지 기다린다. 여기서 Idle 상태란, 대기 상태에 있는 것을 이야기한다.
+  vkDestroyFence(m_Device, fence, nullptr);
 
   // Free Temporary command buffer back to pool
   vkFreeCommandBuffers(m_Device, m_TransferCommandPool, 1, &commandbuffer);
+
+  // vkEndCommandBuffer(commandbuffer);
+
+  //// Queue submission information
+  // VkSubmitInfo submitInfo{};
+  // submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  // submitInfo.commandBufferCount = 1;
+  // submitInfo.pCommandBuffers = &commandbuffer;
+  //// Submit command buffer and use fence instead of queue wait idle
+  // vkQueueSubmit(m_transferQueue, 1, &submitInfo, m_fence);
+  // vkResetFences(m_Device, 1, &m_fence);
+  //
+  // vkWaitForFences(m_Device, 1, &m_fence, VK_TRUE, UINT64_MAX);
+
+  // Reset Command Buffer instead of freeing
+  // vkResetCommandBuffer(commandbuffer, 0);
 }
 
 ResourceManager::ResourceManager() {}
 
 ResourceManager::~ResourceManager() {}
 
-void ResourceManager::Initialize(VkDevice device, VkPhysicalDevice physicalDevice, VkQueue queue, QueueFamilyIndices indices) {
+void ResourceManager::Initialize(VkDevice device, VkPhysicalDevice physicalDevice, VkQueue queue, VkQueue compute,
+                                 QueueFamilyIndices indices) {
   m_Device = device;
   m_PhysicalDevice = physicalDevice;
   m_transferQueue = queue;
+  m_computeQueue = compute;
   m_queueFamilyIndices = indices;
   CreateCommandPool();
+  CreateFence();
 }
 
 VkResult ResourceManager::CreateVertexBuffer(uint32_t sizePerVertex, uint32_t vertexNum, VkDeviceMemory* pOutVertexBufferMemory,
@@ -253,7 +307,6 @@ glm::vec4 ResourceManager::ReadPixelFromImage(VkImage image, uint32_t width, uin
   }
   flippedY = mouseY;
 
-
   // 1) Staging Buffer 만들기 (1픽셀 = 4바이트 RGBA)
   VkBuffer stagingBuffer;
   VkDeviceMemory stagingMemory;
@@ -320,15 +373,14 @@ glm::vec4 ResourceManager::ReadPixelFromImage(VkImage image, uint32_t width, uin
 
   vkCmdCopyImageToBuffer(transferCommandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, stagingBuffer, 1, &region);
 
-   // 5) 다시 Layout 전환: TRANSFER_SRC_OPTIMAL -> PRESENT_SRC_KHR (필요시)
+  // 5) 다시 Layout 전환: TRANSFER_SRC_OPTIMAL -> PRESENT_SRC_KHR (필요시)
   barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
   barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
   barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
   barrier.dstAccessMask = 0;
 
   vkCmdPipelineBarrier(transferCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0,
-                       nullptr, 1,
-                       &barrier);
+                       nullptr, 1, &barrier);
 
   // End commands
   vkEndCommandBuffer(transferCommandBuffer);

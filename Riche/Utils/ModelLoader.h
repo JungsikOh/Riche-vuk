@@ -352,6 +352,13 @@ static bool loadGltfModel(VkDevice device, const std::string& filepath, const st
             v.normal = (i < normals.size()) ? normals[i] : glm::vec3(0, 0, 0);
             v.tex = (i < texcoords.size()) ? texcoords[i] : glm::vec2(0, 0);
             data.vertices.push_back(v);
+
+            RayTracingVertex rv{};
+            rv.pos = glm::vec4(v.pos, 1.0f);
+            rv.normal = glm::vec4(v.normal, 1.0f);
+            rv.tex = v.tex;
+            rv.padd[0] = meshIndex;
+            data.ray_vertices.push_back(rv);
           }
 
           // 인덱스 할당
@@ -369,6 +376,13 @@ static bool loadGltfModel(VkDevice device, const std::string& filepath, const st
             v.tex = (i < texcoords.size()) ? texcoords[i] : glm::vec2(0, 0);
             data.vertices.push_back(v);
 
+            RayTracingVertex rv{};
+            rv.pos = glm::vec4(v.pos, 1.0f);
+            rv.normal = glm::vec4(v.normal, 1.0f);
+            rv.tex = v.tex;
+            rv.padd[0] = meshIndex;
+            data.ray_vertices.push_back(rv);
+
             data.indices.push_back(static_cast<uint32_t>(i));
           }
         }
@@ -381,12 +395,24 @@ static bool loadGltfModel(VkDevice device, const std::string& filepath, const st
   }
 
   // future 결과 수집 후, 기존 로직(Entt entity 생성, MiniBatch 등록 등)
+
+  uint64_t totalVertexOffset = 0;
+  uint64_t totalIndexOffset = 0;
+
   size_t initObjectIDSize = g_BatchManager.m_meshIDList.size();
   for (auto& f : futures) {
     Mesh partial = f.get();
 
-    partial.vertexCount = static_cast<uint32_t>(partial.vertices.size());
+    partial.vertexCount = static_cast<uint32_t>(partial.ray_vertices.size());
     partial.indexCount = static_cast<uint32_t>(partial.indices.size());
+
+    // **현재까지 누적된 Vertex/Index 개수를 Offset으로 저장**
+    partial.vertexOffset = static_cast<uint64_t>(totalVertexOffset * sizeof(RayTracingVertex));
+    partial.indexOffset = static_cast<uint64_t>(totalIndexOffset * sizeof(uint32_t));
+
+    // **다음 Mesh의 Offset을 위해 현재 Mesh의 크기만큼 추가**
+    totalVertexOffset += (uint64_t)partial.vertexCount;
+    totalIndexOffset += (uint64_t)partial.indexCount;
 
     // 리소스 매니저를 통해 실제 버퍼 생성(업로드) 등
     AddDataToMiniBatch(g_BatchManager.m_miniBatchList, g_ResourceManager, partial);

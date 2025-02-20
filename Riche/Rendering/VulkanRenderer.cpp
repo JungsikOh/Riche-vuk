@@ -55,28 +55,24 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
     g_ThreadPool.Initialize(std::thread::hardware_concurrency() - 1);
     g_DescriptorAllocator.Initialize(mainDevice.logicalDevice);
     g_DescriptorLayoutCache.Initialize(mainDevice.logicalDevice);
-    g_ResourceManager.Initialize(mainDevice.logicalDevice, mainDevice.physicalDevice, m_transferQueue, m_queueFamilyIndices);
+    g_ResourceManager.Initialize(mainDevice.logicalDevice, mainDevice.physicalDevice, m_transferQueue, m_computeQueue, m_queueFamilyIndices);
 
-    std::vector<Mesh> outMeshes;
+    std::vector<Mesh>& outMeshes = g_BatchManager.m_meshes;
     loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f);
     FlushMiniBatch(g_BatchManager.m_miniBatchList, g_ResourceManager);
 
     uint32_t globalVertexOffset = 0;
     int rayCount = 0, count = 0;
     for (Mesh& mesh : outMeshes) {
-      for (BasicVertex& vertex : mesh.vertices) {
-        RayTracingVertex v;
-        v.pos = glm::vec4(vertex.pos, 1.0f);
-        v.normal = glm::vec4(vertex.normal, 1.0f);
-        v.tex = vertex.tex;
-        g_BatchManager.m_allMeshVertices.push_back(v);
+      for (RayTracingVertex& vertex : mesh.ray_vertices) {
+        g_BatchManager.m_allMeshVertices.push_back(vertex);
       }
       for (uint32_t& index : mesh.indices) {
         g_BatchManager.m_allMeshIndices.push_back(index + globalVertexOffset);
       }
       rayCount += mesh.ray_vertices.size();
       count += mesh.vertices.size();
-      globalVertexOffset += static_cast<uint32_t>(mesh.vertices.size());
+      //globalVertexOffset += static_cast<uint32_t>(mesh.vertices.size());
     }
 
     std::cout << "Ray : " << rayCount << " Non : " << count << std::endl;

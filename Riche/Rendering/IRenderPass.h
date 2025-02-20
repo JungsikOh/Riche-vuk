@@ -8,6 +8,7 @@ struct ScratchBuffer {
   uint64_t deviceAddress = 0;
   VkBuffer handle = VK_NULL_HANDLE;
   VkDeviceMemory memory = VK_NULL_HANDLE;
+  VkDeviceSize size = 0;
 };
 
 // Ray tracing acceleration structure

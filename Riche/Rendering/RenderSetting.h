@@ -13,6 +13,9 @@ class RenderSetting : public Singleton<RenderSetting> {
   int beforeCullingRenderingNum = 0;
   int afterViewCullingRenderingNum = 0;
   int afterOcclusionCullingRenderingNum = 0;
+
+
+  bool changeFlag = false;
 };
 
 #define g_RenderSetting RenderSetting::Get()

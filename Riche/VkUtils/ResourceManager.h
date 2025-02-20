@@ -14,10 +14,7 @@ class ResourceManager : public Singleton<ResourceManager> {
   VkPhysicalDevice m_PhysicalDevice;
   QueueFamilyIndices m_queueFamilyIndices;
 
-  VkQueue m_transferQueue;
-  VkCommandPool m_TransferCommandPool;
-
-  VkFence m_pFence = VK_NULL_HANDLE;
+  VkFence m_fence = VK_NULL_HANDLE;
 
   void CreateFence();
   void CleanupFence();
@@ -27,13 +24,21 @@ class ResourceManager : public Singleton<ResourceManager> {
   void WaitForFenceValue();
 
  public:
+  VkQueue m_transferQueue;
+  VkQueue m_computeQueue;
+  VkCommandPool m_TransferCommandPool;
+  VkCommandPool m_commputeCommandPool;
+  VkCommandBuffer m_transferCommandBuffer;
+
   ResourceManager();
   ~ResourceManager();
 
-  void Initialize(VkDevice device, VkPhysicalDevice physicalDevice, VkQueue queue, QueueFamilyIndices indices);
+  void Initialize(VkDevice device, VkPhysicalDevice physicalDevice, VkQueue queue, VkQueue compute, QueueFamilyIndices indices);
   void Cleanup();
 
   VkCommandBuffer CreateAndBeginCommandBuffer();
+  void CreateCommandBuffer();
+  void BeginCommandBuffer();
   void EndAndSummitCommandBuffer(VkCommandBuffer commandbuffer);
 
   VkResult CreateVertexBuffer(uint32_t sizePerVertex, uint32_t vertexNum, VkDeviceMemory* pOutVertexBufferMemory, VkBuffer* pOutBuffer,

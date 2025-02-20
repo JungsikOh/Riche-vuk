@@ -6,6 +6,7 @@
 #include "CullingRenderPass.h"
 #include "Editor/Editor.h"
 #include "IRenderPass.h"
+#include "Utils/ThreadPool.h"
 #include "VkUtils/ChooseFunc.h"
 #include "VkUtils/DescriptorManager.h"
 #include "VkUtils/ResourceManager.h"
@@ -60,6 +61,78 @@ class BasicLightingPass : public IRenderPass {
   void CreateTLAS();
   void CreateShaderBindingTables();
 
+  void UpdateTLASAsync(VkDevice device, VkCommandPool commandPool, VkQueue queue, VkAccelerationStructureKHR tlas,
+                       VkAccelerationStructureGeometryKHR* pGeometry, uint32_t numInstances, VkDeviceAddress scratchDeviceAddress) {
+    // 1. 명령 버퍼 할당
+    VkCommandBufferAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandPool = commandPool;
+    allocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer commandBuffer;
+    VK_CHECK(vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer));
+
+    // 2. 명령 버퍼 기록 시작 (one-time submit)
+    VkCommandBufferBeginInfo beginInfo = {};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
+
+    // 3. TLAS 업데이트(Refit) 명령 기록
+    VkAccelerationStructureBuildGeometryInfoKHR updateInfo = {};
+    updateInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
+    updateInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+    // 업데이트 플래그 포함
+    updateInfo.flags =
+        VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+    updateInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR;
+    // src와 dst에 동일한 TLAS 핸들을 지정하여 업데이트 함
+    updateInfo.srcAccelerationStructure = tlas;
+    updateInfo.dstAccelerationStructure = tlas;
+    updateInfo.geometryCount = 1;
+    updateInfo.pGeometries = pGeometry;
+    updateInfo.scratchData.deviceAddress = scratchDeviceAddress;
+
+    // Build Range Info: 인스턴스 수만큼 primitiveCount 설정
+    VkAccelerationStructureBuildRangeInfoKHR rangeInfo = {};
+    rangeInfo.primitiveCount = numInstances;
+    rangeInfo.primitiveOffset = 0;
+    rangeInfo.firstVertex = 0;
+    rangeInfo.transformOffset = 0;
+    VkAccelerationStructureBuildRangeInfoKHR* pRangeInfo = &rangeInfo;
+
+    vkCmdBuildAccelerationStructuresKHR(commandBuffer, 1, &updateInfo, &pRangeInfo);
+
+    VK_CHECK(vkEndCommandBuffer(commandBuffer));
+
+    // 4. fence 생성
+    VkFenceCreateInfo fenceInfo = {};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    VkFence fence;
+    VK_CHECK(vkCreateFence(device, &fenceInfo, nullptr, &fence));
+
+    // 5. 명령 버퍼 제출
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    VK_CHECK(vkQueueSubmit(queue, 1, &submitInfo, fence));
+
+    // 6. 비동기 업데이트: 별도 스레드에서 fence를 기다린 후 cleanup
+    std::thread updateThread([=]() {
+      // fence가 완료될 때까지 기다림
+      VK_CHECK(vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX));
+      // 완료 후, 커맨드 버퍼와 fence 해제
+      vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+      vkDestroyFence(device, fence, nullptr);
+    });
+
+    // 스레드를 분리하여 비동기로 실행 (메인 스레드를 block하지 않음)
+    updateThread.detach();
+  }
+
   void CreatePushConstantRange();
 
   void CreateSemaphores();
@@ -109,7 +182,17 @@ class BasicLightingPass : public IRenderPass {
 
   // For Raytracing
   AccelerationStructure m_bottomLevelAS;
+  std::vector<AccelerationStructure> m_bottomLevelASList; 
   AccelerationStructure m_topLevelAS;
+
+    std::vector<ScratchBuffer> scratchBuffers;
+  std::vector<VkAccelerationStructureBuildRangeInfoKHR*> accelerationBuildStructureRangeInfos;
+  std::vector<VkAccelerationStructureBuildRangeInfoKHR> rangeInfos;
+  std::vector<VkAccelerationStructureBuildGeometryInfoKHR> accelerationBuildGeometryInfos;
+
+  std::vector<InstanceOffset> m_instanceOffsets;
+  VkBuffer m_instanceOffsetBuffer;
+  VkDeviceMemory m_instanceOffsetBufferMemory;
 
   VkPipeline m_raytracingPipeline;
   VkPipelineLayout m_raytracingPipelineLayout;
@@ -121,6 +204,10 @@ class BasicLightingPass : public IRenderPass {
     ShaderBindingTable miss;
     ShaderBindingTable hit;
   } shaderBindingTables;
+
+  VkBuffer instanceBuffer;
+  VkDeviceMemory instanceBufferMemory;
+  ScratchBuffer scratchBufferTLAS;
 
   VkDescriptorPool m_raytracingPool;
   VkDescriptorSet m_raytracingSet;

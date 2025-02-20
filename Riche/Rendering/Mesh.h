@@ -10,6 +10,9 @@ class Mesh {
   std::vector<RayTracingVertex> ray_vertices;
   std::vector<uint32_t> indices;
 
+  uint64_t vertexOffset;
+  uint64_t indexOffset;
+
   // Only vb
   uint32_t vertexCount = 0;
   uint32_t startVertexLoc = 0;  // Index of the first vertex, It' like offset

@@ -22,6 +22,11 @@ struct Vertex {
     vec2 pad;
 };
 
+struct Offset {
+    uint vertexOffset;
+    uint indexOffset;
+};
+
 layout(location = 0) rayPayloadInEXT vec3 hitValue;
 layout(location = 2) rayPayloadEXT bool shadowed;
 hitAttributeEXT vec2 attribs;
@@ -37,15 +42,19 @@ layout(set = 0, binding = 0) readonly uniform U_Camera
 layout(set = 1, binding = 0) uniform accelerationStructureEXT topLevelAS;
 layout(set = 1, binding = 2, scalar) buffer Vertices { RayBasicVertex v[]; } vertices;
 layout(set = 1, binding = 3, scalar) buffer Indices { uint i[]; } indices;
-
+layout(set = 1, binding = 4) buffer Offsets { Offset o[]; } offset;
 
 void main()
 {
-    ivec3 index = ivec3(indices.i[3 * gl_PrimitiveID], indices.i[3 * gl_PrimitiveID + 1], indices.i[3 * gl_PrimitiveID + 2]);
+    uint customID = gl_InstanceCustomIndexEXT; 
+    uint vertexOffset = offset.o[customID].vertexOffset;
+    uint indexOffset = offset.o[customID].indexOffset;
 
-    RayBasicVertex v0 = vertices.v[index.x];
-    RayBasicVertex v1 = vertices.v[index.y];
-    RayBasicVertex v2 = vertices.v[index.z];
+    ivec3 index = ivec3(indices.i[3 * gl_PrimitiveID + indexOffset], indices.i[3 * gl_PrimitiveID + 1+ indexOffset], indices.i[3 * gl_PrimitiveID + 2+ indexOffset]);
+
+    RayBasicVertex v0 = vertices.v[index.x + vertexOffset];
+    RayBasicVertex v1 = vertices.v[index.y + vertexOffset];
+    RayBasicVertex v2 = vertices.v[index.z + vertexOffset];
 
     const vec3 barycentricCoords = vec3(1.0f - attribs.x - attribs.y, attribs.x, attribs.y);
     vec3 normal = normalize(v0.normal.xyz * barycentricCoords.x + v1.normal.xyz * barycentricCoords.y + v2.normal.xyz * barycentricCoords.z);

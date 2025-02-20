@@ -45,6 +45,11 @@ struct RayTracingVertex {
   float padd[2] = {999.0f, 999.0f};
 };
 
+struct InstanceOffset {
+  uint32_t vertexOffset;
+  uint32_t indicesOffset;
+};
+
 struct COMPONENTS MaterialCPU {
   glm::vec4 baseColor = glm::vec4(1.0f);
   float albedoFactor = 1.0f;

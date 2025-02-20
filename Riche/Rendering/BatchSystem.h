@@ -75,6 +75,7 @@ struct BatchManager : public Singleton<BatchManager> {
   /*
     Ray Tracing
   */
+  std::vector<Mesh> m_meshes;
   std::vector<RayTracingVertex> m_allMeshVertices;
   VkBuffer m_vertiesBuffer;
   VkDeviceMemory m_vertiesBufferMemory;
