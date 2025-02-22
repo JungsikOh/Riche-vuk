@@ -64,13 +64,33 @@ void BasicLightingPass::Cleanup() {
   vkDestroyRenderPass(m_pDevice, m_renderPass, nullptr);
   vkDestroyRenderPass(m_pDevice, m_objectIdRenderPass, nullptr);
 
-  vkDestroyBuffer(m_pDevice, m_bottomLevelAS.buffer, nullptr);
-  vkDestroyAccelerationStructureKHR(m_pDevice, m_bottomLevelAS.handle, nullptr);
-  vkFreeMemory(m_pDevice, m_bottomLevelAS.memory, nullptr);
+  for (auto& blas : m_bottomLevelASList) {
+    vkDestroyBuffer(m_pDevice, blas.buffer, nullptr);
+    vkDestroyAccelerationStructureKHR(m_pDevice, blas.handle, nullptr);
+    vkFreeMemory(m_pDevice, blas.memory, nullptr);
+  }
 
   vkDestroyBuffer(m_pDevice, m_topLevelAS.buffer, nullptr);
   vkDestroyAccelerationStructureKHR(m_pDevice, m_topLevelAS.handle, nullptr);
   vkFreeMemory(m_pDevice, m_topLevelAS.memory, nullptr);
+
+  vkDestroyBuffer(m_pDevice, shaderBindingTables.raygen.buffer, nullptr);
+  vkFreeMemory(m_pDevice, shaderBindingTables.raygen.memory, nullptr);
+  vkDestroyBuffer(m_pDevice, shaderBindingTables.hit.buffer, nullptr);
+  vkFreeMemory(m_pDevice, shaderBindingTables.hit.memory, nullptr);
+  vkDestroyBuffer(m_pDevice, shaderBindingTables.miss.buffer, nullptr);
+  vkFreeMemory(m_pDevice, shaderBindingTables.miss.memory, nullptr);
+
+  vkDestroyBuffer(m_pDevice, m_instanceOffsetBuffer, nullptr);
+  vkFreeMemory(m_pDevice, m_instanceOffsetBufferMemory, nullptr);
+  vkDestroyBuffer(m_pDevice, instanceBuffer, nullptr);
+  vkFreeMemory(m_pDevice, instanceBufferMemory, nullptr);
+  vkDestroyBuffer(m_pDevice, m_scratchBufferTLAS.handle, nullptr);
+  vkFreeMemory(m_pDevice, m_scratchBufferTLAS.memory, nullptr);
+
+  vkDestroyImageView(m_pDevice, m_raytracingImageView, nullptr);
+  vkDestroyImage(m_pDevice, m_raytracingImage, nullptr);
+  vkFreeMemory(m_pDevice, m_raytracingImageMemory, nullptr);
 
   vkDestroyPipeline(m_pDevice, m_raytracingPipeline, nullptr);
   vkDestroyPipelineLayout(m_pDevice, m_raytracingPipelineLayout, nullptr);
@@ -143,8 +163,8 @@ void BasicLightingPass::Update() {
                                             &accelerationStructureBuildGeometryInfo, &primitive_count,
                                             &accelerationStructureBuildSizesInfo);
 
-    if (scratchBufferTLAS.handle == VK_NULL_HANDLE) {
-      scratchBufferTLAS = CreateScratchBuffer(m_pDevice, m_pPhyscialDevice, accelerationStructureBuildSizesInfo.buildScratchSize);
+    if (m_scratchBufferTLAS.handle == VK_NULL_HANDLE) {
+      m_scratchBufferTLAS = CreateScratchBuffer(m_pDevice, m_pPhyscialDevice, accelerationStructureBuildSizesInfo.buildScratchSize);
     }
 
     VkAccelerationStructureBuildGeometryInfoKHR accelerationBuildGeometryInfo{};
@@ -157,7 +177,7 @@ void BasicLightingPass::Update() {
     accelerationBuildGeometryInfo.dstAccelerationStructure = m_topLevelAS.handle;
     accelerationBuildGeometryInfo.geometryCount = 1;
     accelerationBuildGeometryInfo.pGeometries = &accelerationStructureGeometry;
-    accelerationBuildGeometryInfo.scratchData.deviceAddress = scratchBufferTLAS.deviceAddress;
+    accelerationBuildGeometryInfo.scratchData.deviceAddress = m_scratchBufferTLAS.deviceAddress;
 
     VkAccelerationStructureBuildRangeInfoKHR accelerationStructureBuildRangeInfo{};
     accelerationStructureBuildRangeInfo.primitiveCount = primitive_count;
@@ -173,10 +193,6 @@ void BasicLightingPass::Update() {
     VkCommandBuffer commandBuffer = g_ResourceManager.CreateAndBeginCommandBuffer();
     vkCmdBuildAccelerationStructuresKHR(commandBuffer, 1, &accelerationBuildGeometryInfo, accelerationBuildStructureRangeInfos.data());
     g_ResourceManager.EndAndSummitCommandBuffer(commandBuffer);
-
-    //// 예: m_topLevelAS.handle, accelerationStructureGeometry, numInstances, scratchBufferTLAS.deviceAddress가 이미 설정된 상황
-    // UpdateTLASAsync(m_pDevice, g_ResourceManager.m_TransferCommandPool, g_ResourceManager.m_transferQueue, m_topLevelAS.handle,
-    //                 &accelerationStructureGeometry, numInstances, scratchBufferTLAS.deviceAddress);
 
     g_RenderSetting.changeFlag = false;
   }
@@ -1413,8 +1429,7 @@ void BasicLightingPass::CreateRaytracingDescriptorSets() {
       VkUtils::DescriptorSetLayoutBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_ALL),
       VkUtils::DescriptorSetLayoutBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL),
       VkUtils::DescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL),
-      VkUtils::DescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL)
-  };
+      VkUtils::DescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL)};
 
   VkDescriptorSetLayoutCreateInfo setLayoutCreateInfo{};
   setLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -1467,92 +1482,10 @@ void BasicLightingPass::CreateRaytracingDescriptorSets() {
     Create the bottom level acceleration structure contains the scene's actual geometry (vertices, triangles)
 */
 void BasicLightingPass::CreateBLAS() {
-  // VkDeviceOrHostAddressConstKHR vertexBufferDeviceAddress{};
-  // VkDeviceOrHostAddressConstKHR indexBufferDeviceAddress{};
-
-  // vertexBufferDeviceAddress.deviceAddress = GetVkDeviceAddress(m_pDevice, g_BatchManager.m_vertiesBuffer);
-  // indexBufferDeviceAddress.deviceAddress = GetVkDeviceAddress(m_pDevice, g_BatchManager.m_indicesBuffer);
-
-  // uint32_t numTriangles = static_cast<uint32_t>(g_BatchManager.m_allMeshIndices.size()) / 3;
-
-  //// Build
-  // VkAccelerationStructureGeometryKHR accelerationStructureGeometry = {};
-  // accelerationStructureGeometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-  // accelerationStructureGeometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR | VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR;
-  // accelerationStructureGeometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-  // accelerationStructureGeometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
-  // accelerationStructureGeometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-  // accelerationStructureGeometry.geometry.triangles.vertexData = vertexBufferDeviceAddress;
-  // accelerationStructureGeometry.geometry.triangles.maxVertex = g_BatchManager.m_allMeshVertices.size() - 1;
-  // accelerationStructureGeometry.geometry.triangles.vertexStride = sizeof(RayTracingVertex);
-  // accelerationStructureGeometry.geometry.triangles.indexType = VK_INDEX_TYPE_UINT32;
-  // accelerationStructureGeometry.geometry.triangles.indexData = indexBufferDeviceAddress;
-  // accelerationStructureGeometry.geometry.triangles.transformData.deviceAddress = 0;
-  // accelerationStructureGeometry.geometry.triangles.transformData.hostAddress = nullptr;
-
-  //// Get size info
-  // VkAccelerationStructureBuildGeometryInfoKHR accelerationStructureBuildGeometryInfo = {};
-  // accelerationStructureBuildGeometryInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
-  // accelerationStructureBuildGeometryInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-  // accelerationStructureBuildGeometryInfo.flags =
-  //     VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR;
-  // accelerationStructureBuildGeometryInfo.geometryCount = 1;
-  // accelerationStructureBuildGeometryInfo.pGeometries = &accelerationStructureGeometry;
-
-  // VkAccelerationStructureBuildSizesInfoKHR accelerationStructureBuildSizesInfo = {};
-  // accelerationStructureBuildSizesInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
-
-  // vkGetAccelerationStructureBuildSizesKHR(m_pDevice, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
-  //                                         &accelerationStructureBuildGeometryInfo, &numTriangles,
-  //                                         &accelerationStructureBuildSizesInfo);
-
-  // CreateAccelerationStructure(m_pDevice, m_pPhyscialDevice, m_bottomLevelAS, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,
-  //                             accelerationStructureBuildSizesInfo);
-
-  // ScratchBuffer scratchBuffer =
-  //     CreateScratchBuffer(m_pDevice, m_pPhyscialDevice, accelerationStructureBuildSizesInfo.buildScratchSize);
-
-  // VkAccelerationStructureBuildGeometryInfoKHR accelerationBuildGeometryInfo{};
-  // accelerationBuildGeometryInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
-  // accelerationBuildGeometryInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-  // accelerationBuildGeometryInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
-  // accelerationBuildGeometryInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
-  // accelerationBuildGeometryInfo.dstAccelerationStructure = m_bottomLevelAS.handle;
-  // accelerationBuildGeometryInfo.geometryCount = 1;
-  // accelerationBuildGeometryInfo.pGeometries = &accelerationStructureGeometry;
-  // accelerationBuildGeometryInfo.scratchData.deviceAddress = scratchBuffer.deviceAddress;
-
-  // VkAccelerationStructureBuildRangeInfoKHR accelerationStructureBuildRangeInfo{};
-  // accelerationStructureBuildRangeInfo.primitiveCount = numTriangles;
-  // accelerationStructureBuildRangeInfo.primitiveOffset = 0;
-  // accelerationStructureBuildRangeInfo.firstVertex = 0;
-  // accelerationStructureBuildRangeInfo.transformOffset = 0;
-  // std::vector<VkAccelerationStructureBuildRangeInfoKHR*> accelerationBuildStructureRangeInfos =
-  // {&accelerationStructureBuildRangeInfo};
-
-  //// Build the acceleration structure on the device via a one-time command buffer submission
-  //// Some implementations may support acceleration structure building on the host
-  //// (VkPhysicalDeviceAccelerationStructureFeaturesKHR->accelerationStructureHostCommands), but we prefer device builds
-
-  // VkCommandBuffer commandBuffer = g_ResourceManager.CreateAndBeginCommandBuffer();
-  // vkCmdBuildAccelerationStructuresKHR(commandBuffer, 1, &accelerationBuildGeometryInfo,
-  // accelerationBuildStructureRangeInfos.data());
-  // g_ResourceManager.EndAndSummitCommandBuffer(commandBuffer);
-
-  // if (scratchBuffer.memory != VK_NULL_HANDLE) {
-  //   vkFreeMemory(m_pDevice, scratchBuffer.memory, nullptr);
-  // }
-  // if (scratchBuffer.handle != VK_NULL_HANDLE) {
-  //   vkDestroyBuffer(m_pDevice, scratchBuffer.handle, nullptr);
-  // }
-
   /*
       여러 BLAS 생성
   */
   m_bottomLevelASList.reserve(g_BatchManager.m_meshes.size());
-  rangeInfos.reserve(g_BatchManager.m_meshes.size());
-  accelerationBuildStructureRangeInfos.reserve(g_BatchManager.m_meshes.size());
-  accelerationBuildGeometryInfos.reserve(g_BatchManager.m_meshes.size());
   scratchBuffers.reserve(g_BatchManager.m_meshes.size());
 
   VkDeviceOrHostAddressConstKHR vertexBufferDeviceAddress{};
@@ -1621,23 +1554,17 @@ void BasicLightingPass::CreateBLAS() {
     accelerationBuildGeometryInfo.pGeometries = &accelerationStructureGeometry;
     accelerationBuildGeometryInfo.scratchData.deviceAddress = scratchBuffers[scratchBuffers.size() - 1].deviceAddress;
 
-    accelerationBuildGeometryInfos.push_back(accelerationBuildGeometryInfo);
-
     VkAccelerationStructureBuildRangeInfoKHR accelerationStructureBuildRangeInfo{};
     accelerationStructureBuildRangeInfo.primitiveCount = numTriangles;
     accelerationStructureBuildRangeInfo.primitiveOffset = 0;
     accelerationStructureBuildRangeInfo.firstVertex = 0;
     accelerationStructureBuildRangeInfo.transformOffset = 0;
 
-    std::vector<VkAccelerationStructureBuildRangeInfoKHR*> test = {&accelerationStructureBuildRangeInfo};
+    std::vector<VkAccelerationStructureBuildRangeInfoKHR*> accelerationStructureBuildRangeInfos = {
+        &accelerationStructureBuildRangeInfo};
 
-    rangeInfos.push_back(accelerationStructureBuildRangeInfo);
+    vkCmdBuildAccelerationStructuresKHR(commandBuffer, 1, &accelerationBuildGeometryInfo, accelerationStructureBuildRangeInfos.data());
 
-    accelerationBuildStructureRangeInfos.push_back(&rangeInfos[rangeInfos.size() - 1]);
-
-    vkCmdBuildAccelerationStructuresKHR(commandBuffer, 1, &accelerationBuildGeometryInfo, test.data());
-
-    // BLAS 리스트에 추가
     m_bottomLevelASList.push_back(blas);
   }
 
@@ -1659,7 +1586,7 @@ void BasicLightingPass::CreateBLAS() {
 void BasicLightingPass::CreateTLAS() {
   uint32_t numInstances = (uint32_t)g_BatchManager.m_trasformList.size();
   std::vector<VkAccelerationStructureInstanceKHR> instances(numInstances);
-  
+
   uint32_t globalVertexOffset = 0;
   for (uint32_t i = 0; i < numInstances; i++) {
     // 각 인스턴스별 변환행렬, customIndex, mask 등 세팅

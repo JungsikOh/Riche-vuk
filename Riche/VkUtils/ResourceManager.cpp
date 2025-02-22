@@ -9,7 +9,7 @@ void ResourceManager::CreateFence() {
   VK_CHECK(vkCreateFence(m_Device, &fenceCreateInfo, nullptr, &m_fence));
 }
 
-void ResourceManager::CleanupFence() {}
+void ResourceManager::CleanupFence() { vkDestroyFence(m_Device, m_fence, nullptr); }
 
 void ResourceManager::CreateCommandPool() {
   VkCommandPoolCreateInfo poolInfo = {};
@@ -29,7 +29,10 @@ void ResourceManager::CreateCommandPool() {
   VK_CHECK(vkCreateCommandPool(m_Device, &poolInfo, nullptr, &m_commputeCommandPool));
 }
 
-void ResourceManager::CleanupCommandPool() { vkDestroyCommandPool(m_Device, m_TransferCommandPool, nullptr); }
+void ResourceManager::CleanupCommandPool() {
+  vkDestroyCommandPool(m_Device, m_TransferCommandPool, nullptr);
+  vkDestroyCommandPool(m_Device, m_commputeCommandPool, nullptr);
+}
 
 void ResourceManager::WaitForFenceValue() {
   // Wait for given fence to signal (open) from last draw before continuing

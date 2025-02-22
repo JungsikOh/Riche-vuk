@@ -181,14 +181,10 @@ class BasicLightingPass : public IRenderPass {
   VkImageView m_objectIdDepthStencilBufferImageView;
 
   // For Raytracing
-  AccelerationStructure m_bottomLevelAS;
-  std::vector<AccelerationStructure> m_bottomLevelASList; 
+  std::vector<AccelerationStructure> m_bottomLevelASList;
   AccelerationStructure m_topLevelAS;
 
-    std::vector<ScratchBuffer> scratchBuffers;
-  std::vector<VkAccelerationStructureBuildRangeInfoKHR*> accelerationBuildStructureRangeInfos;
-  std::vector<VkAccelerationStructureBuildRangeInfoKHR> rangeInfos;
-  std::vector<VkAccelerationStructureBuildGeometryInfoKHR> accelerationBuildGeometryInfos;
+  std::vector<ScratchBuffer> scratchBuffers;
 
   std::vector<InstanceOffset> m_instanceOffsets;
   VkBuffer m_instanceOffsetBuffer;
@@ -207,7 +203,7 @@ class BasicLightingPass : public IRenderPass {
 
   VkBuffer instanceBuffer;
   VkDeviceMemory instanceBufferMemory;
-  ScratchBuffer scratchBufferTLAS;
+  ScratchBuffer m_scratchBufferTLAS;
 
   VkDescriptorPool m_raytracingPool;
   VkDescriptorSet m_raytracingSet;
@@ -216,10 +212,6 @@ class BasicLightingPass : public IRenderPass {
   VkImage m_raytracingImage;
   VkDeviceMemory m_raytracingImageMemory;
   VkImageView m_raytracingImageView;
-
-  VkImage m_rayDepthStencilBufferImage;
-  VkDeviceMemory m_rayDepthStencilBufferImageMemory;
-  VkImageView m_rayDepthStencilBufferImageView;
 
   VkFramebuffer m_framebuffer;
   VkFramebuffer m_objectIdFramebuffer;
