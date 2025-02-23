@@ -4,10 +4,12 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_EXT_debug_printf : enable
 #extension GL_EXT_samplerless_texture_functions : require
+#extension GL_EXT_shader_image_load_formatted : require
+#extension GL_EXT_scalar_block_layout : enable
 
 #include "CommonData.glsl"
 
-layout(local_size_x = 1) in;
+layout(local_size_x = 256) in;
 
 layout(set = 0, binding = 0) readonly uniform U_Camera
 {
@@ -17,20 +19,21 @@ layout(set = 0, binding = 0) readonly uniform U_Camera
     mat4 projInverse;
 }u_Camera;
 
+// BATCH_ALL
 layout(set = 1, binding = 0) readonly buffer SSBO_Model
 {
 	Transform transform[];
 }ssbo_Model;
 
-layout(set = 2, binding = 0) buffer SSBO_DrawIndexedCommands {
+layout(set = 1, binding = 1) buffer SSBO_DrawIndexedCommands {
     IndircetDrawIndexedCommand drawIndexedCommands[];
 }ssbo_DrawIndexedCommands;
 
-layout(set = 2, binding = 1) buffer readonly SSBO_BoundingBoxBuffer {
+layout(set = 1, binding = 2) buffer readonly SSBO_BoundingBoxBuffer {
     AABB boundingBoxList[];
 };
 
-layout(set = 2, binding = 2) uniform FrustumPlanes {
+layout(set = 2, binding = 0) uniform FrustumPlanes {
     vec4 planes[6];  // View Frustum의 6개 평면
 };
 

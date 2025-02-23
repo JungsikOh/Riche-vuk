@@ -6,10 +6,10 @@ void ResourceManager::CreateFence() {
   VkFenceCreateInfo fenceCreateInfo{};
   fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
   fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-  VK_CHECK(vkCreateFence(m_Device, &fenceCreateInfo, nullptr, &m_fence));
+  VK_CHECK(vkCreateFence(m_pDevice, &fenceCreateInfo, nullptr, &m_fence));
 }
 
-void ResourceManager::CleanupFence() { vkDestroyFence(m_Device, m_fence, nullptr); }
+void ResourceManager::CleanupFence() { vkDestroyFence(m_pDevice, m_fence, nullptr); }
 
 void ResourceManager::CreateCommandPool() {
   VkCommandPoolCreateInfo poolInfo = {};
@@ -18,7 +18,7 @@ void ResourceManager::CreateCommandPool() {
   poolInfo.queueFamilyIndex = m_queueFamilyIndices.transferFamily;  // Queue family type that buffers from this command pool will use
 
   // Create a Graphics Queue family Command Pool
-  VK_CHECK(vkCreateCommandPool(m_Device, &poolInfo, nullptr, &m_TransferCommandPool));
+  VK_CHECK(vkCreateCommandPool(m_pDevice, &poolInfo, nullptr, &m_transferCommandPool));
 
   poolInfo = {};
   poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -26,12 +26,12 @@ void ResourceManager::CreateCommandPool() {
   poolInfo.queueFamilyIndex = m_queueFamilyIndices.computeFamily;  // Queue family type that buffers from this command pool will use
 
   // Create a Graphics Queue family Command Pool
-  VK_CHECK(vkCreateCommandPool(m_Device, &poolInfo, nullptr, &m_commputeCommandPool));
+  VK_CHECK(vkCreateCommandPool(m_pDevice, &poolInfo, nullptr, &m_commputeCommandPool));
 }
 
 void ResourceManager::CleanupCommandPool() {
-  vkDestroyCommandPool(m_Device, m_TransferCommandPool, nullptr);
-  vkDestroyCommandPool(m_Device, m_commputeCommandPool, nullptr);
+  vkDestroyCommandPool(m_pDevice, m_transferCommandPool, nullptr);
+  vkDestroyCommandPool(m_pDevice, m_commputeCommandPool, nullptr);
 }
 
 void ResourceManager::WaitForFenceValue() {
@@ -47,11 +47,11 @@ void ResourceManager::CreateCommandBuffer() {
   VkCommandBufferAllocateInfo allocInfo = {};
   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
   allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  allocInfo.commandPool = m_TransferCommandPool;
+  allocInfo.commandPool = m_transferCommandPool;
   allocInfo.commandBufferCount = 1;
 
   // Allocate command buffer and pool
-  VK_CHECK(vkAllocateCommandBuffers(m_Device, &allocInfo, &m_transferCommandBuffer));
+  VK_CHECK(vkAllocateCommandBuffers(m_pDevice, &allocInfo, &m_transferCommandBuffer));
 }
 
 VkCommandBuffer ResourceManager::CreateAndBeginCommandBuffer() {
@@ -61,11 +61,11 @@ VkCommandBuffer ResourceManager::CreateAndBeginCommandBuffer() {
   VkCommandBufferAllocateInfo allocInfo = {};
   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
   allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  allocInfo.commandPool = m_TransferCommandPool;
+  allocInfo.commandPool = m_transferCommandPool;
   allocInfo.commandBufferCount = 1;
 
   // Allocate command buffer and pool
-  VK_CHECK(vkAllocateCommandBuffers(m_Device, &allocInfo, &transferCommandBuffer));
+  VK_CHECK(vkAllocateCommandBuffers(m_pDevice, &allocInfo, &transferCommandBuffer));
 
   // Information to begin the command buffer record
   VkCommandBufferBeginInfo beginInfo = {};
@@ -93,18 +93,18 @@ void ResourceManager::EndAndSummitCommandBuffer(VkCommandBuffer commandbuffer) {
   VkFence fence;
   VkFenceCreateInfo fenceCreateInfo{};
   fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-  VK_CHECK(vkCreateFence(m_Device, &fenceCreateInfo, nullptr, &fence));
+  VK_CHECK(vkCreateFence(m_pDevice, &fenceCreateInfo, nullptr, &fence));
 
   // Submit Transfer command to transfer queue and wait until it finishes
   vkQueueSubmit(m_transferQueue, 1, &submitInfo, fence);
 
-  vkWaitForFences(m_Device, 1, &fence, VK_TRUE, UINT64_MAX);
+  vkWaitForFences(m_pDevice, 1, &fence, VK_TRUE, UINT64_MAX);
 
   vkQueueWaitIdle(m_transferQueue);  // 큐가 Idle 상태가 될 때까지 기다린다. 여기서 Idle 상태란, 대기 상태에 있는 것을 이야기한다.
-  vkDestroyFence(m_Device, fence, nullptr);
+  vkDestroyFence(m_pDevice, fence, nullptr);
 
   // Free Temporary command buffer back to pool
-  vkFreeCommandBuffers(m_Device, m_TransferCommandPool, 1, &commandbuffer);
+  vkFreeCommandBuffers(m_pDevice, m_transferCommandPool, 1, &commandbuffer);
 
   // vkEndCommandBuffer(commandbuffer);
 
@@ -115,9 +115,9 @@ void ResourceManager::EndAndSummitCommandBuffer(VkCommandBuffer commandbuffer) {
   // submitInfo.pCommandBuffers = &commandbuffer;
   //// Submit command buffer and use fence instead of queue wait idle
   // vkQueueSubmit(m_transferQueue, 1, &submitInfo, m_fence);
-  // vkResetFences(m_Device, 1, &m_fence);
+  // vkResetFences(m_pDevice, 1, &m_fence);
   //
-  // vkWaitForFences(m_Device, 1, &m_fence, VK_TRUE, UINT64_MAX);
+  // vkWaitForFences(m_pDevice, 1, &m_fence, VK_TRUE, UINT64_MAX);
 
   // Reset Command Buffer instead of freeing
   // vkResetCommandBuffer(commandbuffer, 0);
@@ -129,8 +129,8 @@ ResourceManager::~ResourceManager() {}
 
 void ResourceManager::Initialize(VkDevice device, VkPhysicalDevice physicalDevice, VkQueue queue, VkQueue compute,
                                  QueueFamilyIndices indices) {
-  m_Device = device;
-  m_PhysicalDevice = physicalDevice;
+  m_pDevice = device;
+  m_pPhysicalDevice = physicalDevice;
   m_transferQueue = queue;
   m_computeQueue = compute;
   m_queueFamilyIndices = indices;
@@ -151,29 +151,29 @@ VkResult ResourceManager::CreateVertexBuffer(uint32_t sizePerVertex, uint32_t ve
   VkDeviceMemory stagingBufferMemory;
 
   // Create Buffer, Allocate Memory and Bind to it
-  CreateBuffer(m_Device, m_PhysicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+  CreateBuffer(m_pDevice, m_pPhysicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffer, &stagingBufferMemory);
 
   // MAP MEMORY TO VERTEX BUFFER
   void* pData = nullptr;                                                 // 1. Create pointer to a point in normal memory
-  vkMapMemory(m_Device, stagingBufferMemory, 0, bufferSize, 0, &pData);  // 2. "Map" the vertex buffer memory to that point
+  vkMapMemory(m_pDevice, stagingBufferMemory, 0, bufferSize, 0, &pData);  // 2. "Map" the vertex buffer memory to that point
   memcpy(pData, pInitData, (size_t)bufferSize);                          // 3. Copy memory from vertices vector to that point
-  vkUnmapMemory(m_Device, stagingBufferMemory);                          // 4. "UnMap" the vertex buffer memory
+  vkUnmapMemory(m_pDevice, stagingBufferMemory);                          // 4. "UnMap" the vertex buffer memory
 
   // Create Buffer win TRANSFER_DST_BIT to mark as recipient of transfer data
   // Buffer Memory is to be DEVICE_LOCAL_BIT meaning memory is on the GPU and only accessible by it and not CPU (host)
-  CreateBuffer(m_Device, m_PhysicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+  CreateBuffer(m_pDevice, m_pPhysicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &pVertexBuffer, &pVertexBufferMemory);
 
   // Copy staging buffer to vertex buffer on GPU
-  CopyBuffer(m_Device, m_transferQueue, m_TransferCommandPool, stagingBuffer, pVertexBuffer, bufferSize);
+  CopyBuffer(m_pDevice, m_transferQueue, m_transferCommandPool, stagingBuffer, pVertexBuffer, bufferSize);
 
   *pOutBuffer = pVertexBuffer;
   *pOutVertexBufferMemory = pVertexBufferMemory;
 
   // Clean up staging buffer
-  vkDestroyBuffer(m_Device, stagingBuffer, nullptr);
-  vkFreeMemory(m_Device, stagingBufferMemory, nullptr);
+  vkDestroyBuffer(m_pDevice, stagingBuffer, nullptr);
+  vkFreeMemory(m_pDevice, stagingBufferMemory, nullptr);
 
   return VK_SUCCESS;
 }
@@ -191,29 +191,29 @@ VkResult ResourceManager::CreateVertexBuffer(uint32_t vertexDataSize, VkDeviceMe
   VkDeviceMemory stagingBufferMemory;
 
   // Create Buffer, Allocate Memory and Bind to it
-  CreateBuffer(m_Device, m_PhysicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+  CreateBuffer(m_pDevice, m_pPhysicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffer, &stagingBufferMemory);
 
   // MAP MEMORY TO VERTEX BUFFER
   void* pData = nullptr;                                                 // 1. Create pointer to a point in normal memory
-  vkMapMemory(m_Device, stagingBufferMemory, 0, bufferSize, 0, &pData);  // 2. "Map" the vertex buffer memory to that point
+  vkMapMemory(m_pDevice, stagingBufferMemory, 0, bufferSize, 0, &pData);  // 2. "Map" the vertex buffer memory to that point
   memcpy(pData, pInitData, (size_t)bufferSize);                          // 3. Copy memory from vertices vector to that point
-  vkUnmapMemory(m_Device, stagingBufferMemory);                          // 4. "UnMap" the vertex buffer memory
+  vkUnmapMemory(m_pDevice, stagingBufferMemory);                          // 4. "UnMap" the vertex buffer memory
 
   // Create Buffer win TRANSFER_DST_BIT to mark as recipient of transfer data
   // Buffer Memory is to be DEVICE_LOCAL_BIT meaning memory is on the GPU and only accessible by it and not CPU (host)
-  CreateBuffer(m_Device, m_PhysicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+  CreateBuffer(m_pDevice, m_pPhysicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &pVertexBuffer, &pVertexBufferMemory);
 
   // Copy staging buffer to vertex buffer on GPU
-  CopyBuffer(m_Device, m_transferQueue, m_TransferCommandPool, stagingBuffer, pVertexBuffer, bufferSize);
+  CopyBuffer(m_pDevice, m_transferQueue, m_transferCommandPool, stagingBuffer, pVertexBuffer, bufferSize);
 
   *pOutBuffer = pVertexBuffer;
   *pOutVertexBufferMemory = pVertexBufferMemory;
 
   // Clean up staging buffer
-  vkDestroyBuffer(m_Device, stagingBuffer, nullptr);
-  vkFreeMemory(m_Device, stagingBufferMemory, nullptr);
+  vkDestroyBuffer(m_pDevice, stagingBuffer, nullptr);
+  vkFreeMemory(m_pDevice, stagingBufferMemory, nullptr);
 
   return VK_SUCCESS;
 }
@@ -230,27 +230,27 @@ VkResult ResourceManager::CreateIndexBuffer(uint32_t indexDataSize, VkDeviceMemo
   VkDeviceMemory stagingBufferMemory;
 
   // Create Buffer, Allocate Memory and Bind to it
-  CreateBuffer(m_Device, m_PhysicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+  CreateBuffer(m_pDevice, m_pPhysicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffer, &stagingBufferMemory);
 
   // MAP MEMORY TO VERTEX BUFFER
   void* pData = nullptr;                                                 // 1. Create pointer to a point in normal memory
-  vkMapMemory(m_Device, stagingBufferMemory, 0, bufferSize, 0, &pData);  // 2. "Map" the vertex buffer memory to that point
+  vkMapMemory(m_pDevice, stagingBufferMemory, 0, bufferSize, 0, &pData);  // 2. "Map" the vertex buffer memory to that point
   memcpy(pData, pInitData, (size_t)bufferSize);                          // 3. Copy memory from vertices vector to that point
-  vkUnmapMemory(m_Device, stagingBufferMemory);                          // 4. "UnMap" the vertex buffer memory
+  vkUnmapMemory(m_pDevice, stagingBufferMemory);                          // 4. "UnMap" the vertex buffer memory
 
-  CreateBuffer(m_Device, m_PhysicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+  CreateBuffer(m_pDevice, m_pPhysicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &pIndexBuffer, &pIndexBufferMemory);
 
   // Copy staging buffer to vertex buffer on GPU
-  CopyBuffer(m_Device, m_transferQueue, m_TransferCommandPool, stagingBuffer, pIndexBuffer, bufferSize);
+  CopyBuffer(m_pDevice, m_transferQueue, m_transferCommandPool, stagingBuffer, pIndexBuffer, bufferSize);
 
   *pOutBuffer = pIndexBuffer;
   *pOutIndexBufferMemory = pIndexBufferMemory;
 
   // Clean up staging buffer
-  vkDestroyBuffer(m_Device, stagingBuffer, nullptr);
-  vkFreeMemory(m_Device, stagingBufferMemory, nullptr);
+  vkDestroyBuffer(m_pDevice, stagingBuffer, nullptr);
+  vkFreeMemory(m_pDevice, stagingBufferMemory, nullptr);
 
   return VK_SUCCESS;
 }
@@ -264,35 +264,35 @@ VkResult ResourceManager::CreateTexture(const std::string& filename, VkDeviceMem
   // Create Staging Buffer to hold loaded data, ready to copy to device
   VkBuffer imageStagingBuffer;
   VkDeviceMemory imageStagingBufferMemory;
-  CreateBuffer(m_Device, m_PhysicalDevice, *pOutImageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+  CreateBuffer(m_pDevice, m_pPhysicalDevice, *pOutImageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &imageStagingBuffer,
                &imageStagingBufferMemory);
 
   // Copy image data to staging buffer
   void* pData;
-  vkMapMemory(m_Device, imageStagingBufferMemory, 0, *pOutImageSize, 0, &pData);
+  vkMapMemory(m_pDevice, imageStagingBufferMemory, 0, *pOutImageSize, 0, &pData);
   memcpy(pData, imageData, static_cast<size_t>(*pOutImageSize));
-  vkUnmapMemory(m_Device, imageStagingBufferMemory);
+  vkUnmapMemory(m_pDevice, imageStagingBufferMemory);
 
   // Free Original image data
   stbi_image_free(imageData);
 
   // Create Image to hold final texture
-  VkUtils::CreateImage2D(m_Device, m_PhysicalDevice, width, height, pOutImageMemory, pOutImage, VK_FORMAT_R8G8B8A8_UNORM,
+  VkUtils::CreateImage2D(m_pDevice, m_pPhysicalDevice, width, height, pOutImageMemory, pOutImage, VK_FORMAT_R8G8B8A8_UNORM,
                          VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
   // Transition image to be DST for copy operation
-  TransitionImageLayout(m_Device, m_transferQueue, m_TransferCommandPool, *pOutImage, VK_IMAGE_LAYOUT_UNDEFINED,
+  TransitionImageLayout(m_pDevice, m_transferQueue, m_transferCommandPool, *pOutImage, VK_IMAGE_LAYOUT_UNDEFINED,
                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
   // Copy Image data
-  CopyImage(m_Device, m_transferQueue, m_TransferCommandPool, imageStagingBuffer, *pOutImage, width, height);
+  CopyImage(m_pDevice, m_transferQueue, m_transferCommandPool, imageStagingBuffer, *pOutImage, width, height);
   // Transition image to be shader readable for shader usage
-  TransitionImageLayout(m_Device, m_transferQueue, m_TransferCommandPool, *pOutImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+  TransitionImageLayout(m_pDevice, m_transferQueue, m_transferCommandPool, *pOutImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
 
   // Destroy Staging buffer
-  vkDestroyBuffer(m_Device, imageStagingBuffer, nullptr);
-  vkFreeMemory(m_Device, imageStagingBufferMemory, nullptr);
+  vkDestroyBuffer(m_pDevice, imageStagingBuffer, nullptr);
+  vkFreeMemory(m_pDevice, imageStagingBufferMemory, nullptr);
 
   return VK_SUCCESS;
 }
@@ -313,7 +313,7 @@ glm::vec4 ResourceManager::ReadPixelFromImage(VkImage image, uint32_t width, uin
   // 1) Staging Buffer 만들기 (1픽셀 = 4바이트 RGBA)
   VkBuffer stagingBuffer;
   VkDeviceMemory stagingMemory;
-  VkUtils::CreateBuffer(m_Device, m_PhysicalDevice,
+  VkUtils::CreateBuffer(m_pDevice, m_pPhysicalDevice,
                         4 * sizeof(float),  // 4 bytes
                         VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                         &stagingBuffer, &stagingMemory);
@@ -324,11 +324,11 @@ glm::vec4 ResourceManager::ReadPixelFromImage(VkImage image, uint32_t width, uin
   VkCommandBufferAllocateInfo allocInfo = {};
   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
   allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  allocInfo.commandPool = m_TransferCommandPool;
+  allocInfo.commandPool = m_transferCommandPool;
   allocInfo.commandBufferCount = 1;
 
   // Allocate command buffer and pool
-  VK_CHECK(vkAllocateCommandBuffers(m_Device, &allocInfo, &transferCommandBuffer));
+  VK_CHECK(vkAllocateCommandBuffers(m_pDevice, &allocInfo, &transferCommandBuffer));
 
   // Information to begin the command buffer record
   VkCommandBufferBeginInfo beginInfo = {};
@@ -399,18 +399,18 @@ glm::vec4 ResourceManager::ReadPixelFromImage(VkImage image, uint32_t width, uin
   vkQueueWaitIdle(m_transferQueue);  // 큐가 Idle 상태가 될 때까지 기다린다. 여기서 Idle 상태란, 대기 상태에 있는 것을 이야기한다.
 
   // Free Temporary command buffer back to pool
-  vkFreeCommandBuffers(m_Device, m_TransferCommandPool, 1, &transferCommandBuffer);
+  vkFreeCommandBuffers(m_pDevice, m_transferCommandPool, 1, &transferCommandBuffer);
 
   // 7) Staging Buffer를 map 해서 픽셀 읽기
   float resultColor[4];
   void* pData;
-  vkMapMemory(m_Device, stagingMemory, 0, 4 * sizeof(float), 0, &pData);
+  vkMapMemory(m_pDevice, stagingMemory, 0, 4 * sizeof(float), 0, &pData);
   std::memcpy(&resultColor, pData, 4 * sizeof(float));
-  vkUnmapMemory(m_Device, stagingMemory);
+  vkUnmapMemory(m_pDevice, stagingMemory);
 
   // 8) 스테이징 버퍼/메모리 정리
-  vkDestroyBuffer(m_Device, stagingBuffer, nullptr);
-  vkFreeMemory(m_Device, stagingMemory, nullptr);
+  vkDestroyBuffer(m_pDevice, stagingBuffer, nullptr);
+  vkFreeMemory(m_pDevice, stagingMemory, nullptr);
 
   return glm::vec4(resultColor[0], resultColor[1], resultColor[2], resultColor[3]);
 }
@@ -427,25 +427,25 @@ VkResult ResourceManager::CreateVkBuffer(VkDeviceSize bufferSize, VkBufferUsageF
   bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;  // Similar to Swapchain images, can share vertex buffers
 
   // In Vulkan Cookbook 166p, Buffers don't have their own memory.
-  VK_CHECK(vkCreateBuffer(m_Device, &bufferCreateInfo, nullptr, pOutBuffer));
+  VK_CHECK(vkCreateBuffer(m_pDevice, &bufferCreateInfo, nullptr, pOutBuffer));
 
   // GET BUFFER MEMORY REQUIRMENTS
   VkMemoryRequirements memRequirements;
-  vkGetBufferMemoryRequirements(m_Device, *pOutBuffer, &memRequirements);
+  vkGetBufferMemoryRequirements(m_pDevice, *pOutBuffer, &memRequirements);
 
   // ALLOCATE MEMORY TO BUFFER
   VkMemoryAllocateInfo memAllocInfo = {};
   memAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
   memAllocInfo.allocationSize = memRequirements.size;
   memAllocInfo.memoryTypeIndex = FindMemoryTypeIndex(
-      m_PhysicalDevice, memRequirements.memoryTypeBits,  // Index of memory type on physical device that has required bit flags
+      m_pPhysicalDevice, memRequirements.memoryTypeBits,  // Index of memory type on physical device that has required bit flags
       bufferProperties);                                 // VK_MEMORY_.._HOST_VISIBLE_BIT : CPU can interact with memory(GPU)
   // VK_MEMORY_.._HOST_COHERENT_BIT : Allows placement of data straight into buffer after mapping (otherwise would have to specify
   // maually) Allocate Memory to VkDeviceMemory
-  VK_CHECK(vkAllocateMemory(m_Device, &memAllocInfo, nullptr, pOutBufferMemory));
+  VK_CHECK(vkAllocateMemory(m_pDevice, &memAllocInfo, nullptr, pOutBufferMemory));
 
   // Bind memory to given vertex buffer
-  vkBindBufferMemory(m_Device, *pOutBuffer, *pOutBufferMemory, 0);
+  vkBindBufferMemory(m_pDevice, *pOutBuffer, *pOutBufferMemory, 0);
 
   return VK_SUCCESS;
 }

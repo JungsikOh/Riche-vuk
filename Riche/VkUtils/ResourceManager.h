@@ -10,8 +10,8 @@ namespace VkUtils {
 class ResourceManager : public Singleton<ResourceManager> {
   friend class Singleton<ResourceManager>;
 
-  VkDevice m_Device;
-  VkPhysicalDevice m_PhysicalDevice;
+  VkDevice m_pDevice;
+  VkPhysicalDevice m_pPhysicalDevice;
   QueueFamilyIndices m_queueFamilyIndices;
 
   VkFence m_fence = VK_NULL_HANDLE;
@@ -26,7 +26,7 @@ class ResourceManager : public Singleton<ResourceManager> {
  public:
   VkQueue m_transferQueue;
   VkQueue m_computeQueue;
-  VkCommandPool m_TransferCommandPool;
+  VkCommandPool m_transferCommandPool;
   VkCommandPool m_commputeCommandPool;
   VkCommandBuffer m_transferCommandBuffer;
 

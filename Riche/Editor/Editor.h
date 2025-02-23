@@ -1,16 +1,16 @@
 #pragma once
+#include <filesystem>
 
-#include "Rendering/Components.h"
-#include "Rendering/RenderSetting.h"
-#include "Rendering/CullingRenderPass.h"
-#include "VkUtils/DescriptorBuilder.h"
-#include "VkUtils/DescriptorManager.h"
+#include "Utils/ModelLoader.h"
+#include "VkUtils/ChooseFunc.h"
 #include "VkUtils/QueueFamilyIndices.h"
 #include "VkUtils/ResourceManager.h"
 
 class Camera;
+class BasicLightingPass;
 
 class Editor {
+  bool check = false;
   GLFWwindow* m_Window;
   Camera* m_pCamera;
   int m_selectedIndex = -1;
@@ -29,9 +29,19 @@ class Editor {
   VkDescriptorPool m_ImguiDescriptorPool;
   VkRenderPass renderPass;
 
+  BasicLightingPass* m_pLightingPass;
+
+
+
  public:
+  Editor() = default;
+  ~Editor() = default;
+
   void Initialize(GLFWwindow* window, VkInstance instance, VkDevice device, VkPhysicalDevice physicalDevice,
                   VkUtils::QueueFamilyIndices queueFamily, VkQueue graphicsQueue, Camera* camera);
+
+  void SetPass(BasicLightingPass* pass);
+
   void Cleanup();
 
   void Update();
@@ -42,6 +52,6 @@ class Editor {
 
  private:
   void CreateImGuiDescriptorPool();
-
+  void ShowFileBrowserUI(const std::string& filter);
   void UpdateKeyboard();
 };

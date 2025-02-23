@@ -7,7 +7,7 @@
 
 #include "CommonData.glsl"
 
-layout(local_size_x = 1) in;
+layout(local_size_x = 256) in;
 
 layout(set = 0, binding = 0) uniform sampler linearWrapSS;
 layout(set = 0, binding = 1) uniform sampler linearClampSS;
@@ -23,25 +23,31 @@ layout(set = 1, binding = 0) readonly uniform U_Camera
     mat4 projInverse;
 }u_Camera;
 
+///////////////////////////////////
+// BATCH_ALL
+///////////////////////////////////
+
 layout(set = 2, binding = 0) readonly buffer SSBO_Model
 {
 	Transform transform[];
 }ssbo_Model;
 
+layout(set = 2, binding = 1) buffer SSBO_DrawIndexedCommands {
+    IndircetDrawIndexedCommand drawIndexedCommands[];
+}ssbo_DrawIndexedCommands;
+
+layout(set = 2, binding = 2) buffer readonly SSBO_BoundingBoxBuffer {
+    AABB boundingBoxList[];
+};
+
 ///////////////////////////////////
 // ViewFrustumCulling_COMPUTE
 ///////////////////////////////////
 
-layout(set = 3, binding = 0) buffer DrawIndexedCommands {
-    IndircetDrawIndexedCommand drawIndexedCommands[];
-};
-layout(set = 3, binding = 1) buffer readonly BoundingBoxes {
-    AABB boundingBoxList[];
-};
-layout(set = 3, binding = 2) uniform FrustumPlanes {
+layout(set = 3, binding = 0) uniform FrustumPlanes {
     vec4 planes[6];  // View Frustum의 6개 평면
 };
-layout(set = 3, binding = 3) buffer fLODListSSBO {
+layout(set = 3, binding = 1) buffer fLODListSSBO {
     float fLODList[];
 };
 
@@ -50,7 +56,7 @@ layout(set = 4, binding = 0) uniform texture2D u_DepthMapTextureLOD;
 void main() {
     uint idx = gl_GlobalInvocationID.x;
 
-    if(drawIndexedCommands[idx].instanceCount == 0) return;
+    if(ssbo_DrawIndexedCommands.drawIndexedCommands[idx].instanceCount == 0) return;
 
     vec2 screenMin = vec2(1.0, 1.0);
     vec2 screenMax = vec2(0.0, 0.0);
@@ -157,5 +163,5 @@ void main() {
     // for debugging
     if(u_ShaderSetting.isDebugging > 0) fLODList[idx] = fLOD;
 
-    drawIndexedCommands[idx].instanceCount = isVisible ? 1 : 0;
+    ssbo_DrawIndexedCommands.drawIndexedCommands[idx].instanceCount = isVisible ? 1 : 0;
 }

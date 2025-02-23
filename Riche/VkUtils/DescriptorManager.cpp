@@ -25,6 +25,8 @@ DescriptorHandle DescriptorManager::AddDescriptorSet(DescriptorBuilder* builder,
   return setHandle;
 }
 
+void DescriptorManager::UpdateDescriptorSet(DescriptorBuilder* builder, VkDescriptorSet set) { builder->Build(set); }
+
 VkDescriptorSet& DescriptorManager::GetVkDescriptorSet(DescriptorHandle handle) { return descriptorSetMap.find(handle)->second; }
 
 VkDescriptorSet& DescriptorManager::GetVkDescriptorSet(std::string const& name) {

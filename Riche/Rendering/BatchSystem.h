@@ -1,29 +1,28 @@
 #pragma once
 
+#include "Buffer.h"
 #include "Components.h"
+#include "Image.h"
 #include "Mesh.h"
 #include "Utils/Boundingbox.h"
 #include "Utils/Singleton.h"
 #include "VkUtils/DescriptorManager.h"
+#include "VkUtils/DescriptorBuilder.h"
 #include "VkUtils/ResourceManager.h"
 
 static const uint32_t MAX_BATCH_SIZE = 3 * 1024 * 1024;  // 3MB
-static std::vector<BasicVertex> accumulatedVertices;
-static std::vector<uint32_t> accumulatedIndices;
-static size_t accumulatedVertexSize = 0;
-static size_t accumulatedIndexSize = 0;
-static uint64_t accumulatedIndirectOffset = 0;
-static uint32_t accumulatedMeshIndex = 0;
+static std::vector<BasicVertex> s_accumulatedVertices;
+static std::vector<uint32_t> s_accumulatedIndices;
+static size_t s_accumulatedVertexSize;
+static size_t s_accumulatedIndexSize;
+static uint64_t s_accumulatedIndirectOffset;
+static uint32_t s_accumulatedMeshIndex;
 
 struct MiniBatch {
   VkBuffer m_vertexBuffer = VK_NULL_HANDLE;
-  VkDeviceMemory m_vertexBufferMemory;
+  VkDeviceMemory m_vertexBufferMemory = VK_NULL_HANDLE;
   VkBuffer m_indexBuffer = VK_NULL_HANDLE;
-  VkDeviceMemory m_indexBufferMemory;
-
-  std::vector<VkImage> m_imageGPU;
-  VkDeviceMemory m_imageGPUMemory;
-  std::vector<VkImageView> m_imageViewGPU;
+  VkDeviceMemory m_indexBufferMemory = VK_NULL_HANDLE;
 
   uint32_t m_currentVertexOffset = 0;
   uint32_t m_currentIndexOffset = 0;
@@ -41,35 +40,54 @@ struct MiniBatch {
   }
 };
 
-struct BatchManager : public Singleton<BatchManager> {
+class BatchManager : public Singleton<BatchManager> {
+  friend class Singleton<BatchManager>;
+
+ public:
+  BatchManager() = default;
+  ~BatchManager() = default;
+
+  void Update(VkDevice device);
+  void UpdateDescriptorSets(VkDevice device);
+
+  void Cleanup(VkDevice device);
+
+  void AddDataToMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::ResourceManager& manager, const Mesh& mesh, bool flag = false);
+  void FlushMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::ResourceManager& manager);
+
+  void CreateBatchManagerBuffers(VkDevice device, VkPhysicalDevice physicalDevice);
+  void CreateDescriptorSets(VkDevice device, VkPhysicalDevice physicalDevice);
+  void RebuildBatchManager(VkDevice device, VkPhysicalDevice physicalDevice);
+
+ public:
   std::vector<MiniBatch> m_miniBatchList;
-  
+  std::vector<BasicVertex> m_accumulatedVertices;
+  std::vector<uint32_t> m_accumulatedIndices;
+  size_t m_accumulatedVertexSize = 0;
+  size_t m_accumulatedIndexSize = 0;
+  uint64_t m_accumulatedIndirectOffset = 0;
+  uint32_t m_accumulatedMeshIndex = 0;
+  uint64_t m_accmulatedVertexOffset = 0;
+  uint64_t m_accmulatedIndexOffset = 0;
+
   // Material ID
-  std::vector<ObjectID> m_meshIDList;
-  VkBuffer m_objectIDListBuffer;
-  VkDeviceMemory m_objectIDListBufferMemory;
+  std::vector<ObjectID> m_objectIDList;
+  GpuBuffer m_objectIDBuffer;
 
   // Model
   std::vector<Transform> m_trasformList;
-  VkBuffer m_trasformListBuffer;
-  VkDeviceMemory m_trasformListBufferMemory;
-  VkDeviceSize m_transformListSize;
+  GpuBuffer m_transformListBuffer;
 
   // Material
-  std::vector<VkImage> m_diffuseImageList;
-  std::vector<VkImageView> m_diffuseImageViewList;
-  std::vector<VkDeviceMemory> m_diffuseImageListMemory;
-  std::vector<VkDeviceSize> m_diffuseImageListSize;
+  std::vector<GpuImage> m_diffuseImages;
 
-  // -- Indirect Draw Call
-  VkBuffer m_indirectDrawBuffer;
-  VkDeviceMemory m_indirectDrawBufferMemory;
-  VkDeviceSize m_indirectDrawCommandSize;
+  // Indirect Draw Call
+  GpuBuffer m_indirectDrawCommandBuffer;
 
-  // -- Bounding Box
+  // Bounding Box
   std::vector<AABB> m_boundingBoxList;
-  VkBuffer m_boundingBoxListBuffer;
-  VkDeviceMemory m_boundingBoxListBufferMemory;
+  GpuBuffer m_boundingBoxListBuffer;
+  // - Each bounding box array (for visible bounding box)
   std::vector<AABBBufferList> m_boundingBoxBufferList;
 
   /*
@@ -77,50 +95,24 @@ struct BatchManager : public Singleton<BatchManager> {
   */
   std::vector<Mesh> m_meshes;
   std::vector<RayTracingVertex> m_allMeshVertices;
-  VkBuffer m_vertiesBuffer;
-  VkDeviceMemory m_vertiesBufferMemory;
-  VkDeviceSize m_vertiesBufferSize;
+  GpuBuffer m_verticesBuffer;
 
   std::vector<uint32_t> m_allMeshIndices;
-  VkBuffer m_indicesBuffer;
-  VkDeviceMemory m_indicesBufferMemory;
-  VkDeviceSize m_indicesBufferSize;
+  GpuBuffer m_indicesBuffer;
 
+  std::vector<InstanceOffset> m_instanceOffsets;
+  GpuBuffer m_instanceOffsetBuffer;
 
-  void Cleanup(VkDevice device) {
-    vkDestroyBuffer(device, m_indirectDrawBuffer, nullptr);
-    vkFreeMemory(device, m_indirectDrawBufferMemory, nullptr);
-
-    vkDestroyBuffer(device, m_boundingBoxListBuffer, nullptr);
-    vkFreeMemory(device, m_boundingBoxListBufferMemory, nullptr);
-
-    vkDestroyBuffer(device, m_trasformListBuffer, nullptr);
-    vkFreeMemory(device, m_trasformListBufferMemory, nullptr);
-
-    vkDestroyBuffer(device, m_objectIDListBuffer, nullptr);
-    vkFreeMemory(device, m_objectIDListBufferMemory, nullptr);
-
-    for (int i = 0; i < m_diffuseImageList.size(); ++i) {
-      vkDestroyImageView(device, m_diffuseImageViewList[i], nullptr);
-      vkDestroyImage(device, m_diffuseImageList[i], nullptr);
-      vkFreeMemory(device, m_diffuseImageListMemory[i], nullptr);
-    }
-
-    for (int i = 0; i < m_boundingBoxBufferList.size(); ++i) {
-      vkDestroyBuffer(device, m_boundingBoxBufferList[i].vertexBuffer, nullptr);
-      vkFreeMemory(device, m_boundingBoxBufferList[i].vertexBufferMemory, nullptr);
-
-      vkDestroyBuffer(device, m_boundingBoxBufferList[i].indexBuffer, nullptr);
-      vkFreeMemory(device, m_boundingBoxBufferList[i].indexBufferMemory, nullptr);
-    }
-
-    vkDestroyBuffer(device, m_vertiesBuffer, nullptr);
-    vkFreeMemory(device, m_vertiesBufferMemory, nullptr);
-
-    vkDestroyBuffer(device, m_indicesBuffer, nullptr);
-    vkFreeMemory(device, m_indicesBufferMemory, nullptr);
-  }
+ public:
+  void CreateTransformListBuffers(VkDevice device, VkPhysicalDevice physicalDevice);
+  void CreateIndirectDrawBuffers(VkDevice device, VkPhysicalDevice physicalDevice);
+  void CreateObjectIDBuffers(VkDevice device, VkPhysicalDevice physicalDevice);
+  void CreateTextureBuffers(VkDevice device, VkPhysicalDevice physicalDevice);
+  void CreateBoundingBoxBuffers(VkDevice device, VkPhysicalDevice physicalDevice);
+  void CreateRaytracingBuffers(VkDevice device, VkPhysicalDevice physicalDevice);
 };
+
+#define g_BatchManager BatchManager::Get()
 
 static void AddDataToMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::ResourceManager& manager, const Mesh& mesh,
                                bool flag = false) {
@@ -130,86 +122,84 @@ static void AddDataToMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::Res
   size_t totalDataSize = vertexDataSize + indexDataSize;
 
   // 만약 miniBatches가 비어 있으면 하나 생성
-  if (miniBatches.empty()) {
+  if (s_accumulatedVertexSize == 0 && s_accumulatedIndexSize == 0) {
     miniBatches.emplace_back();
   }
+
   MiniBatch* currentBatch = &miniBatches.back();
 
   // Draw Command 생성 및 추가
   VkDrawIndexedIndirectCommand drawCommand{};
   drawCommand.indexCount = mesh.indexCount;
   drawCommand.instanceCount = 1;
-  drawCommand.firstIndex = accumulatedIndexSize / sizeof(uint32_t);
-  drawCommand.vertexOffset = accumulatedVertexSize / sizeof(BasicVertex);  // It's not byte offset, Just Index Offset
-  drawCommand.firstInstance = accumulatedMeshIndex++;
+  drawCommand.firstIndex = s_accumulatedIndexSize / sizeof(uint32_t);
+  drawCommand.vertexOffset = s_accumulatedVertexSize / sizeof(BasicVertex);  // It's not byte offset, Just Index Offset
+  drawCommand.firstInstance = s_accumulatedMeshIndex++;
 
   currentBatch->m_drawIndexedCommands.push_back(drawCommand);
 
   // 누적된 데이터에 현재 메쉬 추가
-  accumulatedVertices.insert(accumulatedVertices.end(), mesh.vertices.begin(), mesh.vertices.end());
-  accumulatedIndices.insert(accumulatedIndices.end(), mesh.indices.begin(), mesh.indices.end());
+  s_accumulatedVertices.insert(s_accumulatedVertices.end(), mesh.vertices.begin(), mesh.vertices.end());
+  s_accumulatedIndices.insert(s_accumulatedIndices.end(), mesh.indices.begin(), mesh.indices.end());
+  std::cout << mesh.indices.size() << std::endl;
 
-  accumulatedVertexSize += vertexDataSize;
-  accumulatedIndexSize += indexDataSize;
+  s_accumulatedVertexSize += vertexDataSize;
+  s_accumulatedIndexSize += indexDataSize;
 
   // 누적된 크기가 3MB를 초과하면 새로운 mini-batch 생성 또는 현재까지 아무것도 생성하지 않았을 경우, 마지막에 생성
-  if (accumulatedVertexSize + accumulatedIndexSize > MAX_BATCH_SIZE || flag) {
+  if (s_accumulatedVertexSize + s_accumulatedIndexSize > MAX_BATCH_SIZE || flag) {
     // 새로운 mini-batch 생성
-    manager.CreateVertexBuffer(accumulatedVertexSize, &currentBatch->m_vertexBufferMemory, &currentBatch->m_vertexBuffer,
-                               accumulatedVertices.data());
-    manager.CreateIndexBuffer(accumulatedIndexSize, &currentBatch->m_indexBufferMemory, &currentBatch->m_indexBuffer,
-                              accumulatedIndices.data());
+    manager.CreateVertexBuffer(s_accumulatedVertexSize, &currentBatch->m_vertexBufferMemory, &currentBatch->m_vertexBuffer,
+                               s_accumulatedVertices.data());
+    manager.CreateIndexBuffer(s_accumulatedIndexSize, &currentBatch->m_indexBufferMemory, &currentBatch->m_indexBuffer,
+                              s_accumulatedIndices.data());
 
-    currentBatch->m_currentVertexOffset = accumulatedVertexSize;
-    currentBatch->m_currentIndexOffset = accumulatedIndexSize;
-    currentBatch->m_currentBatchSize = accumulatedVertexSize + accumulatedIndexSize;
+    currentBatch->m_currentVertexOffset = s_accumulatedVertexSize;
+    currentBatch->m_currentIndexOffset = s_accumulatedIndexSize;
+    currentBatch->m_currentBatchSize = s_accumulatedVertexSize + s_accumulatedIndexSize;
 
-    currentBatch->m_indirectCommandsOffset = accumulatedIndirectOffset;
-    accumulatedIndirectOffset +=
+    currentBatch->m_indirectCommandsOffset = s_accumulatedIndirectOffset;
+    s_accumulatedIndirectOffset +=
         static_cast<uint64_t>(currentBatch->m_drawIndexedCommands.size() * sizeof(VkDrawIndexedIndirectCommand));
 
     std::cout << "New mini-batch created with size: " << currentBatch->m_currentBatchSize << " bytes." << std::endl;
 
-    miniBatches.emplace_back();
-
     // 누적된 데이터 초기화
-    accumulatedVertices.clear();
-    accumulatedIndices.clear();
-    accumulatedVertexSize = 0;
-    accumulatedIndexSize = 0;
-    accumulatedMeshIndex = 0;
+    s_accumulatedVertices.clear();
+    s_accumulatedIndices.clear();
+    s_accumulatedVertexSize = 0;
+    s_accumulatedIndexSize = 0;
+    s_accumulatedMeshIndex = 0;
 
   } else {
-    std::cout << "Accumulating mesh data. Current accumulated size: " << accumulatedVertexSize + accumulatedIndexSize << " bytes."
+    std::cout << "Accumulating mesh data. Current accumulated size: " << s_accumulatedVertexSize + s_accumulatedIndexSize << " bytes."
               << std::endl;
   }
 }
 
 static void FlushMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::ResourceManager& manager) {
-  if (accumulatedVertexSize == 0 && accumulatedIndexSize == 0) return;
+  if (s_accumulatedVertexSize == 0 && s_accumulatedIndexSize == 0) return;
 
   MiniBatch* currentBatch = &miniBatches.back();
 
-  manager.CreateVertexBuffer(accumulatedVertexSize, &currentBatch->m_vertexBufferMemory, &currentBatch->m_vertexBuffer,
-                             accumulatedVertices.data());
-  manager.CreateIndexBuffer(accumulatedIndexSize, &currentBatch->m_indexBufferMemory, &currentBatch->m_indexBuffer,
-                            accumulatedIndices.data());
+  manager.CreateVertexBuffer(s_accumulatedVertexSize, &currentBatch->m_vertexBufferMemory, &currentBatch->m_vertexBuffer,
+                             s_accumulatedVertices.data());
+  manager.CreateIndexBuffer(s_accumulatedIndexSize, &currentBatch->m_indexBufferMemory, &currentBatch->m_indexBuffer,
+                            s_accumulatedIndices.data());
 
-  currentBatch->m_currentVertexOffset = accumulatedVertexSize;
-  currentBatch->m_currentIndexOffset = accumulatedIndexSize;
-  currentBatch->m_currentBatchSize = accumulatedVertexSize + accumulatedIndexSize;
+  currentBatch->m_currentVertexOffset = s_accumulatedVertexSize;
+  currentBatch->m_currentIndexOffset = s_accumulatedIndexSize;
+  currentBatch->m_currentBatchSize = s_accumulatedVertexSize + s_accumulatedIndexSize;
 
-  currentBatch->m_indirectCommandsOffset = accumulatedIndirectOffset;
+  currentBatch->m_indirectCommandsOffset = s_accumulatedIndirectOffset;
 
   std::cout << "Flushed mini-batch with size: " << currentBatch->m_currentBatchSize << " bytes." << std::endl;
-
+  std::cout << "Flushed mini-batch with fefefe: " << currentBatch->m_indirectCommandsOffset << " bytes." << std::endl;
 
   // 누적된 데이터 초기화
-  accumulatedVertices.clear();
-  accumulatedIndices.clear();
-  accumulatedVertexSize = 0;
-  accumulatedIndexSize = 0;
-  accumulatedMeshIndex = 0;
+  s_accumulatedVertices.clear();
+  s_accumulatedIndices.clear();
+  s_accumulatedVertexSize = 0;
+  s_accumulatedIndexSize = 0;
+  s_accumulatedMeshIndex = 0;
 }
-
-#define g_BatchManager BatchManager::Get()

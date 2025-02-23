@@ -2,6 +2,7 @@
 
 #include "BoundingBox.h"
 #include "Rendering/Components.h"
+#include "Rendering/Image.h"
 #include "Rendering/Mesh.h"
 #include "Rendering/VulkanRenderer.h"
 #include "Singleton.h"
@@ -9,6 +10,11 @@
 #include "VkUtils/ResourceManager.h"
 
 static entt::registry g_Registry;
+
+// future 결과 수집 후, 기존 로직(Entt entity 생성, MiniBatch 등록 등)
+static uint64_t totalVertexOffset = 0;
+static uint64_t totalIndexOffset = 0;
+static int totalDiffuseOffset = 0;
 
 static bool loadObjModel(VkDevice device, const std::string& filepath, const std::string& objName, std::vector<Mesh>& outMeshes,
                          float scale = 1.0f) {
@@ -65,7 +71,7 @@ static bool loadObjModel(VkDevice device, const std::string& filepath, const std
     futures.push_back(std::move(future));
   }
 
-  size_t initObjectIDSize = g_BatchManager.m_meshIDList.size();
+  size_t initObjectIDSize = g_BatchManager.m_objectIDList.size();
   for (int i = 0; i < futures.size(); ++i) {
     auto& f = futures[i];
 
@@ -78,7 +84,7 @@ static bool loadObjModel(VkDevice device, const std::string& filepath, const std
     entt::entity object = g_Registry.create();
     ObjectID _id;
     _id.materialID = partial.materialID;
-    g_BatchManager.m_meshIDList.push_back(_id);
+    g_BatchManager.m_objectIDList.push_back(_id);
     g_Registry.emplace<ObjectID>(object, _id);
 
     Transform _transfrom = {};
@@ -101,18 +107,12 @@ static bool loadObjModel(VkDevice device, const std::string& filepath, const std
       std::string texturePath = filepath + mat.diffuse_texname;
       std::replace(texturePath.begin(), texturePath.end(), '\\', '/');
 
-      VkImage _image;
-      VkDeviceMemory _imageMemory;
-      VkDeviceSize _imageSize;
-      VkImageView _imageView;
+      GpuImage _image;
 
-      g_ResourceManager.CreateTexture(texturePath, &_imageMemory, &_image, &_imageSize);
-      VkUtils::CreateImageView(device, _image, &_imageView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+      g_ResourceManager.CreateTexture(texturePath, &_image.memory, &_image.image, &_image.size);
+      VkUtils::CreateImageView(device, _image.image, &_image.imageView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 
-      g_BatchManager.m_diffuseImageList.push_back(_image);
-      g_BatchManager.m_diffuseImageViewList.push_back(_imageView);
-      g_BatchManager.m_diffuseImageListMemory.push_back(_imageMemory);
-      g_BatchManager.m_diffuseImageListSize.push_back(_imageSize);
+      g_BatchManager.m_diffuseImages.push_back(_image);
     }
   }
 
@@ -394,35 +394,24 @@ static bool loadGltfModel(VkDevice device, const std::string& filepath, const st
     }
   }
 
-  // future 결과 수집 후, 기존 로직(Entt entity 생성, MiniBatch 등록 등)
 
-  uint64_t totalVertexOffset = 0;
-  uint64_t totalIndexOffset = 0;
-
-  size_t initObjectIDSize = g_BatchManager.m_meshIDList.size();
+  totalDiffuseOffset = g_BatchManager.m_diffuseImages.size();
+  
   for (auto& f : futures) {
     Mesh partial = f.get();
 
     partial.vertexCount = static_cast<uint32_t>(partial.ray_vertices.size());
     partial.indexCount = static_cast<uint32_t>(partial.indices.size());
 
-    // **현재까지 누적된 Vertex/Index 개수를 Offset으로 저장**
-    partial.vertexOffset = static_cast<uint64_t>(totalVertexOffset * sizeof(RayTracingVertex));
-    partial.indexOffset = static_cast<uint64_t>(totalIndexOffset * sizeof(uint32_t));
-
-    // **다음 Mesh의 Offset을 위해 현재 Mesh의 크기만큼 추가**
-    totalVertexOffset += (uint64_t)partial.vertexCount;
-    totalIndexOffset += (uint64_t)partial.indexCount;
-
     // 리소스 매니저를 통해 실제 버퍼 생성(업로드) 등
-    AddDataToMiniBatch(g_BatchManager.m_miniBatchList, g_ResourceManager, partial);
+    g_BatchManager.AddDataToMiniBatch(g_BatchManager.m_miniBatchList, g_ResourceManager, partial);
 
     // 엔티티 생성 및 등록
     entt::entity object = g_Registry.create();
 
     ObjectID _id;
-    _id.materialID = partial.materialID;
-    g_BatchManager.m_meshIDList.push_back(_id);
+    _id.materialID = partial.materialID + totalDiffuseOffset;
+    g_BatchManager.m_objectIDList.push_back(_id);
     g_Registry.emplace<ObjectID>(object, _id);
 
     Transform _transform = {};
@@ -471,24 +460,18 @@ static bool loadGltfModel(VkDevice device, const std::string& filepath, const st
             texturePath = filepath + texturePath;
           }
 
-          VkImage _image;
-          VkDeviceMemory _imageMemory;
-          VkDeviceSize _imageSize;
-          VkImageView _imageView;
+          GpuImage _image;
 
-          g_ResourceManager.CreateTexture(texturePath, &_imageMemory, &_image, &_imageSize);
-          VkUtils::CreateImageView(device, _image, &_imageView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+          g_ResourceManager.CreateTexture(texturePath, &_image.memory, &_image.image, &_image.size);
+          VkUtils::CreateImageView(device, _image.image, &_image.imageView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 
-          g_BatchManager.m_diffuseImageList.push_back(_image);
-          g_BatchManager.m_diffuseImageViewList.push_back(_imageView);
-          g_BatchManager.m_diffuseImageListMemory.push_back(_imageMemory);
-          g_BatchManager.m_diffuseImageListSize.push_back(_imageSize);
+          g_BatchManager.m_diffuseImages.push_back(_image);
         }
       }
     }
   }
 
-  std::cout << "mesh count: " << g_BatchManager.m_meshIDList.size() << std::endl;
+  std::cout << "mesh count: " << g_BatchManager.m_objectIDList.size() << std::endl;
   return true;
 }
 
@@ -682,7 +665,7 @@ static bool loadSeqGltfModel(VkDevice device, const std::string& filepath, const
       entt::entity object = g_Registry.create();
       ObjectID _id;
       _id.materialID = data.materialID;
-      g_BatchManager.m_meshIDList.push_back(_id);
+      g_BatchManager.m_objectIDList.push_back(_id);
       g_Registry.emplace<ObjectID>(object, _id);
 
       Transform _transform = {};
@@ -728,23 +711,17 @@ static bool loadSeqGltfModel(VkDevice device, const std::string& filepath, const
             texturePath = filepath + texturePath;
           }
 
-          VkImage _image;
-          VkDeviceMemory _imageMemory;
-          VkDeviceSize _imageSize;
-          VkImageView _imageView;
+          GpuImage _image;
 
-          g_ResourceManager.CreateTexture(texturePath, &_imageMemory, &_image, &_imageSize);
-          VkUtils::CreateImageView(device, _image, &_imageView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+          g_ResourceManager.CreateTexture(texturePath, &_image.memory, &_image.image, &_image.size);
+          VkUtils::CreateImageView(device, _image.image, &_image.imageView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 
-          g_BatchManager.m_diffuseImageList.push_back(_image);
-          g_BatchManager.m_diffuseImageViewList.push_back(_imageView);
-          g_BatchManager.m_diffuseImageListMemory.push_back(_imageMemory);
-          g_BatchManager.m_diffuseImageListSize.push_back(_imageSize);
+          g_BatchManager.m_diffuseImages.push_back(_image);
         }
       }
     }
   }
 
-  std::cout << "mesh count: " << g_BatchManager.m_meshIDList.size() << std::endl;
+  std::cout << "mesh count: " << g_BatchManager.m_objectIDList.size() << std::endl;
   return true;
 }

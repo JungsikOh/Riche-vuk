@@ -78,6 +78,9 @@
     <ClCompile Include="Rendering\IRenderPass.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="Rendering\BatchSystem.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="VkUtils\DescriptorBuilder.h">
@@ -180,6 +183,12 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="VkUtils\ResourceManager.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Rendering\Buffer.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Rendering\Image.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

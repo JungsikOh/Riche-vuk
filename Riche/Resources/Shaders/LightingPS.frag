@@ -14,6 +14,10 @@ layout(location = 1) in vec3 inNormalWS;
 layout(location = 2) in vec2 inFragTexcoord;
 layout(location = 3) flat in int inIndex;
 
+layout(set = 1, binding = 3) buffer readonly SSBO_TextureID
+{
+	ObjectID handle[];													// SSBO
+}ssbo_TextureID;
 
 layout(set = 2, binding = 0) uniform sampler linearWrapSS;
 layout(set = 2, binding = 1) uniform sampler linearClampSS;
@@ -21,13 +25,7 @@ layout(set = 2, binding = 2) uniform sampler linearBorderSS;
 layout(set = 2, binding = 3) uniform sampler pointWrapSS;
 layout(set = 2, binding = 4) uniform sampler pointClampSS;
 
-layout(set = 3, binding = 0) buffer readonly SSBO_TextureID
-{
-	ObjectID handle[];													// SSBO
-}ssbo_TextureID;
-layout(set = 4, binding = 0) uniform texture2D u_DiffuseTextureList[];	// Bindless Textures
-layout(set = 5, binding = 0) uniform texture2D u_ShadowTexture;
-
+layout(set = 3, binding = 0) uniform texture2D u_DiffuseTextureList[];	// Bindless Textures
 
 layout(location = 0) out vec4  outColour;	// Final output colour (must also have location)
 

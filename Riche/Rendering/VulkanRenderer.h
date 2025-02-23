@@ -1,31 +1,31 @@
 #pragma once
+
 #include "BatchSystem.h"
 #include "Components.h"
-#include "Editor/Editor.h"
+#include "Core.h"
 #include "Mesh.h"
 #include "RenderSetting.h"
 #include "Swapchain.h"
-#include "VkUtils/DescriptorBuilder.h"
+#include "Utils/ModelLoader.h"
+#include "Utils/StringUtil.h"
+#include "VkUtils/ChooseFunc.h"
 #include "VkUtils/DescriptorManager.h"
 #include "VkUtils/QueueFamilyIndices.h"
 #include "VkUtils/ResourceManager.h"
+#include "VkUtils/ShaderModule.h"
 
-#define VK_BIND_SET_MVP_COMPUTE(commandBuffer, pipelineLayout, baseBinding)                                    \
-  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, baseBinding, 1,       \
-                          &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL"), 0, nullptr);           \
-  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, (baseBinding) + 1, 1, \
-                          &g_DescriptorManager.GetVkDescriptorSet("Transform_ALL"), 0, nullptr)
+#define VK_BIND_SET_MVP_COMPUTE(commandBuffer, pipelineLayout, baseBinding)                              \
+  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, baseBinding, 1, \
+                          &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL"), 0, nullptr);
 
-#define VK_BIND_SET_MVP_GRAPHICS(commandBuffer, pipelineLayout, baseBinding)                                 \
-  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, baseBinding, 1,       \
-                          &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL"), 0, nullptr);           \
-  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, (baseBinding) + 1, 1, \
-                          &g_DescriptorManager.GetVkDescriptorSet("Transform_ALL"), 0, nullptr)
+#define VK_BIND_SET_MVP_GRAPHICS(commandBuffer, pipelineLayout, baseBinding)                              \
+  vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, baseBinding, 1, \
+                          &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL"), 0, nullptr);
 
 static const int OBJECT_COUNT = 1000;
 
 class Camera;
-class Mesh;
+class Editor;
 class CullingRenderPass;
 class BasicLightingPass;
 
@@ -102,7 +102,7 @@ class VulkanRenderer {
 
   // - Rendering Pipelines
   std::shared_ptr<CullingRenderPass> m_pCullingRenderPass;
-  std::shared_ptr<BasicLightingPass> m_pLightingRenderPass; 
+  std::shared_ptr<BasicLightingPass> m_pLightingRenderPass;
 
   entt::registry m_registry;
 
@@ -139,7 +139,7 @@ class VulkanRenderer {
   void CreateRenderPass();
   void CreateOffScreenRenderPass();
   void CreateOffScrrenDescriptorSet();
-  void CreatePipeline();
+  void CreatePipelines();
 
   void CreatePushConstantRange();
 

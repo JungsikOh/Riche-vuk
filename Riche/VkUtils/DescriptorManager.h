@@ -30,6 +30,7 @@ class DescriptorManager : public Singleton<DescriptorManager> {
   void Cleanup(VkDevice device);
 
   DescriptorHandle AddDescriptorSet(DescriptorBuilder* builder, std::string const& name, bool isBindless = false);
+  void UpdateDescriptorSet(DescriptorBuilder* builder, VkDescriptorSet set);
   VkDescriptorSet& GetVkDescriptorSet(DescriptorHandle handle);
   VkDescriptorSet& GetVkDescriptorSet(std::string const& name);
 

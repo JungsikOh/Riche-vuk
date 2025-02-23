@@ -1,20 +1,9 @@
 #include "VulkanRenderer.h"
 
-#include <random>
-
 #include "BasicLightingPass.h"
 #include "Camera.h"
-#include "Core.h"
 #include "CullingRenderPass.h"
-#include "Mesh.h"
-#include "Utils/ModelLoader.h"
-#include "Utils/StringUtil.h"
-#include "Utils/ThreadPool.h"
-#include "VkUtils/ChooseFunc.h"
-#include "VkUtils/DescriptorBuilder.h"
-#include "VkUtils/DescriptorManager.h"
-#include "VkUtils/ResourceManager.h"
-#include "VkUtils/ShaderModule.h"
+#include "Editor/Editor.h"
 
 namespace {
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
@@ -55,35 +44,41 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
     g_ThreadPool.Initialize(std::thread::hardware_concurrency() - 1);
     g_DescriptorAllocator.Initialize(mainDevice.logicalDevice);
     g_DescriptorLayoutCache.Initialize(mainDevice.logicalDevice);
-    g_ResourceManager.Initialize(mainDevice.logicalDevice, mainDevice.physicalDevice, m_transferQueue, m_computeQueue, m_queueFamilyIndices);
+    g_ResourceManager.Initialize(mainDevice.logicalDevice, mainDevice.physicalDevice, m_transferQueue, m_computeQueue,
+                                 m_queueFamilyIndices);
+
+    m_pEditor = std::make_shared<Editor>();
+    m_pEditor->Initialize(window, instance, mainDevice.logicalDevice, mainDevice.physicalDevice, m_queueFamilyIndices, m_graphicsQueue,
+                          m_camera);
 
     std::vector<Mesh>& outMeshes = g_BatchManager.m_meshes;
     loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f);
-    FlushMiniBatch(g_BatchManager.m_miniBatchList, g_ResourceManager);
+    g_BatchManager.FlushMiniBatch(g_BatchManager.m_miniBatchList, g_ResourceManager);
 
-    uint32_t globalVertexOffset = 0;
     int rayCount = 0, count = 0;
     for (Mesh& mesh : outMeshes) {
       for (RayTracingVertex& vertex : mesh.ray_vertices) {
         g_BatchManager.m_allMeshVertices.push_back(vertex);
       }
       for (uint32_t& index : mesh.indices) {
-        g_BatchManager.m_allMeshIndices.push_back(index + globalVertexOffset);
+        g_BatchManager.m_allMeshIndices.push_back(index);
       }
+      mesh.vertexOffset = g_BatchManager.m_accmulatedVertexOffset;
+      mesh.indexOffset = g_BatchManager.m_accmulatedIndexOffset; 
+      g_BatchManager.m_accmulatedVertexOffset += mesh.ray_vertices.size() * sizeof(RayTracingVertex);
+      g_BatchManager.m_accmulatedIndexOffset += mesh.indices.size() * sizeof(uint32_t);
       rayCount += mesh.ray_vertices.size();
       count += mesh.vertices.size();
-      //globalVertexOffset += static_cast<uint32_t>(mesh.vertices.size());
     }
+
+    // 물체가 추가되면, 여기에 함수가 추가되는 것과 같은 효과를 보이게 하고 싶어
 
     std::cout << "Ray : " << rayCount << " Non : " << count << std::endl;
 
+    g_BatchManager.CreateBatchManagerBuffers(mainDevice.logicalDevice, mainDevice.physicalDevice);
+    g_BatchManager.CreateDescriptorSets(mainDevice.logicalDevice, mainDevice.physicalDevice);
+
     CreateBuffers();
-
-
-    /// Editor Pipeline
-    m_pEditor = std::make_shared<Editor>();
-    m_pEditor->Initialize(window, instance, mainDevice.logicalDevice, mainDevice.physicalDevice, m_queueFamilyIndices, m_graphicsQueue,
-                          m_camera);
 
     /// Culling Pipeline
     m_pCullingRenderPass = std::make_shared<CullingRenderPass>();
@@ -93,11 +88,13 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
     m_pLightingRenderPass->Initialize(mainDevice.logicalDevice, mainDevice.physicalDevice, m_graphicsQueue, m_graphicsCommandPool,
                                       m_camera, m_pEditor.get(), swapChainExtent.width, swapChainExtent.height);
 
+    m_pEditor->SetPass(m_pLightingRenderPass.get());
+
     /// OffScreen Pipeline
     CreateRenderPass();
     CreateSwapchainFrameBuffers();
     CreateOffScrrenDescriptorSet();
-    CreatePipeline();
+    CreatePipelines();
 
   } catch (const std::runtime_error& e) {
     printf("ERROR: %s\n", e.what());
@@ -109,6 +106,8 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
 
 void VulkanRenderer::Update() {
   void* pData = nullptr;
+
+  g_BatchManager.Update(mainDevice.logicalDevice);
 
   m_camera->Update();
 
@@ -723,7 +722,7 @@ void VulkanRenderer::CreateCameraBuffers() {
   g_DescriptorManager.AddDescriptorSet(&vpBuilder, "ViewProjection_ALL");
 }
 
-void VulkanRenderer::CreatePipeline() {
+void VulkanRenderer::CreatePipelines() {
   // Create Second Pass Pipeline
   // Second pass shaders
   auto vertexShaderCode = VkUtils::ReadFile("Resources/Shaders/RenderingQuadVS.spv");
@@ -834,9 +833,8 @@ void VulkanRenderer::CreatePipeline() {
   colourBlendingCreateInfo.pAttachments = &colourState;
 
   std::vector<VkDescriptorSetLayout> setLayouts = {g_DescriptorManager.GetVkDescriptorSetLayout("SamplerList_ALL"),
-                                                     g_DescriptorManager.GetVkDescriptorSetLayout("OffScreenInput"),
-                                                     g_DescriptorManager.GetVkDescriptorSetLayout("ShadowTexture_ALL")
-  };
+                                                   g_DescriptorManager.GetVkDescriptorSetLayout("OffScreenInput"),
+                                                   g_DescriptorManager.GetVkDescriptorSetLayout("ShadowTexture_ALL")};
 
   // -- PIPELINE LAYOUT (It's like Root signature in D3D12) --
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
@@ -980,7 +978,6 @@ void VulkanRenderer::FillOffScreenCommands(uint32_t currentImage) {
                           &g_DescriptorManager.GetVkDescriptorSet("OffScreenInput"), 0, nullptr);
   vkCmdBindDescriptorSets(m_swapchainCommandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_offScreenPipelineLayout, 2, 1,
                           &g_DescriptorManager.GetVkDescriptorSet("ShadowTexture_ALL"), 0, nullptr);
-
 
   vkCmdDraw(m_swapchainCommandBuffers[currentImage], 3, 1, 0, 0);
 

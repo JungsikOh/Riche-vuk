@@ -73,11 +73,11 @@ class IRenderPass {
 
  private:
   // - Rendering Pipeline
-  virtual void CreateFramebuffer() = 0;
+  virtual void CreateFramebuffers() = 0;
   virtual void CreateRenderPass() = 0;
 
-  virtual void CreatePipeline() = 0;
-  virtual void CreatePipelineLayout() = 0;
+  virtual void CreatePipelines() = 0;
+  virtual void CreatePipelineLayouts() = 0;
   virtual void CreateBuffers() = 0;
 
   virtual void CreateCommandBuffers() = 0;

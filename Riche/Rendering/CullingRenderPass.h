@@ -2,7 +2,18 @@
 
 #include "BatchSystem.h"
 #include "Components.h"
+#include "Editor/Editor.h"
 #include "IRenderPass.h"
+#include "Mesh.h"
+#include "Utils/BoundingBox.h"
+#include "Utils/ModelLoader.h"
+#include "VkUtils/ChooseFunc.h"
+#include "VkUtils/DescriptorBuilder.h"
+#include "VkUtils/DescriptorManager.h"
+#include "VkUtils/QueueFamilyIndices.h"
+#include "VkUtils/ResourceManager.h"
+#include "VkUtils/ShaderModule.h"
+#include "VulkanRenderer.h"
 
 const static int HIZ_MIP_LEVEL = 3;
 
@@ -12,10 +23,9 @@ class CullingRenderPass : public IRenderPass {
   CullingRenderPass() = default;
   CullingRenderPass(VkDevice device, VkPhysicalDevice physicalDevice);
   ~CullingRenderPass() = default;
-  
+
   virtual void Initialize(VkDevice device, VkPhysicalDevice physicalDevice, VkQueue queue, VkCommandPool commandPool, Camera* camera,
-                          Editor* editor,
-                          const uint32_t width, const uint32_t height);
+                          Editor* editor, const uint32_t width, const uint32_t height);
   virtual void Cleanup();
 
   virtual void Update();
@@ -30,15 +40,14 @@ class CullingRenderPass : public IRenderPass {
   virtual void CreateRenderPass();
   void CreateDepthRenderPass();
 
-  virtual void CreateFramebuffer();
+  virtual void CreateFramebuffers();
   void CreateDepthFramebuffer();
 
-  virtual void CreatePipelineLayout();
-  virtual void CreatePipeline();
+  virtual void CreatePipelineLayouts();
+  virtual void CreatePipelines();
   void CreateDepthGraphicsPipeline();
   void CraeteViewCullingComputePipeline();
   void CreateOcclusionCullingComputePipeline();
-
 
   virtual void CreateBuffers();
   void CreateShaderStorageBuffers();
@@ -50,6 +59,9 @@ class CullingRenderPass : public IRenderPass {
   void CreateSemaphores();
   virtual void CreateCommandBuffers();
   virtual void RecordCommands();
+  void RecordViewCullingCommands();
+  void RecordOnlyDepthCommands();
+  void RecordOcclusionCullingCommands();
 
  private:
   // - Main Objects
@@ -72,14 +84,14 @@ class CullingRenderPass : public IRenderPass {
   // -- Only Depth Rendering Pipeline
   VkRenderPass m_depthRenderPass;
 
-  VkPipeline m_depthGraphicePipeline;   // Use a same GraphicsPipelineLayout
+  VkPipeline m_depthGraphicePipeline;  // Use a same GraphicsPipelineLayout
   VkPipelineLayout m_graphicsPipelineLayout;
 
   VkImage m_onlyDepthBufferImage;
   VkDeviceMemory m_onlyDepthBufferImageMemory;
   std::vector<VkImageView> m_onlyDepthBufferImageViews;
 
-  std::vector<VkFramebuffer> m_depthFramebuffers;       // mipmap 喊肺 积己.
+  std::vector<VkFramebuffer> m_depthFramebuffers;  // mipmap 喊肺 积己.
 
   // -- Compute Pipeline
   VkPipeline m_viewCullingComputePipeline;

@@ -1,17 +1,5 @@
 #include "CullingRenderPass.h"
-
 #include "Camera.h"
-#include "Editor/Editor.h"
-#include "Mesh.h"
-#include "Utils/BoundingBox.h"
-#include "Utils/ModelLoader.h"
-#include "VkUtils/ChooseFunc.h"
-#include "VkUtils/DescriptorBuilder.h"
-#include "VkUtils/DescriptorManager.h"
-#include "VkUtils/QueueFamilyIndices.h"
-#include "VkUtils/ResourceManager.h"
-#include "VkUtils/ShaderModule.h"
-#include "VulkanRenderer.h"
 
 CullingRenderPass::CullingRenderPass(VkDevice device, VkPhysicalDevice physicalDevice) {}
 
@@ -28,17 +16,22 @@ void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDev
 
   m_pGraphicsCommandPool = commandPool;
 
+  /*
+   * Create Resources
+   */
   CreateRenderPass();
-
-  CreateFramebuffer();
-
+  CreateFramebuffers();
   CreateBuffers();
+
   CreateDesrciptorSets();
   CreatePushConstantRange();
 
-  CreatePipelineLayout();
-  CreatePipeline();
+  CreatePipelineLayouts();
+  CreatePipelines();
 
+  /*
+   * Synchronization + Command Buffer
+   */
   CreateSemaphores();
   CreateCommandBuffers();
 }
@@ -80,38 +73,48 @@ void CullingRenderPass::Cleanup() {
 
 void CullingRenderPass::Update() {
   void* pData = nullptr;
-  vkMapMemory(m_pDevice, g_BatchManager.m_trasformListBufferMemory, 0, g_BatchManager.m_transformListSize, 0,
-              &pData);
-  memcpy(pData, g_BatchManager.m_trasformList.data(), g_BatchManager.m_transformListSize);
-  vkUnmapMemory(m_pDevice, g_BatchManager.m_trasformListBufferMemory);
+  // 1. Update Transform List Buffer
+  {
+    vkMapMemory(m_pDevice, g_BatchManager.m_transformListBuffer.memory, 0, g_BatchManager.m_transformListBuffer.size, 0, &pData);
+    memcpy(pData, g_BatchManager.m_trasformList.data(), g_BatchManager.m_transformListBuffer.size);
+    vkUnmapMemory(m_pDevice, g_BatchManager.m_transformListBuffer.memory);
+  }
+  // 2. Update BoundingBox
+  {
+    VkDeviceSize aabbBufferSize = sizeof(AABB) * g_BatchManager.m_boundingBoxList.size();
+    vkMapMemory(m_pDevice, g_BatchManager.m_boundingBoxListBuffer.memory, 0, aabbBufferSize, 0, &pData);
+    memcpy(pData, g_BatchManager.m_boundingBoxList.data(), aabbBufferSize);
+    vkUnmapMemory(m_pDevice, g_BatchManager.m_boundingBoxListBuffer.memory);
+  }
+  // 3. Update Camera frustum
+  {
+    std::array<FrustumPlane, 6> cameraFrustumPlanes = CalculateFrustumPlanes(m_pCamera->ViewProj());
+    VkDeviceSize cameraPlaneSize = sizeof(FrustumPlane) * cameraFrustumPlanes.size();
+    vkMapMemory(m_pDevice, m_cameraFrustumBufferMemory, 0, cameraPlaneSize, 0, &pData);
+    memcpy(pData, cameraFrustumPlanes.data(), cameraPlaneSize);
+    vkUnmapMemory(m_pDevice, m_cameraFrustumBufferMemory);
+  }
 
-  VkDeviceSize aabbBufferSize = sizeof(AABB) * g_BatchManager.m_boundingBoxList.size();
-  vkMapMemory(m_pDevice, g_BatchManager.m_boundingBoxListBufferMemory, 0, aabbBufferSize, 0, &pData);
-  memcpy(pData, g_BatchManager.m_boundingBoxList.data(), aabbBufferSize);
-  vkUnmapMemory(m_pDevice, g_BatchManager.m_boundingBoxListBufferMemory);
-
-  std::array<FrustumPlane, 6> cameraFrustumPlanes = CalculateFrustumPlanes(m_pCamera->ViewProj());
-  VkDeviceSize cameraPlaneSize = sizeof(FrustumPlane) * cameraFrustumPlanes.size();
-  vkMapMemory(m_pDevice, m_cameraFrustumBufferMemory, 0, cameraPlaneSize, 0, &pData);
-  memcpy(pData, cameraFrustumPlanes.data(), cameraPlaneSize);
-  vkUnmapMemory(m_pDevice, m_cameraFrustumBufferMemory);
-
-  ///////////
-  // Debug
-  ///////////
+  /*
+   * Debug
+   */
 
   // Number of Rendering Object
   void* mappedMemory = nullptr;
-  vkMapMemory(m_pDevice, g_BatchManager.m_indirectDrawBufferMemory, 0, g_BatchManager.m_indirectDrawCommandSize, 0, &mappedMemory);
-  VkDrawIndexedIndirectCommand* drawCommands = reinterpret_cast<VkDrawIndexedIndirectCommand*>(mappedMemory);
-  uint32_t commandCount = g_BatchManager.m_indirectDrawCommandSize / sizeof(VkDrawIndexedIndirectCommand);
-  std::vector<VkDrawIndexedIndirectCommand> commandVector(drawCommands, drawCommands + commandCount);
-  uint32_t instantCount = 0;
-  for (int i = 0; i < commandVector.size(); ++i) {
-    instantCount += commandVector[i].instanceCount == 0 ? 0 : 1;
+  {
+    vkMapMemory(m_pDevice, g_BatchManager.m_indirectDrawCommandBuffer.memory, 0, g_BatchManager.m_indirectDrawCommandBuffer.size, 0,
+                &mappedMemory);
+    VkDrawIndexedIndirectCommand* drawCommands = reinterpret_cast<VkDrawIndexedIndirectCommand*>(mappedMemory);
+    uint64_t commandCount =
+        static_cast<uint64_t>(g_BatchManager.m_indirectDrawCommandBuffer.size / sizeof(VkDrawIndexedIndirectCommand));
+    std::vector<VkDrawIndexedIndirectCommand> commandVector(drawCommands, drawCommands + commandCount);
+    uint64_t instantCount = 0;
+    for (int i = 0; i < commandVector.size(); ++i) {
+      instantCount += commandVector[i].instanceCount == 0 ? 0 : 1;
+    }
+    g_RenderSetting.afterViewCullingRenderingNum = instantCount;
+    vkUnmapMemory(m_pDevice, g_BatchManager.m_indirectDrawCommandBuffer.memory);
   }
-  g_RenderSetting.afterViewCullingRenderingNum = instantCount;
-  vkUnmapMemory(m_pDevice, g_BatchManager.m_indirectDrawBufferMemory);
 }
 
 void CullingRenderPass::Draw(VkSemaphore renderAvailable) {
@@ -206,7 +209,7 @@ void CullingRenderPass::CreateDepthRenderPass() {
   VK_CHECK(vkCreateRenderPass(m_pDevice, &renderPassCreateInfo, nullptr, &m_depthRenderPass));
 }
 
-void CullingRenderPass::CreateFramebuffer() { CreateDepthFramebuffer(); }
+void CullingRenderPass::CreateFramebuffers() { CreateDepthFramebuffer(); }
 
 void CullingRenderPass::CreateDepthFramebuffer() {
   VkFormat depthImageFormat = VkUtils::ChooseSupportedFormat(m_pPhyscialDevice, {VK_FORMAT_D32_SFLOAT}, VK_IMAGE_TILING_OPTIMAL,
@@ -241,58 +244,64 @@ void CullingRenderPass::CreateDepthFramebuffer() {
                            VK_IMAGE_ASPECT_DEPTH_BIT, 0, HIZ_MIP_LEVEL);
 }
 
-void CullingRenderPass::CreatePipelineLayout() {
+void CullingRenderPass::CreatePipelineLayouts() {
   // -- PIPELINE LAYOUT (It's like Root signature in D3D12) --
 
   // Graphics Pipeline
-  std::array<VkDescriptorSetLayout, 2> setGraphicsLayouts = {
-      g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL"),
-      g_DescriptorManager.GetVkDescriptorSetLayout("Transform_ALL"),
-  };
+  {
+    std::array<VkDescriptorSetLayout, 2> setGraphicsLayouts = {
+        g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL"),
+        g_DescriptorManager.GetVkDescriptorSetLayout("BATCH_ALL"),
+    };
 
-  VkPipelineLayoutCreateInfo grahpicsPipelineLayoutCreateInfo = {};
-  grahpicsPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  grahpicsPipelineLayoutCreateInfo.setLayoutCount = setGraphicsLayouts.size();
-  grahpicsPipelineLayoutCreateInfo.pSetLayouts = setGraphicsLayouts.data();
-  grahpicsPipelineLayoutCreateInfo.pushConstantRangeCount = 1;
-  grahpicsPipelineLayoutCreateInfo.pPushConstantRanges = &m_debugPushConstant;
+    VkPipelineLayoutCreateInfo grahpicsPipelineLayoutCreateInfo = {};
+    grahpicsPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    grahpicsPipelineLayoutCreateInfo.setLayoutCount = setGraphicsLayouts.size();
+    grahpicsPipelineLayoutCreateInfo.pSetLayouts = setGraphicsLayouts.data();
+    grahpicsPipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+    grahpicsPipelineLayoutCreateInfo.pPushConstantRanges = &m_debugPushConstant;
 
-  VK_CHECK(vkCreatePipelineLayout(m_pDevice, &grahpicsPipelineLayoutCreateInfo, nullptr, &m_graphicsPipelineLayout));
-
+    VK_CHECK(vkCreatePipelineLayout(m_pDevice, &grahpicsPipelineLayoutCreateInfo, nullptr, &m_graphicsPipelineLayout));
+  }
   // Hi-z Occlusion Culling
-  std::array<VkDescriptorSetLayout, 5> setCullingLayouts = {g_DescriptorManager.GetVkDescriptorSetLayout("SamplerList_ALL"),
-                                                            g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL"),
-                                                            g_DescriptorManager.GetVkDescriptorSetLayout("Transform_ALL"),
-                                                            g_DescriptorManager.GetVkDescriptorSetLayout("ViewFrustumCulling_COMPUTE"),
-                                                            g_DescriptorManager.GetVkDescriptorSetLayout("DepthOnlyImage")};
+  {
+    std::array<VkDescriptorSetLayout, 5> setCullingLayouts = {
+        g_DescriptorManager.GetVkDescriptorSetLayout("SamplerList_ALL"),
+        g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL"),
+        g_DescriptorManager.GetVkDescriptorSetLayout("BATCH_ALL"),
+        g_DescriptorManager.GetVkDescriptorSetLayout("ViewFrustumCulling_COMPUTE"),
+        g_DescriptorManager.GetVkDescriptorSetLayout("DepthOnlyImage")};
 
-  VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
-  pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  pipelineLayoutInfo.setLayoutCount = setCullingLayouts.size();
-  pipelineLayoutInfo.pSetLayouts = setCullingLayouts.data();
-  pipelineLayoutInfo.pushConstantRangeCount = 1;
-  pipelineLayoutInfo.pPushConstantRanges = &m_debugPushConstant;
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = setCullingLayouts.size();
+    pipelineLayoutInfo.pSetLayouts = setCullingLayouts.data();
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &m_debugPushConstant;
 
-  VK_CHECK(vkCreatePipelineLayout(m_pDevice, &pipelineLayoutInfo, nullptr, &m_occlusionCullingComputePipelineLayout));
-
-  std::array<VkDescriptorSetLayout, 3> setViewCullingLayouts = {
-      g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL"),
-      g_DescriptorManager.GetVkDescriptorSetLayout("Transform_ALL"),
-      g_DescriptorManager.GetVkDescriptorSetLayout("ViewFrustumCulling_COMPUTE"),
-  };
+    VK_CHECK(vkCreatePipelineLayout(m_pDevice, &pipelineLayoutInfo, nullptr, &m_occlusionCullingComputePipelineLayout));
+  }
 
   // View Frustum culling
-  pipelineLayoutInfo = {};
-  pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  pipelineLayoutInfo.setLayoutCount = setViewCullingLayouts.size();
-  pipelineLayoutInfo.pSetLayouts = setViewCullingLayouts.data();
-  pipelineLayoutInfo.pushConstantRangeCount = 1;
-  pipelineLayoutInfo.pPushConstantRanges = &m_debugPushConstant;
+  {
+    std::array<VkDescriptorSetLayout, 3> setViewCullingLayouts = {
+        g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL"),
+        g_DescriptorManager.GetVkDescriptorSetLayout("BATCH_ALL"),
+        g_DescriptorManager.GetVkDescriptorSetLayout("ViewFrustumCulling_COMPUTE"),
+    };
 
-  VK_CHECK(vkCreatePipelineLayout(m_pDevice, &pipelineLayoutInfo, nullptr, &m_viewCullingComputePipelineLayout));
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = setViewCullingLayouts.size();
+    pipelineLayoutInfo.pSetLayouts = setViewCullingLayouts.data();
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &m_debugPushConstant;
+
+    VK_CHECK(vkCreatePipelineLayout(m_pDevice, &pipelineLayoutInfo, nullptr, &m_viewCullingComputePipelineLayout));
+  }
 }
 
-void CullingRenderPass::CreatePipeline() {
+void CullingRenderPass::CreatePipelines() {
   CreateDepthGraphicsPipeline();
   CraeteViewCullingComputePipeline();
   CreateOcclusionCullingComputePipeline();
@@ -513,53 +522,6 @@ void CullingRenderPass::CreateBuffers() {
 void CullingRenderPass::CreateShaderStorageBuffers() {
   void* pData = nullptr;
 
-  // Transform
-  VkDeviceSize transformBufferSize = static_cast<uint64_t>(g_BatchManager.m_trasformList.size() * sizeof(Transform));
-  g_BatchManager.m_transformListSize = transformBufferSize;
-  VkUtils::CreateBuffer(m_pDevice, m_pPhyscialDevice, transformBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                        &g_BatchManager.m_trasformListBuffer, &g_BatchManager.m_trasformListBufferMemory);
-
-  vkMapMemory(m_pDevice, g_BatchManager.m_trasformListBufferMemory, 0, transformBufferSize, 0, &pData);
-  memcpy(pData, g_BatchManager.m_trasformList.data(), transformBufferSize);
-  vkUnmapMemory(m_pDevice, g_BatchManager.m_trasformListBufferMemory);
-
-  VkDescriptorBufferInfo transformUBOInfo = {};
-  transformUBOInfo.buffer = g_BatchManager.m_trasformListBuffer;  // Buffer to get data from
-  transformUBOInfo.offset = 0;                                    // Position of start of data
-  transformUBOInfo.range = transformBufferSize;                   // size of data
-
-  VkUtils::DescriptorBuilder transformBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
-  transformBuilder.BindBuffer(0, &transformUBOInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL, false);
-
-  g_DescriptorManager.AddDescriptorSet(&transformBuilder, "Transform_ALL", false);
-
-  VkDeviceSize indirectBufferSize = 0;
-  std::vector<VkDrawIndexedIndirectCommand> flattenCommands;
-  for (int i = 0; i < g_BatchManager.m_miniBatchList.size(); ++i) {
-    indirectBufferSize += sizeof(VkDrawIndexedIndirectCommand) * g_BatchManager.m_miniBatchList[i].m_drawIndexedCommands.size();
-    flattenCommands.insert(flattenCommands.end(), g_BatchManager.m_miniBatchList[i].m_drawIndexedCommands.begin(),
-                           g_BatchManager.m_miniBatchList[i].m_drawIndexedCommands.end());
-  }
-  VkUtils::CreateBuffer(m_pDevice, m_pPhyscialDevice, indirectBufferSize,
-                        VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                        &g_BatchManager.m_indirectDrawBuffer, &g_BatchManager.m_indirectDrawBufferMemory);
-
-  vkMapMemory(m_pDevice, g_BatchManager.m_indirectDrawBufferMemory, 0, indirectBufferSize, 0, &pData);
-  memcpy(pData, flattenCommands.data(), indirectBufferSize);
-  vkUnmapMemory(m_pDevice, g_BatchManager.m_indirectDrawBufferMemory);
-  g_BatchManager.m_indirectDrawCommandSize = indirectBufferSize;
-
-  VkDeviceSize aabbBufferSize = sizeof(AABB) * g_BatchManager.m_boundingBoxList.size();
-  VkUtils::CreateBuffer(m_pDevice, m_pPhyscialDevice, aabbBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                        &g_BatchManager.m_boundingBoxListBuffer, &g_BatchManager.m_boundingBoxListBufferMemory);
-
-  vkMapMemory(m_pDevice, g_BatchManager.m_boundingBoxListBufferMemory, 0, aabbBufferSize, 0, &pData);
-  memcpy(pData, g_BatchManager.m_boundingBoxList.data(), aabbBufferSize);
-  vkUnmapMemory(m_pDevice, g_BatchManager.m_boundingBoxListBufferMemory);
-
   std::array<FrustumPlane, 6> cameraFrustumPlanes = CalculateFrustumPlanes(m_pCamera->ViewProj());
   VkDeviceSize cameraPlaneSize = sizeof(FrustumPlane) * cameraFrustumPlanes.size();
   VkUtils::CreateBuffer(m_pDevice, m_pPhyscialDevice, cameraPlaneSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
@@ -570,25 +532,13 @@ void CullingRenderPass::CreateShaderStorageBuffers() {
   memcpy(pData, cameraFrustumPlanes.data(), cameraPlaneSize);
   vkUnmapMemory(m_pDevice, m_cameraFrustumBufferMemory);
 
-  VkDescriptorBufferInfo indirectBufferInfo = {};
-  indirectBufferInfo.buffer = g_BatchManager.m_indirectDrawBuffer;  // Buffer to get data from
-  indirectBufferInfo.offset = 0;                                    // Position of start of data
-  indirectBufferInfo.range = indirectBufferSize;                    // size of data
-
-  VkDescriptorBufferInfo aabbIndirectInfo = {};
-  aabbIndirectInfo.buffer = g_BatchManager.m_boundingBoxListBuffer;  // Buffer to get data from
-  aabbIndirectInfo.offset = 0;                                       // Position of start of data
-  aabbIndirectInfo.range = aabbBufferSize;                           // size of data
-
   VkDescriptorBufferInfo cameraBoundingBoxInfo = {};
   cameraBoundingBoxInfo.buffer = m_cameraFrustumBuffer;  // Buffer to get data from
   cameraBoundingBoxInfo.offset = 0;                      // Position of start of data
   cameraBoundingBoxInfo.range = cameraPlaneSize;         // size of data
 
-  VkUtils::DescriptorBuilder indirect = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
-  indirect.BindBuffer(0, &indirectBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-      .BindBuffer(1, &aabbIndirectInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
-      .BindBuffer(2, &cameraBoundingBoxInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
+  VkUtils::DescriptorBuilder culling = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
+  culling.BindBuffer(0, &cameraBoundingBoxInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 
 #ifdef _DEBUG  // NDEBUG is C++ standard Macro.
   VkDeviceSize fLODListSize = sizeof(float) * g_BatchManager.m_boundingBoxList.size();
@@ -601,10 +551,10 @@ void CullingRenderPass::CreateShaderStorageBuffers() {
   fLODListBufferInfo.offset = 0;                 // Position of start of data
   fLODListBufferInfo.range = fLODListSize;       // size of data
 
-  indirect.BindBuffer(3, &fLODListBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
+  culling.BindBuffer(1, &fLODListBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
 #endif
 
-  g_DescriptorManager.AddDescriptorSet(&indirect, "ViewFrustumCulling_COMPUTE");
+  g_DescriptorManager.AddDescriptorSet(&culling, "ViewFrustumCulling_COMPUTE");
 }
 
 void CullingRenderPass::CreateUniformBuffers() {}
@@ -672,17 +622,9 @@ void CullingRenderPass::RecordCommands() {
                                                                          // submitted and is awaiting executi
 
   // Start recording commands to command buffer!
-  VkResult result = vkBeginCommandBuffer(m_commandBuffer, &bufferBeginInfo);
-  if (result != VK_SUCCESS) {
-    throw std::runtime_error("Failed to start recording a Command Buffer!");
-  }
+  VK_CHECK(vkBeginCommandBuffer(m_commandBuffer, &bufferBeginInfo));
 
-  vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipeline);
-  VK_BIND_SET_MVP_COMPUTE(m_commandBuffer, m_viewCullingComputePipelineLayout, 0);
-  vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 2, 1,
-                          &g_DescriptorManager.GetVkDescriptorSet("ViewFrustumCulling_COMPUTE"), 0, nullptr);
-
-  vkCmdDispatch(m_commandBuffer, 1000, 1, 1);
+  RecordViewCullingCommands();
 
   // Information about how to begin a render pass (only needed for graphical applications)
   VkRenderPassBeginInfo depthOnlyRenderPassBeginInfo = {};
@@ -702,34 +644,8 @@ void CullingRenderPass::RecordCommands() {
   vkCmdBeginRenderPass(m_commandBuffer, &depthOnlyRenderPassBeginInfo,
                        VK_SUBPASS_CONTENTS_INLINE);  // 렌더 패스의 내용을 직접 명령 버퍼에 기록하는 것을 의미
 
-  // Bind Pipeline to be used in render pass
-  vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_depthGraphicePipeline);
+  RecordOnlyDepthCommands();
 
-  //
-  // mini-batch system
-  //
-  g_ShaderSetting.batchIdx = 0;
-  for (auto& miniBatch : g_BatchManager.m_miniBatchList) {
-    // Bind the vertex buffer with the correct offset
-    VkDeviceSize vertexOffset = 0;  // Always bind at offset 0 since indirect commands handle offsets
-    vkCmdBindVertexBuffers(m_commandBuffer, 0, 1, &miniBatch.m_vertexBuffer, &vertexOffset);
-
-    // Bind the index buffer with the correct offset
-    vkCmdBindIndexBuffer(m_commandBuffer, miniBatch.m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-    VK_BIND_SET_MVP_GRAPHICS(m_commandBuffer, m_graphicsPipelineLayout, 0);
-
-    vkCmdPushConstants(m_commandBuffer, m_graphicsPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting), &g_ShaderSetting);
-
-    uint32_t drawCount = static_cast<uint32_t>(miniBatch.m_drawIndexedCommands.size());
-    vkCmdDrawIndexedIndirect(m_commandBuffer, g_BatchManager.m_indirectDrawBuffer,
-                             miniBatch.m_indirectCommandsOffset,   // offset
-                             drawCount,                            // drawCount
-                             sizeof(VkDrawIndexedIndirectCommand)  // stride
-    );
-
-    g_ShaderSetting.batchIdx += miniBatch.m_drawIndexedCommands.size();
-  }
   vkCmdEndRenderPass(m_commandBuffer);
 
   if (g_RenderSetting.isOcclusionCulling) {
@@ -838,23 +754,73 @@ void CullingRenderPass::RecordCommands() {
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,  // 또는 필요한 셰이더 스테이지
                          0, 0, nullptr, 0, nullptr, 1, &finalBarrier);
 
-    //
-    // Hi-Z Occlusion Culling
-    //
-    vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipeline);
-    vkCmdPushConstants(m_commandBuffer, m_occlusionCullingComputePipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting),
-                       &g_ShaderSetting);
-
-    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 0, 1,
-                            &g_DescriptorManager.GetVkDescriptorSet("SamplerList_ALL"), 0, nullptr);
-    VK_BIND_SET_MVP_COMPUTE(m_commandBuffer, m_occlusionCullingComputePipelineLayout, 1);
-    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 3, 1,
-                            &g_DescriptorManager.GetVkDescriptorSet("ViewFrustumCulling_COMPUTE"), 0, nullptr);
-    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 4, 1,
-                            &g_DescriptorManager.GetVkDescriptorSet("DepthOnlyImage"), 0, nullptr);
-
-    vkCmdDispatch(m_commandBuffer, 1000, 1, 1);
+    RecordOcclusionCullingCommands();
   }
-
   VK_CHECK(vkEndCommandBuffer(m_commandBuffer));
+}
+
+void CullingRenderPass::RecordViewCullingCommands() {
+  vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipeline);
+  VK_BIND_SET_MVP_COMPUTE(m_commandBuffer, m_viewCullingComputePipelineLayout, 0);
+  vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 1, 1,
+                          &g_DescriptorManager.GetVkDescriptorSet("BATCH_ALL"), 0, nullptr);
+  vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 2, 1,
+                          &g_DescriptorManager.GetVkDescriptorSet("ViewFrustumCulling_COMPUTE"), 0, nullptr);
+
+  vkCmdDispatch(m_commandBuffer, m_width / 256, 1, 1);
+}
+
+void CullingRenderPass::RecordOnlyDepthCommands() {
+  // Bind Pipeline to be used in render pass
+  vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_depthGraphicePipeline);
+
+  //
+  // mini-batch system
+  //
+  g_ShaderSetting.batchIdx = 0;
+  for (auto& miniBatch : g_BatchManager.m_miniBatchList) {
+    // Bind the vertex buffer with the correct offset
+    VkDeviceSize vertexOffset = 0;  // Always bind at offset 0 since indirect commands handle offsets
+    vkCmdBindVertexBuffers(m_commandBuffer, 0, 1, &miniBatch.m_vertexBuffer, &vertexOffset);
+
+    // Bind the index buffer with the correct offset
+    vkCmdBindIndexBuffer(m_commandBuffer, miniBatch.m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+    VK_BIND_SET_MVP_GRAPHICS(m_commandBuffer, m_graphicsPipelineLayout, 0);
+    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 1, 1,
+                            &g_DescriptorManager.GetVkDescriptorSet("BATCH_ALL"), 0, nullptr);
+
+
+    vkCmdPushConstants(m_commandBuffer, m_graphicsPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting), &g_ShaderSetting);
+
+    uint32_t drawCount = static_cast<uint32_t>(miniBatch.m_drawIndexedCommands.size());
+    vkCmdDrawIndexedIndirect(m_commandBuffer, g_BatchManager.m_indirectDrawCommandBuffer.buffer,
+                             miniBatch.m_indirectCommandsOffset,   // offset
+                             drawCount,                            // drawCount
+                             sizeof(VkDrawIndexedIndirectCommand)  // stride
+    );
+
+    g_ShaderSetting.batchIdx += miniBatch.m_drawIndexedCommands.size();
+  }
+}
+
+void CullingRenderPass::RecordOcclusionCullingCommands() {
+  //
+  // Hi-Z Occlusion Culling
+  //
+  vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipeline);
+  vkCmdPushConstants(m_commandBuffer, m_occlusionCullingComputePipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting),
+                     &g_ShaderSetting);
+
+  vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 0, 1,
+                          &g_DescriptorManager.GetVkDescriptorSet("SamplerList_ALL"), 0, nullptr);
+  VK_BIND_SET_MVP_COMPUTE(m_commandBuffer, m_occlusionCullingComputePipelineLayout, 1);
+  vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 2, 1,
+                          &g_DescriptorManager.GetVkDescriptorSet("BATCH_ALL"), 0, nullptr);
+  vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 3, 1,
+                          &g_DescriptorManager.GetVkDescriptorSet("ViewFrustumCulling_COMPUTE"), 0, nullptr);
+  vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 4, 1,
+                          &g_DescriptorManager.GetVkDescriptorSet("DepthOnlyImage"), 0, nullptr);
+
+  vkCmdDispatch(m_commandBuffer, m_width / 256, 1, 1);
 }
