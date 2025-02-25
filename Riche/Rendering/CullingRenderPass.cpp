@@ -40,8 +40,10 @@ void CullingRenderPass::Cleanup() {
   vkDestroyBuffer(m_pDevice, m_cameraFrustumBuffer, nullptr);
   vkFreeMemory(m_pDevice, m_cameraFrustumBufferMemory, nullptr);
 
-  vkDestroySemaphore(m_pDevice, m_renderAvailable, nullptr);
-  vkDestroyFence(m_pDevice, m_fence, nullptr);
+  for (int i = 0; i < MAX_FRAME_DRAWS; ++i) {
+    vkDestroySemaphore(m_pDevice, m_renderAvailable[i], nullptr);
+    vkDestroyFence(m_pDevice, m_fence[i], nullptr);
+  }
   vkFreeCommandBuffers(m_pDevice, m_pGraphicsCommandPool, MAX_FRAME_DRAWS, m_commandBuffers.data());
 
   vkDestroyPipelineLayout(m_pDevice, m_graphicsPipelineLayout, nullptr);
@@ -118,8 +120,8 @@ void CullingRenderPass::Update() {
 }
 
 void CullingRenderPass::Draw(uint32_t imageIndex, VkSemaphore renderAvailable) {
-  vkWaitForFences(m_pDevice, 1, &m_fence, VK_TRUE, (std::numeric_limits<uint32_t>::max)());
-  vkResetFences(m_pDevice, 1, &m_fence);
+  vkWaitForFences(m_pDevice, 1, &m_fence[imageIndex], VK_TRUE, (std::numeric_limits<uint32_t>::max)());
+  vkResetFences(m_pDevice, 1, &m_fence[imageIndex]);
 
   RecordCommands(imageIndex);
 
@@ -135,10 +137,10 @@ void CullingRenderPass::Draw(uint32_t imageIndex, VkSemaphore renderAvailable) {
   basicSubmitInfo.commandBufferCount = 1;                  // Number of command buffers to submit
   basicSubmitInfo.pCommandBuffers = &m_commandBuffers[imageIndex];      // Command buffer to submit
   basicSubmitInfo.signalSemaphoreCount = 1;                // Number of semaphores to signal
-  basicSubmitInfo.pSignalSemaphores = &m_renderAvailable;  // Semaphores to signal when command buffer finishes
+  basicSubmitInfo.pSignalSemaphores = &m_renderAvailable[imageIndex];   // Semaphores to signal when command buffer finishes
   // Command buffer가 실행을 완료하면, Signaled 상태가 될 semaphore 배열.
 
-  VK_CHECK(vkQueueSubmit(m_pGraphicsQueue, 1, &basicSubmitInfo, m_fence));
+  VK_CHECK(vkQueueSubmit(m_pGraphicsQueue, 1, &basicSubmitInfo, m_fence[imageIndex]));
 }
 
 void CullingRenderPass::CreateRenderPass() { CreateDepthRenderPass(); }
@@ -580,6 +582,9 @@ void CullingRenderPass::CreatePushConstantRange() {
 }
 
 void CullingRenderPass::CreateSemaphores() {
+  m_fence.resize(MAX_FRAME_DRAWS);
+  m_renderAvailable.resize(MAX_FRAME_DRAWS);
+
   // Semaphore creataion information
   VkSemaphoreCreateInfo semaphoreCreateInfo = {};
   semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -587,8 +592,8 @@ void CullingRenderPass::CreateSemaphores() {
   fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
   fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-  VK_CHECK(vkCreateFence(m_pDevice, &fenceCreateInfo, nullptr, &m_fence));
-  VK_CHECK(vkCreateSemaphore(m_pDevice, &semaphoreCreateInfo, nullptr, &m_renderAvailable));
+  VK_CHECK(vkCreateFence(m_pDevice, &fenceCreateInfo, nullptr, m_fence.data()));
+  VK_CHECK(vkCreateSemaphore(m_pDevice, &semaphoreCreateInfo, nullptr, m_renderAvailable.data()));
 }
 
 void CullingRenderPass::CreateCommandBuffers() {

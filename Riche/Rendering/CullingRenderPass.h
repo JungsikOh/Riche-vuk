@@ -33,7 +33,7 @@ class CullingRenderPass : public IRenderPass {
   virtual void Draw(uint32_t imageIndex, VkSemaphore renderAvailable);
 
   VkImageView& GetFrameBufferImageView() { return m_onlyDepthBufferImageViews[0]; };
-  VkSemaphore& GetSemaphore() { return m_renderAvailable; };
+  VkSemaphore& GetSemaphore(uint32_t imageIndex) { return m_renderAvailable[imageIndex]; };
 
  private:
   // - Rendering Pipeline
@@ -78,8 +78,8 @@ class CullingRenderPass : public IRenderPass {
   VkCommandPool m_pGraphicsCommandPool;
   std::vector<VkCommandBuffer> m_commandBuffers;
 
-  VkSemaphore m_renderAvailable;
-  VkFence m_fence;
+  std::vector<VkSemaphore> m_renderAvailable;
+  std::vector<VkFence> m_fence;
 
   // -- Only Depth Rendering Pipeline
   VkRenderPass m_depthRenderPass;

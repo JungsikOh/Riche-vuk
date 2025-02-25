@@ -142,7 +142,7 @@ void VulkanRenderer::Draw() {
   m_pCullingRenderPass->Draw(imageIndex, imageAvailable[imageIndex]);
 
   m_pLightingRenderPass->Update();
-  m_pLightingRenderPass->Draw(imageIndex, m_pCullingRenderPass->GetSemaphore());
+  m_pLightingRenderPass->Draw(imageIndex, m_pCullingRenderPass->GetSemaphore(imageIndex));
 
   RecordCommands(imageIndex);
 
