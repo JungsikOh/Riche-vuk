@@ -64,7 +64,7 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
         g_BatchManager.m_allMeshIndices.push_back(index);
       }
       mesh.vertexOffset = g_BatchManager.m_accmulatedVertexOffset;
-      mesh.indexOffset = g_BatchManager.m_accmulatedIndexOffset; 
+      mesh.indexOffset = g_BatchManager.m_accmulatedIndexOffset;
       g_BatchManager.m_accmulatedVertexOffset += mesh.ray_vertices.size() * sizeof(RayTracingVertex);
       g_BatchManager.m_accmulatedIndexOffset += mesh.indices.size() * sizeof(uint32_t);
       rayCount += mesh.ray_vertices.size();
@@ -104,7 +104,7 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
   return;
 }
 
-void VulkanRenderer::Update() {
+void VulkanRenderer::Update(uint32_t imageIndex) {
   void* pData = nullptr;
 
   g_BatchManager.Update(mainDevice.logicalDevice);
@@ -118,6 +118,14 @@ void VulkanRenderer::Update() {
   vkMapMemory(mainDevice.logicalDevice, m_viewProjectionUBOMemory, 0, sizeof(ViewProjection), 0, &pData);
   memcpy(pData, &m_viewProjectionCPU, sizeof(ViewProjection));
   vkUnmapMemory(mainDevice.logicalDevice, m_viewProjectionUBOMemory);
+
+  m_viewProjections[imageIndex].view = m_camera->View();
+  m_viewProjections[imageIndex].projection = m_camera->Proj();
+  m_viewProjections[imageIndex].viewInverse = m_camera->InvView();
+  m_viewProjections[imageIndex].projInverse = m_camera->InvProj();
+  vkMapMemory(mainDevice.logicalDevice, m_viewProjectionBuffers[imageIndex].memory, 0, sizeof(ViewProjection), 0, &pData);
+  memcpy(pData, &m_viewProjections[imageIndex], sizeof(ViewProjection));
+  vkUnmapMemory(mainDevice.logicalDevice, m_viewProjectionBuffers[imageIndex].memory);
 
   m_pCullingRenderPass->Update();
   m_pLightingRenderPass->Update();
@@ -138,6 +146,8 @@ void VulkanRenderer::Draw() {
   vkAcquireNextImageKHR(mainDevice.logicalDevice, m_swapchain, (std::numeric_limits<uint32_t>::max)(), imageAvailable[currentFrame],
                         VK_NULL_HANDLE, &imageIndex);
 
+  Update(imageIndex);
+
   m_pCullingRenderPass->Update();
   m_pCullingRenderPass->Draw(imageIndex, imageAvailable[imageIndex]);
 
@@ -152,8 +162,8 @@ void VulkanRenderer::Draw() {
   VkSubmitInfo submitInfo = {};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submitInfo.waitSemaphoreCount = 1;  // Number of semaphores to wait on
-  submitInfo.pWaitSemaphores =
-      &m_pLightingRenderPass->GetSemaphore();  // List of semaphores to wait on, Command buffer가 실행하기전 대기해야하는 semaphores
+  submitInfo.pWaitSemaphores = &m_pLightingRenderPass->GetSemaphore(
+      imageIndex);  // List of semaphores to wait on, Command buffer가 실행하기전 대기해야하는 semaphores
   // 즉, 이 semphore가 signaled 상태가 될 때까지 대기하고, 그 후에 Command buffer를 실행한다.
   VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
   submitInfo.pWaitDstStageMask = waitStages;                            // Stages to check semaphores at
@@ -654,22 +664,23 @@ void VulkanRenderer::CreateOffScreenRenderPass() {
 }
 
 void VulkanRenderer::CreateOffScrrenDescriptorSet() {
-  // CREATE INPUT ATTACHMENT IMAGE DESCRIPTOR SET LAYOUT
-  VkDescriptorImageInfo colourAttachmentDescriptor = {};
-  colourAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-  colourAttachmentDescriptor.imageView = m_pLightingRenderPass->GetFrameBufferImageView();
-  colourAttachmentDescriptor.sampler = VK_NULL_HANDLE;
+  for (uint32_t i = 0; i < MAX_FRAME_DRAWS; ++i) {
+    // CREATE INPUT ATTACHMENT IMAGE DESCRIPTOR SET LAYOUT
+    VkDescriptorImageInfo colourAttachmentDescriptor = {};
+    colourAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    colourAttachmentDescriptor.imageView = m_pLightingRenderPass->GetFrameBufferImageView(i);
+    colourAttachmentDescriptor.sampler = VK_NULL_HANDLE;
 
-  VkDescriptorImageInfo depthAttachmentDescriptor = {};
-  depthAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-  depthAttachmentDescriptor.imageView = m_pLightingRenderPass->GetDepthStencilImageView();
-  depthAttachmentDescriptor.sampler = VK_NULL_HANDLE;
+    VkDescriptorImageInfo depthAttachmentDescriptor = {};
+    depthAttachmentDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    depthAttachmentDescriptor.imageView = m_pLightingRenderPass->GetDepthStencilImageView(i);
+    depthAttachmentDescriptor.sampler = VK_NULL_HANDLE;
 
-  VkUtils::DescriptorBuilder inputOffScreen = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
-  inputOffScreen.BindImage(0, &colourAttachmentDescriptor, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT);
-  // inputOffScreen.BindImage(1, &depthAttachmentDescriptor, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkUtils::DescriptorBuilder inputOffScreen = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
+    inputOffScreen.BindImage(0, &colourAttachmentDescriptor, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-  g_DescriptorManager.AddDescriptorSet(&inputOffScreen, "OffScreenInput");
+    g_DescriptorManager.AddDescriptorSet(&inputOffScreen, "OffScreenInput" + std::to_string(i));
+  }
 }
 
 void VulkanRenderer::CreatePushConstantRange() {
@@ -720,6 +731,26 @@ void VulkanRenderer::CreateCameraBuffers() {
   VkUtils::DescriptorBuilder vpBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
   vpBuilder.BindBuffer(0, &uboViewProjectionBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL);
   g_DescriptorManager.AddDescriptorSet(&vpBuilder, "ViewProjection_ALL");
+
+  m_viewProjections.resize(MAX_FRAME_DRAWS);
+  m_viewProjectionBuffers.resize(MAX_FRAME_DRAWS);
+  for (int i = 0; i < MAX_FRAME_DRAWS; ++i) {
+    VkDeviceSize vpBufferSize = sizeof(ViewProjection);
+    VkUtils::CreateBuffer(mainDevice.logicalDevice, mainDevice.physicalDevice, vpBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                          &m_viewProjectionBuffers[i].buffer, &m_viewProjectionBuffers[i].memory);
+
+    // VIEW PROJECTION DESCRIPTOR
+    // Buffer Info and data offset info
+    VkDescriptorBufferInfo uboViewProjectionBufferInfo = {};
+    uboViewProjectionBufferInfo.buffer = m_viewProjectionBuffers[i].buffer;  // Buffer to get data from
+    uboViewProjectionBufferInfo.offset = 0;                                  // Position of start of data
+    uboViewProjectionBufferInfo.range = sizeof(ViewProjection);              // size of data
+
+    VkUtils::DescriptorBuilder vpBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
+    vpBuilder.BindBuffer(0, &uboViewProjectionBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL);
+    g_DescriptorManager.AddDescriptorSet(&vpBuilder, "ViewProjection_ALL" + std::to_string(i));
+  }
 }
 
 void VulkanRenderer::CreatePipelines() {
@@ -833,8 +864,8 @@ void VulkanRenderer::CreatePipelines() {
   colourBlendingCreateInfo.pAttachments = &colourState;
 
   std::vector<VkDescriptorSetLayout> setLayouts = {g_DescriptorManager.GetVkDescriptorSetLayout("SamplerList_ALL"),
-                                                   g_DescriptorManager.GetVkDescriptorSetLayout("OffScreenInput"),
-                                                   g_DescriptorManager.GetVkDescriptorSetLayout("ShadowTexture_ALL")};
+                                                   g_DescriptorManager.GetVkDescriptorSetLayout("OffScreenInput0"),
+                                                   g_DescriptorManager.GetVkDescriptorSetLayout("ShadowTexture_ALL0")};
 
   // -- PIPELINE LAYOUT (It's like Root signature in D3D12) --
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
@@ -975,9 +1006,9 @@ void VulkanRenderer::FillOffScreenCommands(uint32_t currentImage) {
   vkCmdBindDescriptorSets(m_swapchainCommandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_offScreenPipelineLayout, 0, 1,
                           &g_DescriptorManager.GetVkDescriptorSet("SamplerList_ALL"), 0, nullptr);
   vkCmdBindDescriptorSets(m_swapchainCommandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_offScreenPipelineLayout, 1, 1,
-                          &g_DescriptorManager.GetVkDescriptorSet("OffScreenInput"), 0, nullptr);
+                          &g_DescriptorManager.GetVkDescriptorSet("OffScreenInput" + std::to_string(currentImage)), 0, nullptr);
   vkCmdBindDescriptorSets(m_swapchainCommandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_offScreenPipelineLayout, 2, 1,
-                          &g_DescriptorManager.GetVkDescriptorSet("ShadowTexture_ALL"), 0, nullptr);
+                          &g_DescriptorManager.GetVkDescriptorSet("ShadowTexture_ALL" + std::to_string(currentImage)), 0, nullptr);
 
   vkCmdDraw(m_swapchainCommandBuffers[currentImage], 3, 1, 0, 0);
 

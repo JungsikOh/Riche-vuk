@@ -36,7 +36,7 @@ class VulkanRenderer {
 
   void Initialize(GLFWwindow* newWindow, Camera* newcamera);
 
-  void Update();
+  void Update(uint32_t imageIndex);
 
   void Draw();
   void Cleanup();
@@ -95,10 +95,9 @@ class VulkanRenderer {
   VkPipeline m_offScreenPipeline;
   VkPipelineLayout m_offScreenPipelineLayout;
 
-  // Camera Buffer
-  ViewProjection m_viewProjectionCPU;
-  VkBuffer m_viewProjectionUBO;
-  VkDeviceMemory m_viewProjectionUBOMemory;
+  // Camera Buffers
+  std::vector<ViewProjection> m_viewProjections;
+  std::vector<GpuBuffer> m_viewProjectionBuffers;
 
   // - Rendering Pipelines
   std::shared_ptr<CullingRenderPass> m_pCullingRenderPass;

@@ -6,8 +6,8 @@
 #include "Mesh.h"
 #include "Utils/Boundingbox.h"
 #include "Utils/Singleton.h"
-#include "VkUtils/DescriptorManager.h"
 #include "VkUtils/DescriptorBuilder.h"
+#include "VkUtils/DescriptorManager.h"
 #include "VkUtils/ResourceManager.h"
 
 static const uint32_t MAX_BATCH_SIZE = 3 * 1024 * 1024;  // 3MB

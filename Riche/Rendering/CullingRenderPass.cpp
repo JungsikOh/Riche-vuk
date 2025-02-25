@@ -1,4 +1,5 @@
 #include "CullingRenderPass.h"
+
 #include "Camera.h"
 
 CullingRenderPass::CullingRenderPass(VkDevice device, VkPhysicalDevice physicalDevice) {}
@@ -75,20 +76,7 @@ void CullingRenderPass::Cleanup() {
 
 void CullingRenderPass::Update() {
   void* pData = nullptr;
-  // 1. Update Transform List Buffer
-  {
-    vkMapMemory(m_pDevice, g_BatchManager.m_transformListBuffer.memory, 0, g_BatchManager.m_transformListBuffer.size, 0, &pData);
-    memcpy(pData, g_BatchManager.m_trasformList.data(), g_BatchManager.m_transformListBuffer.size);
-    vkUnmapMemory(m_pDevice, g_BatchManager.m_transformListBuffer.memory);
-  }
-  // 2. Update BoundingBox
-  {
-    VkDeviceSize aabbBufferSize = sizeof(AABB) * g_BatchManager.m_boundingBoxList.size();
-    vkMapMemory(m_pDevice, g_BatchManager.m_boundingBoxListBuffer.memory, 0, aabbBufferSize, 0, &pData);
-    memcpy(pData, g_BatchManager.m_boundingBoxList.data(), aabbBufferSize);
-    vkUnmapMemory(m_pDevice, g_BatchManager.m_boundingBoxListBuffer.memory);
-  }
-  // 3. Update Camera frustum
+  // Update Camera frustum
   {
     std::array<FrustumPlane, 6> cameraFrustumPlanes = CalculateFrustumPlanes(m_pCamera->ViewProj());
     VkDeviceSize cameraPlaneSize = sizeof(FrustumPlane) * cameraFrustumPlanes.size();
@@ -133,11 +121,11 @@ void CullingRenderPass::Draw(uint32_t imageIndex, VkSemaphore renderAvailable) {
 
   VkPipelineStageFlags basicWaitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
                                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT};
-  basicSubmitInfo.pWaitDstStageMask = basicWaitStages;     // Stages to check semaphores at
-  basicSubmitInfo.commandBufferCount = 1;                  // Number of command buffers to submit
-  basicSubmitInfo.pCommandBuffers = &m_commandBuffers[imageIndex];      // Command buffer to submit
-  basicSubmitInfo.signalSemaphoreCount = 1;                // Number of semaphores to signal
-  basicSubmitInfo.pSignalSemaphores = &m_renderAvailable[imageIndex];   // Semaphores to signal when command buffer finishes
+  basicSubmitInfo.pWaitDstStageMask = basicWaitStages;                 // Stages to check semaphores at
+  basicSubmitInfo.commandBufferCount = 1;                              // Number of command buffers to submit
+  basicSubmitInfo.pCommandBuffers = &m_commandBuffers[imageIndex];     // Command buffer to submit
+  basicSubmitInfo.signalSemaphoreCount = 1;                            // Number of semaphores to signal
+  basicSubmitInfo.pSignalSemaphores = &m_renderAvailable[imageIndex];  // Semaphores to signal when command buffer finishes
   // Command buffer가 실행을 완료하면, Signaled 상태가 될 semaphore 배열.
 
   VK_CHECK(vkQueueSubmit(m_pGraphicsQueue, 1, &basicSubmitInfo, m_fence[imageIndex]));
@@ -252,7 +240,7 @@ void CullingRenderPass::CreatePipelineLayouts() {
   // Graphics Pipeline
   {
     std::array<VkDescriptorSetLayout, 2> setGraphicsLayouts = {
-        g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL"),
+        g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL0"),
         g_DescriptorManager.GetVkDescriptorSetLayout("BATCH_ALL"),
     };
 
@@ -269,8 +257,7 @@ void CullingRenderPass::CreatePipelineLayouts() {
   {
     std::array<VkDescriptorSetLayout, 5> setCullingLayouts = {
         g_DescriptorManager.GetVkDescriptorSetLayout("SamplerList_ALL"),
-        g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL"),
-        g_DescriptorManager.GetVkDescriptorSetLayout("BATCH_ALL"),
+        g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL0"), g_DescriptorManager.GetVkDescriptorSetLayout("BATCH_ALL"),
         g_DescriptorManager.GetVkDescriptorSetLayout("ViewFrustumCulling_COMPUTE"),
         g_DescriptorManager.GetVkDescriptorSetLayout("DepthOnlyImage")};
 
@@ -287,7 +274,7 @@ void CullingRenderPass::CreatePipelineLayouts() {
   // View Frustum culling
   {
     std::array<VkDescriptorSetLayout, 3> setViewCullingLayouts = {
-        g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL"),
+        g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL0"),
         g_DescriptorManager.GetVkDescriptorSetLayout("BATCH_ALL"),
         g_DescriptorManager.GetVkDescriptorSetLayout("ViewFrustumCulling_COMPUTE"),
     };
@@ -592,8 +579,10 @@ void CullingRenderPass::CreateSemaphores() {
   fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
   fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-  VK_CHECK(vkCreateFence(m_pDevice, &fenceCreateInfo, nullptr, m_fence.data()));
-  VK_CHECK(vkCreateSemaphore(m_pDevice, &semaphoreCreateInfo, nullptr, m_renderAvailable.data()));
+  for (int i = 0; i < MAX_FRAME_DRAWS; ++i) {
+    VK_CHECK(vkCreateFence(m_pDevice, &fenceCreateInfo, nullptr, &m_fence[i]));
+    VK_CHECK(vkCreateSemaphore(m_pDevice, &semaphoreCreateInfo, nullptr, &m_renderAvailable[i]));
+  }
 }
 
 void CullingRenderPass::CreateCommandBuffers() {
@@ -672,8 +661,7 @@ void CullingRenderPass::RecordCommands(uint32_t currentImage) {
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 
     vkCmdPipelineBarrier(m_commandBuffers[currentImage], VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
-                         0, nullptr, 0,
-                         nullptr, 1, &barrier);
+                         0, nullptr, 0, nullptr, 1, &barrier);
 
     // 8.3. Blit to generate Mip Levels
     for (uint32_t i = 1; i < HIZ_MIP_LEVEL; ++i) {
@@ -716,13 +704,11 @@ void CullingRenderPass::RecordCommands(uint32_t currentImage) {
       dstBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
       vkCmdPipelineBarrier(m_commandBuffers[currentImage], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
-                           nullptr, 0, nullptr,
-                           1, &dstBarrier);
+                           nullptr, 0, nullptr, 1, &dstBarrier);
 
       // Perform the blit
       vkCmdBlitImage(m_commandBuffers[currentImage], m_onlyDepthBufferImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                     m_onlyDepthBufferImage,
-                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_NEAREST);
+                     m_onlyDepthBufferImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_NEAREST);
 
       // Transition destination Mip Level to TRANSFER_SRC_OPTIMAL for next Blit
       VkImageMemoryBarrier srcBarrier = {};
@@ -741,8 +727,7 @@ void CullingRenderPass::RecordCommands(uint32_t currentImage) {
       srcBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 
       vkCmdPipelineBarrier(m_commandBuffers[currentImage], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
-                           nullptr, 0, nullptr,
-                           1, &srcBarrier);
+                           nullptr, 0, nullptr, 1, &srcBarrier);
     }
 
     // 8.4. Transition all Mip Levels to SHADER_READ_ONLY_OPTIMAL
@@ -772,7 +757,8 @@ void CullingRenderPass::RecordCommands(uint32_t currentImage) {
 
 void CullingRenderPass::RecordViewCullingCommands(uint32_t currentImage) {
   vkCmdBindPipeline(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipeline);
-  VK_BIND_SET_MVP_COMPUTE(m_commandBuffers[currentImage], m_viewCullingComputePipelineLayout, 0);
+  vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 0, 1,
+                          &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL" + std::to_string(currentImage)), 0, nullptr);
   vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 1, 1,
                           &g_DescriptorManager.GetVkDescriptorSet("BATCH_ALL"), 0, nullptr);
   vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 2, 1,
@@ -797,10 +783,10 @@ void CullingRenderPass::RecordOnlyDepthCommands(uint32_t currentImage) {
     // Bind the index buffer with the correct offset
     vkCmdBindIndexBuffer(m_commandBuffers[currentImage], miniBatch.m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-    VK_BIND_SET_MVP_GRAPHICS(m_commandBuffers[currentImage], m_graphicsPipelineLayout, 0);
+    vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 0, 1,
+                            &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL" + std::to_string(currentImage)), 0, nullptr);
     vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 1, 1,
                             &g_DescriptorManager.GetVkDescriptorSet("BATCH_ALL"), 0, nullptr);
-
 
     vkCmdPushConstants(m_commandBuffers[currentImage], m_graphicsPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting),
                        &g_ShaderSetting);
@@ -822,22 +808,18 @@ void CullingRenderPass::RecordOcclusionCullingCommands(uint32_t currentImage) {
   //
   vkCmdBindPipeline(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipeline);
   vkCmdPushConstants(m_commandBuffers[currentImage], m_occlusionCullingComputePipelineLayout, VK_SHADER_STAGE_ALL, 0,
-                     sizeof(ShaderSetting),
-                     &g_ShaderSetting);
+                     sizeof(ShaderSetting), &g_ShaderSetting);
 
   vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 0,
-                          1,
-                          &g_DescriptorManager.GetVkDescriptorSet("SamplerList_ALL"), 0, nullptr);
-  VK_BIND_SET_MVP_COMPUTE(m_commandBuffers[currentImage], m_occlusionCullingComputePipelineLayout, 1);
+                          1, &g_DescriptorManager.GetVkDescriptorSet("SamplerList_ALL"), 0, nullptr);
+  vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 1,
+                          1, &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL" + std::to_string(currentImage)), 0, nullptr);
   vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 2,
-                          1,
-                          &g_DescriptorManager.GetVkDescriptorSet("BATCH_ALL"), 0, nullptr);
+                          1, &g_DescriptorManager.GetVkDescriptorSet("BATCH_ALL"), 0, nullptr);
   vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 3,
-                          1,
-                          &g_DescriptorManager.GetVkDescriptorSet("ViewFrustumCulling_COMPUTE"), 0, nullptr);
+                          1, &g_DescriptorManager.GetVkDescriptorSet("ViewFrustumCulling_COMPUTE"), 0, nullptr);
   vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 4,
-                          1,
-                          &g_DescriptorManager.GetVkDescriptorSet("DepthOnlyImage"), 0, nullptr);
+                          1, &g_DescriptorManager.GetVkDescriptorSet("DepthOnlyImage"), 0, nullptr);
 
   vkCmdDispatch(m_commandBuffers[currentImage], m_width / 256, 1, 1);
 }

@@ -40,14 +40,6 @@ void BasicLightingPass::Initialize(VkDevice device, VkPhysicalDevice physicalDev
 }
 
 void BasicLightingPass::Cleanup() {
-  vkDestroyImageView(m_pDevice, m_colourBufferImageView, nullptr);
-  vkDestroyImage(m_pDevice, m_colourBufferImage, nullptr);
-  vkFreeMemory(m_pDevice, m_colourBufferImageMemory, nullptr);
-
-  vkDestroyImageView(m_pDevice, m_depthStencilBufferImageView, nullptr);
-  vkDestroyImage(m_pDevice, m_depthStencilBufferImage, nullptr);
-  vkFreeMemory(m_pDevice, m_depthStencilBufferImageMemory, nullptr);
-
   vkDestroyImageView(m_pDevice, m_objectIdBufferImageView, nullptr);
   vkDestroyImage(m_pDevice, m_objectIdColourBufferImage, nullptr);
   vkFreeMemory(m_pDevice, m_objectIdBufferImageMemory, nullptr);
@@ -56,12 +48,29 @@ void BasicLightingPass::Cleanup() {
   vkDestroyImage(m_pDevice, m_objectIdDepthStencilBufferImage, nullptr);
   vkFreeMemory(m_pDevice, m_objectIdDepthStencilBufferImageMemory, nullptr);
 
-  vkDestroyFramebuffer(m_pDevice, m_framebuffer, nullptr);
+  for (int i = 0; i < MAX_FRAME_DRAWS; ++i) {
+    vkDestroyFramebuffer(m_pDevice, m_framebuffers[i], nullptr);
+
+    vkDestroyImageView(m_pDevice, m_colourBufferImages[i].imageView, nullptr);
+    vkDestroyImage(m_pDevice, m_colourBufferImages[i].image, nullptr);
+    vkFreeMemory(m_pDevice, m_colourBufferImages[i].memory, nullptr);
+
+    vkDestroyImageView(m_pDevice, m_depthStencilBufferImages[i].imageView, nullptr);
+    vkDestroyImage(m_pDevice, m_depthStencilBufferImages[i].image, nullptr);
+    vkFreeMemory(m_pDevice, m_depthStencilBufferImages[i].memory, nullptr);
+
+    vkDestroyImageView(m_pDevice, m_raytracingImages[i].imageView, nullptr);
+    vkDestroyImage(m_pDevice, m_raytracingImages[i].image, nullptr);
+    vkFreeMemory(m_pDevice, m_raytracingImages[i].memory, nullptr);
+  }
+
   vkDestroyFramebuffer(m_pDevice, m_objectIdFramebuffer, nullptr);
 
-  vkDestroySemaphore(m_pDevice, m_renderAvailable, nullptr);
-  vkDestroyFence(m_pDevice, m_fence, nullptr);
-  vkFreeCommandBuffers(m_pDevice, m_pGraphicsCommandPool, 1, &m_commandBuffer);
+  for (int i = 0; i < MAX_FRAME_DRAWS; ++i) {
+    vkDestroySemaphore(m_pDevice, m_renderAvailable[i], nullptr);
+    vkDestroyFence(m_pDevice, m_fence[i], nullptr);
+  }
+  vkFreeCommandBuffers(m_pDevice, m_pGraphicsCommandPool, MAX_FRAME_DRAWS, m_commandBuffers.data());
 
   vkDestroyPipeline(m_pDevice, m_graphicsPipeline, nullptr);
   vkDestroyPipeline(m_pDevice, m_wireGraphicsPipeline, nullptr);
@@ -94,15 +103,13 @@ void BasicLightingPass::Cleanup() {
   vkDestroyBuffer(m_pDevice, m_scratchBufferTLAS.handle, nullptr);
   vkFreeMemory(m_pDevice, m_scratchBufferTLAS.memory, nullptr);
 
-  vkDestroyImageView(m_pDevice, m_raytracingImageView, nullptr);
-  vkDestroyImage(m_pDevice, m_raytracingImage, nullptr);
-  vkFreeMemory(m_pDevice, m_raytracingImageMemory, nullptr);
-
   vkDestroyPipeline(m_pDevice, m_raytracingPipeline, nullptr);
   vkDestroyPipelineLayout(m_pDevice, m_raytracingPipelineLayout, nullptr);
 
-  vkFreeDescriptorSets(m_pDevice, m_raytracingPool, 1, &m_raytracingSet);
-  vkDestroyDescriptorSetLayout(m_pDevice, m_raytracingSetLayout, nullptr);
+  vkFreeDescriptorSets(m_pDevice, m_raytracingPool, MAX_FRAME_DRAWS, m_raytracingSets.data());
+  for (int i = 0; i < MAX_FRAME_DRAWS; ++i) {
+    vkDestroyDescriptorSetLayout(m_pDevice, m_raytracingSetLayouts[i], nullptr);
+  }
   vkDestroyDescriptorPool(m_pDevice, m_raytracingPool, nullptr);
 }
 
@@ -233,9 +240,7 @@ void BasicLightingPass::RebuildAS() {
   vkDestroyBuffer(m_pDevice, m_scratchBufferTLAS.handle, nullptr);
   vkFreeMemory(m_pDevice, m_scratchBufferTLAS.memory, nullptr);
 
-  // 3) BLAS 생성
-  CreateBLAS();  // 내부에서 g_BatchManager.m_meshes 등 전체 메시를 돌며 Build
-  // 4) TLAS 생성
+  CreateBLAS();
   CreateTLAS();
 
   VkWriteDescriptorSetAccelerationStructureKHR descriptorAccelerationStructureInfo{};
@@ -243,38 +248,41 @@ void BasicLightingPass::RebuildAS() {
   descriptorAccelerationStructureInfo.accelerationStructureCount = 1;
   descriptorAccelerationStructureInfo.pAccelerationStructures = &m_topLevelAS.handle;
 
-  VkWriteDescriptorSet accelerationStructureWrite{};
-  accelerationStructureWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  // The specialized acceleration structure descriptor has to be chained
-  accelerationStructureWrite.pNext = &descriptorAccelerationStructureInfo;
-  accelerationStructureWrite.dstSet = m_raytracingSet;
-  accelerationStructureWrite.dstBinding = 0;
-  accelerationStructureWrite.descriptorCount = 1;
-  accelerationStructureWrite.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+  for (int i = 0; i < MAX_FRAME_DRAWS; ++i) {
+    VkWriteDescriptorSet accelerationStructureWrite{};
+    accelerationStructureWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    // The specialized acceleration structure descriptor has to be chained
+    accelerationStructureWrite.pNext = &descriptorAccelerationStructureInfo;
+    accelerationStructureWrite.dstSet = m_raytracingSets[i];
+    accelerationStructureWrite.dstBinding = 0;
+    accelerationStructureWrite.descriptorCount = 1;
+    accelerationStructureWrite.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
 
-  VkDescriptorImageInfo storageImageDescriptor{VK_NULL_HANDLE, m_raytracingImageView, VK_IMAGE_LAYOUT_GENERAL};
-  VkDescriptorBufferInfo vertexBufferDescriptor{g_BatchManager.m_verticesBuffer.buffer, 0, VK_WHOLE_SIZE};
-  VkDescriptorBufferInfo indexBufferDescriptor{g_BatchManager.m_indicesBuffer.buffer, 0, VK_WHOLE_SIZE};
-  VkDescriptorBufferInfo instanceOffsetBufferDesc{g_BatchManager.m_instanceOffsetBuffer.buffer, 0, VK_WHOLE_SIZE};
+    VkDescriptorImageInfo storageImageDescriptor{VK_NULL_HANDLE, m_raytracingImages[i].imageView, VK_IMAGE_LAYOUT_GENERAL};
+    VkDescriptorBufferInfo vertexBufferDescriptor{g_BatchManager.m_verticesBuffer.buffer, 0, VK_WHOLE_SIZE};
+    VkDescriptorBufferInfo indexBufferDescriptor{g_BatchManager.m_indicesBuffer.buffer, 0, VK_WHOLE_SIZE};
+    VkDescriptorBufferInfo instanceOffsetBufferDesc{g_BatchManager.m_instanceOffsetBuffer.buffer, 0, VK_WHOLE_SIZE};
 
-  std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-      // Binding 0: Top level acceleration structure
-      accelerationStructureWrite,
-      // Binding 1: Ray tracing result image
-      VkUtils::WriteDescriptorSet(m_raytracingSet, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, &storageImageDescriptor),
-      // Binding 3: Scene vertex buffer
-      VkUtils::WriteDescriptorSet(m_raytracingSet, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2, &vertexBufferDescriptor),
-      // Binding 4: Scene index buffer
-      VkUtils::WriteDescriptorSet(m_raytracingSet, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3, &indexBufferDescriptor),
-      // Binding 5 : BLAS offset buffer
-      VkUtils::WriteDescriptorSet(m_raytracingSet, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4, &instanceOffsetBufferDesc),
-  };
-  vkUpdateDescriptorSets(m_pDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, VK_NULL_HANDLE);
+    std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
+        // Binding 0: Top level acceleration structure
+        accelerationStructureWrite,
+        // Binding 1: Ray tracing result image
+        VkUtils::WriteDescriptorSet(m_raytracingSets[i], VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, &storageImageDescriptor),
+        // Binding 3: Scene vertex buffer
+        VkUtils::WriteDescriptorSet(m_raytracingSets[i], VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2, &vertexBufferDescriptor),
+        // Binding 4: Scene index buffer
+        VkUtils::WriteDescriptorSet(m_raytracingSets[i], VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3, &indexBufferDescriptor),
+        // Binding 5 : BLAS offset buffer
+        VkUtils::WriteDescriptorSet(m_raytracingSets[i], VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4, &instanceOffsetBufferDesc),
+    };
+    vkUpdateDescriptorSets(m_pDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0,
+                           VK_NULL_HANDLE);
+  }
 }
 
 void BasicLightingPass::Draw(uint32_t imageIndex, VkSemaphore renderAvailable) {
-  vkWaitForFences(m_pDevice, 1, &m_fence, VK_TRUE, (std::numeric_limits<uint32_t>::max)());
-  vkResetFences(m_pDevice, 1, &m_fence);
+  vkWaitForFences(m_pDevice, 1, &m_fence[imageIndex], VK_TRUE, (std::numeric_limits<uint32_t>::max)());
+  vkResetFences(m_pDevice, 1, &m_fence[imageIndex]);
 
   RecordCommands(imageIndex);
 
@@ -286,14 +294,14 @@ void BasicLightingPass::Draw(uint32_t imageIndex, VkSemaphore renderAvailable) {
 
   VkPipelineStageFlags basicWaitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
                                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT};
-  basicSubmitInfo.pWaitDstStageMask = basicWaitStages;     // Stages to check semaphores at
-  basicSubmitInfo.commandBufferCount = 1;                  // Number of command buffers to submit
-  basicSubmitInfo.pCommandBuffers = &m_commandBuffer;      // Command buffer to submit
-  basicSubmitInfo.signalSemaphoreCount = 1;                // Number of semaphores to signal
-  basicSubmitInfo.pSignalSemaphores = &m_renderAvailable;  // Semaphores to signal when command buffer finishes
+  basicSubmitInfo.pWaitDstStageMask = basicWaitStages;                 // Stages to check semaphores at
+  basicSubmitInfo.commandBufferCount = 1;                              // Number of command buffers to submit
+  basicSubmitInfo.pCommandBuffers = &m_commandBuffers[imageIndex];     // Command buffer to submit
+  basicSubmitInfo.signalSemaphoreCount = 1;                            // Number of semaphores to signal
+  basicSubmitInfo.pSignalSemaphores = &m_renderAvailable[imageIndex];  // Semaphores to signal when command buffer finishes
   // Command buffer가 실행을 완료하면, Signaled 상태가 될 semaphore 배열.
 
-  VK_CHECK(vkQueueSubmit(m_pGraphicsQueue, 1, &basicSubmitInfo, m_fence));
+  VK_CHECK(vkQueueSubmit(m_pGraphicsQueue, 1, &basicSubmitInfo, m_fence[imageIndex]));
 }
 
 void BasicLightingPass::CreateRenderPass() {
@@ -474,37 +482,44 @@ void BasicLightingPass::CreateFramebuffers() {
 }
 
 void BasicLightingPass::CreateLightingFramebuffer() {
+  m_colourBufferImages.resize(MAX_FRAME_DRAWS);
+  m_depthStencilBufferImages.resize(MAX_FRAME_DRAWS);
+  m_framebuffers.resize(MAX_FRAME_DRAWS);
+
   VkFormat colourImageFormat = VkUtils::ChooseSupportedFormat(m_pPhyscialDevice, {VK_FORMAT_R8G8B8A8_UNORM}, VK_IMAGE_TILING_OPTIMAL,
                                                               VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT);
-
-  VkUtils::CreateImage2D(m_pDevice, m_pPhyscialDevice, m_width, m_height, &m_colourBufferImageMemory, &m_colourBufferImage,
-                         colourImageFormat,
-                         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-  VkUtils::CreateImageView(m_pDevice, m_colourBufferImage, &m_colourBufferImageView, colourImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
-
   VkFormat depthImageFormat = VkUtils::ChooseSupportedFormat(
       m_pPhyscialDevice, {VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT}, VK_IMAGE_TILING_OPTIMAL,
       VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-  VkUtils::CreateImage2D(m_pDevice, m_pPhyscialDevice, m_width, m_height, &m_depthStencilBufferImageMemory, &m_depthStencilBufferImage,
-                         depthImageFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-  VkUtils::CreateImageView(m_pDevice, m_depthStencilBufferImage, &m_depthStencilBufferImageView, depthImageFormat,
-                           VK_IMAGE_ASPECT_DEPTH_BIT);
+  for (int i = 0; i < MAX_FRAME_DRAWS; ++i) {
+    VkUtils::CreateImage2D(m_pDevice, m_pPhyscialDevice, m_width, m_height, &m_colourBufferImages[i].memory,
+                           &m_colourBufferImages[i].image, colourImageFormat,
+                           VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    VkUtils::CreateImageView(m_pDevice, m_colourBufferImages[i].image, &m_colourBufferImages[i].imageView, colourImageFormat,
+                             VK_IMAGE_ASPECT_COLOR_BIT);
 
-  std::array<VkImageView, 2> attachments = {m_colourBufferImageView, m_depthStencilBufferImageView};
+    VkUtils::CreateImage2D(m_pDevice, m_pPhyscialDevice, m_width, m_height, &m_depthStencilBufferImages[i].memory,
+                           &m_depthStencilBufferImages[i].image, depthImageFormat,
+                           VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    VkUtils::CreateImageView(m_pDevice, m_depthStencilBufferImages[i].image, &m_depthStencilBufferImages[i].imageView,
+                             depthImageFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-  VkFramebufferCreateInfo framebufferCreateInfo = {};
-  framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-  framebufferCreateInfo.renderPass = m_renderPass;  // Render pass layout the framebuffer will be used with
-  framebufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-  framebufferCreateInfo.pAttachments = attachments.data();  // List of attachments (1:1 with render pass)
-  framebufferCreateInfo.width = m_width;                    // framebuffer width
-  framebufferCreateInfo.height = m_height;                  // framebuffer height
-  framebufferCreateInfo.layers = 1;                         // framebuffer layers
+    std::array<VkImageView, 2> attachments = {m_colourBufferImages[i].imageView, m_depthStencilBufferImages[i].imageView};
 
-  VK_CHECK(vkCreateFramebuffer(m_pDevice, &framebufferCreateInfo, nullptr, &m_framebuffer));
+    VkFramebufferCreateInfo framebufferCreateInfo = {};
+    framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    framebufferCreateInfo.renderPass = m_renderPass;  // Render pass layout the framebuffer will be used with
+    framebufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+    framebufferCreateInfo.pAttachments = attachments.data();  // List of attachments (1:1 with render pass)
+    framebufferCreateInfo.width = m_width;                    // framebuffer width
+    framebufferCreateInfo.height = m_height;                  // framebuffer height
+    framebufferCreateInfo.layers = 1;                         // framebuffer layers
+
+    VK_CHECK(vkCreateFramebuffer(m_pDevice, &framebufferCreateInfo, nullptr, &m_framebuffers[i]));
+  }
 }
 
 void BasicLightingPass::CreateObjectIdFramebuffer() {
@@ -543,19 +558,62 @@ void BasicLightingPass::CreateObjectIdFramebuffer() {
 }
 
 void BasicLightingPass::CreateRaytracingFramebuffer() {
+  m_raytracingImages.resize(MAX_FRAME_DRAWS);
   VkFormat colourImageFormat = VkUtils::ChooseSupportedFormat(m_pPhyscialDevice, {VK_FORMAT_R8G8B8A8_UNORM}, VK_IMAGE_TILING_OPTIMAL,
                                                               VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT);
 
-  VkUtils::CreateImage2D(m_pDevice, m_pPhyscialDevice, m_width, m_height, &m_raytracingImageMemory, &m_raytracingImage,
-                         colourImageFormat,
-                         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-  VkUtils::CreateImageView(m_pDevice, m_raytracingImage, &m_raytracingImageView, colourImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+  VkCommandBuffer commandBuffer = g_ResourceManager.CreateAndBeginCommandBuffer();
+  for (int i = 0; i < MAX_FRAME_DRAWS; ++i) {
+    {
+      // CREATE IMAGE
+      // Image creation info
+      VkImageCreateInfo imageCreateInfo = {};
+      imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+      imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;  // Type of Image (1D, 2D or 3D)
+      imageCreateInfo.extent.width = m_width;
+      imageCreateInfo.extent.height = m_height;
+      imageCreateInfo.extent.depth = 1;
+      imageCreateInfo.mipLevels = 1;                            // Number of mipmap levels
+      imageCreateInfo.arrayLayers = 1;                          // Number of levels in image array
+      imageCreateInfo.format = colourImageFormat;               // Format type of image
+      imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;         // How image data should be "tiled" (arranged for optimal reading)
+      imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_GENERAL;  // Layout of image data on creation (프레임버퍼에 맞게 변형됨)
+      imageCreateInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+                              VK_IMAGE_USAGE_STORAGE_BIT;       // Bit flags defining what image will be used for
+      imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;          // Number of samples for multi-sampling
+      imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;  // Whether image can be shared between queues
 
-  VkUtils::DescriptorBuilder raytracingBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
-  VkDescriptorImageInfo shadowImageInfo{VK_NULL_HANDLE, m_raytracingImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-  raytracingBuilder.BindImage(0, &shadowImageInfo, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_ALL);
-  g_DescriptorManager.AddDescriptorSet(&raytracingBuilder, "ShadowTexture_ALL");
+      VK_CHECK(vkCreateImage(m_pDevice, &imageCreateInfo, nullptr, &m_raytracingImages[i].image));
+
+      // CRAETE MEMORY FOR IMAGE
+      // Get memory requirements for a type of image
+      VkMemoryRequirements memRequirements;
+      vkGetImageMemoryRequirements(m_pDevice, m_raytracingImages[i].image, &memRequirements);
+
+      VkMemoryAllocateInfo memAllocInfo = {};
+      memAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+      memAllocInfo.allocationSize = memRequirements.size;
+      memAllocInfo.memoryTypeIndex =
+          VkUtils::FindMemoryTypeIndex(m_pPhyscialDevice, memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+      VK_CHECK(vkAllocateMemory(m_pDevice, &memAllocInfo, nullptr, &m_raytracingImages[i].memory));
+
+      // Connect memory to Image
+      VK_CHECK(vkBindImageMemory(m_pDevice, m_raytracingImages[i].image, m_raytracingImages[i].memory, 0));
+    }
+    VkUtils::CreateImageView(m_pDevice, m_raytracingImages[i].image, &m_raytracingImages[i].imageView, colourImageFormat,
+                             VK_IMAGE_ASPECT_COLOR_BIT);
+    VkUtils::DescriptorBuilder raytracingBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
+    VkDescriptorImageInfo shadowImageInfo{VK_NULL_HANDLE, m_raytracingImages[i].imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+    raytracingBuilder.BindImage(0, &shadowImageInfo, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_ALL);
+    g_DescriptorManager.AddDescriptorSet(&raytracingBuilder, "ShadowTexture_ALL" + std::to_string(i));
+
+    VkUtils::CmdImageBarrier(commandBuffer, m_raytracingImages[i].image, VK_IMAGE_LAYOUT_GENERAL,
+                             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_ACCESS_SHADER_READ_BIT,
+                             VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                             VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR);
+  }
+  g_ResourceManager.EndAndSummitCommandBuffer(commandBuffer);
 }
 
 void BasicLightingPass::CreatePipelineLayouts() { CreateRaytracingPipelineLayout(); }
@@ -564,10 +622,9 @@ void BasicLightingPass::CreateRaytracingPipelineLayout() {
   // -- PIPELINE LAYOUT (It's like Root signature in D3D12) --
   std::vector<VkDescriptorSetLayout> setLayouts = {
       g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL"),
-      m_raytracingSetLayout,
+      m_raytracingSetLayouts[0],
       g_DescriptorManager.GetVkDescriptorSetLayout("BATCH_ALL"),
       g_DescriptorManager.GetVkDescriptorSetLayout("DiffuseTextureList"),
-      g_DescriptorManager.GetVkDescriptorSetLayout("SamplerList_ALL"),
   };
 
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
@@ -729,7 +786,7 @@ void BasicLightingPass::CreateGraphicsPipeline() {
                                                    g_DescriptorManager.GetVkDescriptorSetLayout("BATCH_ALL"),
                                                    g_DescriptorManager.GetVkDescriptorSetLayout("SamplerList_ALL"),
                                                    g_DescriptorManager.GetVkDescriptorSetLayout("DiffuseTextureList"),
-                                                   g_DescriptorManager.GetVkDescriptorSetLayout("ShadowTexture_ALL")};
+                                                   g_DescriptorManager.GetVkDescriptorSetLayout("ShadowTexture_ALL0")};
 
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
   pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -1405,14 +1462,14 @@ void BasicLightingPass::CreateRaytracingBuffers() {
 }
 
 void BasicLightingPass::CreateRaytracingDescriptorSets() {
-  std::vector<VkDescriptorPoolSize> poolSizes = {{VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1},
-                                                 {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1},
-                                                 {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1},
-                                                 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3}};
+  std::vector<VkDescriptorPoolSize> poolSizes = {{VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1 * MAX_FRAME_DRAWS},
+                                                 {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 * MAX_FRAME_DRAWS},
+                                                 {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 * MAX_FRAME_DRAWS},
+                                                 {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3 * MAX_FRAME_DRAWS}};
   VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{};
   descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
   descriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-  descriptorPoolCreateInfo.maxSets = 1;
+  descriptorPoolCreateInfo.maxSets = MAX_FRAME_DRAWS;
   descriptorPoolCreateInfo.poolSizeCount = (uint32_t)poolSizes.size();
   descriptorPoolCreateInfo.pPoolSizes = poolSizes.data();
   VK_CHECK(vkCreateDescriptorPool(m_pDevice, &descriptorPoolCreateInfo, nullptr, &m_raytracingPool));
@@ -1424,51 +1481,57 @@ void BasicLightingPass::CreateRaytracingDescriptorSets() {
       VkUtils::DescriptorSetLayoutBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL),
       VkUtils::DescriptorSetLayoutBinding(4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL)};
 
-  VkDescriptorSetLayoutCreateInfo setLayoutCreateInfo{};
-  setLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-  setLayoutCreateInfo.pBindings = descriptorSetLayoutBindings.data();
-  setLayoutCreateInfo.bindingCount = static_cast<uint32_t>(descriptorSetLayoutBindings.size());
-  vkCreateDescriptorSetLayout(m_pDevice, &setLayoutCreateInfo, nullptr, &m_raytracingSetLayout);
+  m_raytracingSetLayouts.resize(MAX_FRAME_DRAWS);
+  m_raytracingSets.resize(MAX_FRAME_DRAWS);
 
-  VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{};
-  descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-  descriptorSetAllocateInfo.descriptorPool = m_raytracingPool;
-  descriptorSetAllocateInfo.descriptorSetCount = 1;
-  descriptorSetAllocateInfo.pSetLayouts = &m_raytracingSetLayout;
-  VK_CHECK(vkAllocateDescriptorSets(m_pDevice, &descriptorSetAllocateInfo, &m_raytracingSet));
+  for (int i = 0; i < MAX_FRAME_DRAWS; ++i) {
+    VkDescriptorSetLayoutCreateInfo setLayoutCreateInfo{};
+    setLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    setLayoutCreateInfo.pBindings = descriptorSetLayoutBindings.data();
+    setLayoutCreateInfo.bindingCount = static_cast<uint32_t>(descriptorSetLayoutBindings.size());
+    vkCreateDescriptorSetLayout(m_pDevice, &setLayoutCreateInfo, nullptr, &m_raytracingSetLayouts[i]);
 
-  VkWriteDescriptorSetAccelerationStructureKHR descriptorAccelerationStructureInfo{};
-  descriptorAccelerationStructureInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
-  descriptorAccelerationStructureInfo.accelerationStructureCount = 1;
-  descriptorAccelerationStructureInfo.pAccelerationStructures = &m_topLevelAS.handle;
+    VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{};
+    descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    descriptorSetAllocateInfo.descriptorPool = m_raytracingPool;
+    descriptorSetAllocateInfo.descriptorSetCount = 1;
+    descriptorSetAllocateInfo.pSetLayouts = &m_raytracingSetLayouts[i];
+    VK_CHECK(vkAllocateDescriptorSets(m_pDevice, &descriptorSetAllocateInfo, &m_raytracingSets[i]));
 
-  VkWriteDescriptorSet accelerationStructureWrite{};
-  accelerationStructureWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  // The specialized acceleration structure descriptor has to be chained
-  accelerationStructureWrite.pNext = &descriptorAccelerationStructureInfo;
-  accelerationStructureWrite.dstSet = m_raytracingSet;
-  accelerationStructureWrite.dstBinding = 0;
-  accelerationStructureWrite.descriptorCount = 1;
-  accelerationStructureWrite.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+    VkWriteDescriptorSetAccelerationStructureKHR descriptorAccelerationStructureInfo{};
+    descriptorAccelerationStructureInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+    descriptorAccelerationStructureInfo.accelerationStructureCount = 1;
+    descriptorAccelerationStructureInfo.pAccelerationStructures = &m_topLevelAS.handle;
 
-  VkDescriptorImageInfo storageImageDescriptor{VK_NULL_HANDLE, m_raytracingImageView, VK_IMAGE_LAYOUT_GENERAL};
-  VkDescriptorBufferInfo vertexBufferDescriptor{g_BatchManager.m_verticesBuffer.buffer, 0, VK_WHOLE_SIZE};
-  VkDescriptorBufferInfo indexBufferDescriptor{g_BatchManager.m_indicesBuffer.buffer, 0, VK_WHOLE_SIZE};
-  VkDescriptorBufferInfo instanceOffsetBufferDesc{g_BatchManager.m_instanceOffsetBuffer.buffer, 0, VK_WHOLE_SIZE};
+    VkWriteDescriptorSet accelerationStructureWrite{};
+    accelerationStructureWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    // The specialized acceleration structure descriptor has to be chained
+    accelerationStructureWrite.pNext = &descriptorAccelerationStructureInfo;
+    accelerationStructureWrite.dstSet = m_raytracingSets[i];
+    accelerationStructureWrite.dstBinding = 0;
+    accelerationStructureWrite.descriptorCount = 1;
+    accelerationStructureWrite.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
 
-  std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-      // Binding 0: Top level acceleration structure
-      accelerationStructureWrite,
-      // Binding 1: Ray tracing result image
-      VkUtils::WriteDescriptorSet(m_raytracingSet, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, &storageImageDescriptor),
-      // Binding 3: Scene vertex buffer
-      VkUtils::WriteDescriptorSet(m_raytracingSet, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2, &vertexBufferDescriptor),
-      // Binding 4: Scene index buffer
-      VkUtils::WriteDescriptorSet(m_raytracingSet, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3, &indexBufferDescriptor),
-      // Binding 5 : BLAS offset buffer
-      VkUtils::WriteDescriptorSet(m_raytracingSet, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4, &instanceOffsetBufferDesc),
-  };
-  vkUpdateDescriptorSets(m_pDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, VK_NULL_HANDLE);
+    VkDescriptorImageInfo storageImageDescriptor{VK_NULL_HANDLE, m_raytracingImages[i].imageView, VK_IMAGE_LAYOUT_GENERAL};
+    VkDescriptorBufferInfo vertexBufferDescriptor{g_BatchManager.m_verticesBuffer.buffer, 0, VK_WHOLE_SIZE};
+    VkDescriptorBufferInfo indexBufferDescriptor{g_BatchManager.m_indicesBuffer.buffer, 0, VK_WHOLE_SIZE};
+    VkDescriptorBufferInfo instanceOffsetBufferDesc{g_BatchManager.m_instanceOffsetBuffer.buffer, 0, VK_WHOLE_SIZE};
+
+    std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
+        // Binding 0: Top level acceleration structure
+        accelerationStructureWrite,
+        // Binding 1: Ray tracing result image
+        VkUtils::WriteDescriptorSet(m_raytracingSets[i], VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, &storageImageDescriptor),
+        // Binding 3: Scene vertex buffer
+        VkUtils::WriteDescriptorSet(m_raytracingSets[i], VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2, &vertexBufferDescriptor),
+        // Binding 4: Scene index buffer
+        VkUtils::WriteDescriptorSet(m_raytracingSets[i], VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3, &indexBufferDescriptor),
+        // Binding 5 : BLAS offset buffer
+        VkUtils::WriteDescriptorSet(m_raytracingSets[i], VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4, &instanceOffsetBufferDesc),
+    };
+    vkUpdateDescriptorSets(m_pDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0,
+                           VK_NULL_HANDLE);
+  }
 }
 
 /*
@@ -1706,6 +1769,9 @@ void BasicLightingPass::CreatePushConstantRange() {
 }
 
 void BasicLightingPass::CreateSemaphores() {
+  m_fence.resize(MAX_FRAME_DRAWS);
+  m_renderAvailable.resize(MAX_FRAME_DRAWS);
+
   // Semaphore creataion information
   VkSemaphoreCreateInfo semaphoreCreateInfo = {};
   semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -1713,14 +1779,15 @@ void BasicLightingPass::CreateSemaphores() {
   fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
   fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-  VK_CHECK(vkCreateFence(m_pDevice, &fenceCreateInfo, nullptr, &m_fence));
-  VK_CHECK(vkCreateSemaphore(m_pDevice, &semaphoreCreateInfo, nullptr, &m_renderAvailable));
+  for (int i = 0; i < MAX_FRAME_DRAWS; ++i) {
+    VK_CHECK(vkCreateFence(m_pDevice, &fenceCreateInfo, nullptr, &m_fence[i]));
+    VK_CHECK(vkCreateSemaphore(m_pDevice, &semaphoreCreateInfo, nullptr, &m_renderAvailable[i]));
+  }
 }
 
 void BasicLightingPass::CreateCommandBuffers() {
-  //
-  // Single Command Buffer
-  //
+  m_commandBuffers.resize(MAX_FRAME_DRAWS);
+
   VkCommandBufferAllocateInfo cbAllocInfo = {};
   cbAllocInfo = {};
   cbAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -1729,10 +1796,10 @@ void BasicLightingPass::CreateCommandBuffers() {
                                                         // queue. cant be called by other buffers
   // VK_COMMAND_BUFFER_LEVEL_SECONDARY	: buffer can't be called directly. Can be called from other buffers via
   // 'vkCmdExecuteCommands' when recording commands in primary buffer.
-  cbAllocInfo.commandBufferCount = 1;
+  cbAllocInfo.commandBufferCount = static_cast<uint32_t>(m_commandBuffers.size());
 
   // Allocate command buffers and place handles in array of buffers
-  VK_CHECK(vkAllocateCommandBuffers(m_pDevice, &cbAllocInfo, &m_commandBuffer));
+  VK_CHECK(vkAllocateCommandBuffers(m_pDevice, &cbAllocInfo, m_commandBuffers.data()));
 }
 
 void BasicLightingPass::RecordCommands(uint32_t currentImage) {
@@ -1742,9 +1809,9 @@ void BasicLightingPass::RecordCommands(uint32_t currentImage) {
                                                                          // submitted and is awaiting executi
 
   // Start recording commands to command buffer!
-  VK_CHECK(vkBeginCommandBuffer(m_commandBuffer, &bufferBeginInfo));
+  VK_CHECK(vkBeginCommandBuffer(m_commandBuffers[currentImage], &bufferBeginInfo));
 
-  RecordRaytracingShadowCommands();
+  RecordRaytracingShadowCommands(currentImage);
 
   // Information about how to begin a render pass (only needed for graphical applications)
   VkRenderPassBeginInfo renderPassBeginInfo = {};
@@ -1760,21 +1827,23 @@ void BasicLightingPass::RecordCommands(uint32_t currentImage) {
   renderPassBeginInfo.pClearValues = clearValues.data();  // List of clear values
   renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
 
-  renderPassBeginInfo.framebuffer = m_framebuffer;
+  renderPassBeginInfo.framebuffer = m_framebuffers[currentImage];
 
   // Begin Render Pass
-  vkCmdBeginRenderPass(m_commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+  vkCmdBeginRenderPass(m_commandBuffers[currentImage], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-  RecordLightingPassCommands();
-  RecordBoundingBoxCommands();
+  RecordLightingPassCommands(currentImage);
+  RecordBoundingBoxCommands(currentImage);
 
   // End Render Pass
-  vkCmdEndRenderPass(m_commandBuffer);
+  vkCmdEndRenderPass(m_commandBuffers[currentImage]);
 
-  VkUtils::CmdImageBarrier(m_commandBuffer, m_colourBufferImage, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
-  VkUtils::CmdImageBarrier(m_commandBuffer, m_depthStencilBufferImage, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+  VkUtils::CmdImageBarrier(m_commandBuffers[currentImage], m_colourBufferImages[currentImage].image,
+                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                           VK_IMAGE_ASPECT_COLOR_BIT);
+  VkUtils::CmdImageBarrier(m_commandBuffers[currentImage], m_depthStencilBufferImages[currentImage].image,
+                           VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                           VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
 
   /*
    * Object Id commands
@@ -1795,41 +1864,43 @@ void BasicLightingPass::RecordCommands(uint32_t currentImage) {
   renderPassBeginInfo.framebuffer = m_objectIdFramebuffer;
 
   // Begin Render Pass
-  vkCmdBeginRenderPass(m_commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+  vkCmdBeginRenderPass(m_commandBuffers[currentImage], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-  RecordObjectIDPassCommands();
+  RecordObjectIDPassCommands(currentImage);
 
-  vkCmdEndRenderPass(m_commandBuffer);
+  vkCmdEndRenderPass(m_commandBuffers[currentImage]);
 
   // Stop recording commands to command buffer!
-  VK_CHECK(vkEndCommandBuffer(m_commandBuffer));
+  VK_CHECK(vkEndCommandBuffer(m_commandBuffers[currentImage]));
 }
 
-void BasicLightingPass::RecordLightingPassCommands() {
+void BasicLightingPass::RecordLightingPassCommands(uint32_t currentImage) {
   // Bind Pipeline to be used in render pass
-  vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+  vkCmdBindPipeline(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS,
                     g_RenderSetting.isWireRendering ? m_wireGraphicsPipeline : m_graphicsPipeline);
 
   g_ShaderSetting.batchIdx = 0;
   for (auto& miniBatch : g_BatchManager.m_miniBatchList) {
     // Bind the vertex buffer with the correct offset
     VkDeviceSize vertexOffset = 0;  // Always bind at offset 0 since indirect commands handle offsets
-    vkCmdBindVertexBuffers(m_commandBuffer, 0, 1, &miniBatch.m_vertexBuffer, &vertexOffset);
+    vkCmdBindVertexBuffers(m_commandBuffers[currentImage], 0, 1, &miniBatch.m_vertexBuffer, &vertexOffset);
     // Bind the index buffer with the correct offset
-    vkCmdBindIndexBuffer(m_commandBuffer, miniBatch.m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindIndexBuffer(m_commandBuffers[currentImage], miniBatch.m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-    VK_BIND_SET_MVP_GRAPHICS(m_commandBuffer, m_graphicsPipelineLayout, 0);
-    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 1, 1,
+    vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 0, 1,
+                            &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL" + std::to_string(currentImage)), 0, nullptr);
+    vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 1, 1,
                             &g_DescriptorManager.GetVkDescriptorSet("BATCH_ALL"), 0, nullptr);
-    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 2, 1,
+    vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 2, 1,
                             &g_DescriptorManager.GetVkDescriptorSet("SamplerList_ALL"), 0, nullptr);
-    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 3, 1,
+    vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 3, 1,
                             &g_DescriptorManager.GetVkDescriptorSet("DiffuseTextureList"), 0, nullptr);
 
-    vkCmdPushConstants(m_commandBuffer, m_graphicsPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting), &g_ShaderSetting);
+    vkCmdPushConstants(m_commandBuffers[currentImage], m_graphicsPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting),
+                       &g_ShaderSetting);
 
     uint32_t drawCount = static_cast<uint32_t>(miniBatch.m_drawIndexedCommands.size());
-    vkCmdDrawIndexedIndirect(m_commandBuffer, g_BatchManager.m_indirectDrawCommandBuffer.buffer,
+    vkCmdDrawIndexedIndirect(m_commandBuffers[currentImage], g_BatchManager.m_indirectDrawCommandBuffer.buffer,
                              miniBatch.m_indirectCommandsOffset,   // offset
                              drawCount,                            // drawCount
                              sizeof(VkDrawIndexedIndirectCommand)  // stride
@@ -1838,61 +1909,68 @@ void BasicLightingPass::RecordLightingPassCommands() {
   }
 }
 
-void BasicLightingPass::RecordRaytracingShadowCommands() {
+void BasicLightingPass::RecordRaytracingShadowCommands(uint32_t currentImage) {
   /*
    * Ray tracing shadow commands
    */
-  VkUtils::CmdImageBarrier(m_commandBuffer, m_raytracingImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
-                           VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-                           VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR);
+  VkUtils::CmdImageBarrier(m_commandBuffers[currentImage], m_raytracingImages[currentImage].image,
+                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT,
+                           VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR);
 
-  vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, m_raytracingPipeline);
-  vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, m_raytracingPipelineLayout, 0, 1,
-                          &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL"), 0, nullptr);
-  vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, m_raytracingPipelineLayout, 1, 1, &m_raytracingSet,
-                          0, nullptr);
-  vkCmdPushConstants(m_commandBuffer, m_raytracingPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting), &g_ShaderSetting);
+  vkCmdBindPipeline(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, m_raytracingPipeline);
+  vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, m_raytracingPipelineLayout, 0, 1,
+                          &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL" + std::to_string(currentImage)), 0, nullptr);
+  vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, m_raytracingPipelineLayout, 1, 1,
+                          &m_raytracingSets[currentImage], 0, nullptr);
+  vkCmdPushConstants(m_commandBuffers[currentImage], m_raytracingPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting),
+                     &g_ShaderSetting);
 
   VkStridedDeviceAddressRegionKHR emptySbtEntry = {};
-  vkCmdTraceRaysKHR(m_commandBuffer, &shaderBindingTables.raygen.stridedDeviceAddressRegion,
+  vkCmdTraceRaysKHR(m_commandBuffers[currentImage], &shaderBindingTables.raygen.stridedDeviceAddressRegion,
                     &shaderBindingTables.miss.stridedDeviceAddressRegion, &shaderBindingTables.hit.stridedDeviceAddressRegion,
                     &emptySbtEntry, m_width, m_height, 1);
 
-  VkUtils::CmdImageBarrier(m_commandBuffer, m_raytracingImage, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                           VK_IMAGE_ASPECT_COLOR_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-                           VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
-                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+  VkUtils::CmdImageBarrier(m_commandBuffers[currentImage], m_raytracingImages[currentImage].image, VK_IMAGE_LAYOUT_GENERAL,
+                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT,
+                           VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
+                           VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 }
 
-void BasicLightingPass::RecordBoundingBoxCommands() {
+void BasicLightingPass::RecordBoundingBoxCommands(uint32_t currentImage) {
   /*
    * BoundingBox Renderer
    */
   g_ShaderSetting.batchIdx = 0;
   if (g_RenderSetting.isRenderBoundingBox) {
-    vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_boundingBoxPipeline);
+    vkCmdBindPipeline(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_boundingBoxPipeline);
 
     for (int i = 0; i < g_BatchManager.m_boundingBoxBufferList.size(); ++i) {
       VkDeviceSize vertexOffset = 0;  // Always bind at offset 0 since indirect commands handle offsets
-      vkCmdBindVertexBuffers(m_commandBuffer, 0, 1, &g_BatchManager.m_boundingBoxBufferList[i].vertexBuffer, &vertexOffset);
+      vkCmdBindVertexBuffers(m_commandBuffers[currentImage], 0, 1, &g_BatchManager.m_boundingBoxBufferList[i].vertexBuffer,
+                             &vertexOffset);
 
       // Bind the index buffer with the correct offset
-      vkCmdBindIndexBuffer(m_commandBuffer, g_BatchManager.m_boundingBoxBufferList[i].indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+      vkCmdBindIndexBuffer(m_commandBuffers[currentImage], g_BatchManager.m_boundingBoxBufferList[i].indexBuffer, 0,
+                           VK_INDEX_TYPE_UINT32);
 
-      VK_BIND_SET_MVP_GRAPHICS(m_commandBuffer, m_graphicsPipelineLayout, 0);
-      vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 1, 1,
+      vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 0, 1,
+                              &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL" + std::to_string(currentImage)), 0,
+                              nullptr);
+      vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 1, 1,
                               &g_DescriptorManager.GetVkDescriptorSet("BATCH_ALL"), 0, nullptr);
-      vkCmdPushConstants(m_commandBuffer, m_graphicsPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting), &g_ShaderSetting);
+      vkCmdPushConstants(m_commandBuffers[currentImage], m_graphicsPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting),
+                         &g_ShaderSetting);
 
-      vkCmdDrawIndexed(m_commandBuffer, 24, 1, 0, 0, 0);
+      vkCmdDrawIndexed(m_commandBuffers[currentImage], 24, 1, 0, 0, 0);
       g_ShaderSetting.batchIdx += 1;
     }
   }
 }
 
-void BasicLightingPass::RecordObjectIDPassCommands() {
+void BasicLightingPass::RecordObjectIDPassCommands(uint32_t currentImage) {
   // Bind Pipeline to be used in render pass
-  vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_objectIDPipeline);
+  vkCmdBindPipeline(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_objectIDPipeline);
   //
   // mini-batch system
   //
@@ -1900,19 +1978,21 @@ void BasicLightingPass::RecordObjectIDPassCommands() {
   for (auto& miniBatch : g_BatchManager.m_miniBatchList) {
     // Bind the vertex buffer with the correct offset
     VkDeviceSize vertexOffset = 0;  // Always bind at offset 0 since indirect commands handle offsets
-    vkCmdBindVertexBuffers(m_commandBuffer, 0, 1, &miniBatch.m_vertexBuffer, &vertexOffset);
+    vkCmdBindVertexBuffers(m_commandBuffers[currentImage], 0, 1, &miniBatch.m_vertexBuffer, &vertexOffset);
 
     // Bind the index buffer with the correct offset
-    vkCmdBindIndexBuffer(m_commandBuffer, miniBatch.m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindIndexBuffer(m_commandBuffers[currentImage], miniBatch.m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-    VK_BIND_SET_MVP_GRAPHICS(m_commandBuffer, m_graphicsPipelineLayout, 0);
-    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 1, 1,
+    vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 0, 1,
+                            &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL" + std::to_string(currentImage)), 0, nullptr);
+    vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 1, 1,
                             &g_DescriptorManager.GetVkDescriptorSet("BATCH_ALL"), 0, nullptr);
 
-    vkCmdPushConstants(m_commandBuffer, m_graphicsPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting), &g_ShaderSetting);
+    vkCmdPushConstants(m_commandBuffers[currentImage], m_graphicsPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting),
+                       &g_ShaderSetting);
 
     uint32_t drawCount = static_cast<uint32_t>(miniBatch.m_drawIndexedCommands.size());
-    vkCmdDrawIndexedIndirect(m_commandBuffer, g_BatchManager.m_indirectDrawCommandBuffer.buffer,
+    vkCmdDrawIndexedIndirect(m_commandBuffers[currentImage], g_BatchManager.m_indirectDrawCommandBuffer.buffer,
                              miniBatch.m_indirectCommandsOffset,   // offset
                              drawCount,                            // drawCount
                              sizeof(VkDrawIndexedIndirectCommand)  // stride

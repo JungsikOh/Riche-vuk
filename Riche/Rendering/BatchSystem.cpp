@@ -1,6 +1,21 @@
 #include "BatchSystem.h"
 
-void BatchManager::Update(VkDevice device) {}
+void BatchManager::Update(VkDevice device) {
+  void* pData = nullptr;
+  // 1. Update Transform List Buffer
+  {
+    vkMapMemory(device, g_BatchManager.m_transformListBuffer.memory, 0, g_BatchManager.m_transformListBuffer.size, 0, &pData);
+    memcpy(pData, g_BatchManager.m_trasformList.data(), g_BatchManager.m_transformListBuffer.size);
+    vkUnmapMemory(device, g_BatchManager.m_transformListBuffer.memory);
+  }
+  // 2. Update BoundingBox
+  {
+    VkDeviceSize aabbBufferSize = sizeof(AABB) * g_BatchManager.m_boundingBoxList.size();
+    vkMapMemory(device, g_BatchManager.m_boundingBoxListBuffer.memory, 0, aabbBufferSize, 0, &pData);
+    memcpy(pData, g_BatchManager.m_boundingBoxList.data(), aabbBufferSize);
+    vkUnmapMemory(device, g_BatchManager.m_boundingBoxListBuffer.memory);
+  }
+}
 
 void BatchManager::UpdateDescriptorSets(VkDevice device) {
   VkDescriptorBufferInfo transformUBOInfo = {};
@@ -240,27 +255,29 @@ void BatchManager::CreateDescriptorSets(VkDevice device, VkPhysicalDevice physic
 }
 
 void BatchManager::RebuildBatchManager(VkDevice device, VkPhysicalDevice physicalDevice) {
-  vkDestroyBuffer(device, m_indirectDrawCommandBuffer.buffer, nullptr);
-  vkFreeMemory(device, m_indirectDrawCommandBuffer.memory, nullptr);
+  {
+    vkDestroyBuffer(device, m_indirectDrawCommandBuffer.buffer, nullptr);
+    vkFreeMemory(device, m_indirectDrawCommandBuffer.memory, nullptr);
 
-  vkDestroyBuffer(device, m_boundingBoxListBuffer.buffer, nullptr);
-  vkFreeMemory(device, m_boundingBoxListBuffer.memory, nullptr);
+    vkDestroyBuffer(device, m_boundingBoxListBuffer.buffer, nullptr);
+    vkFreeMemory(device, m_boundingBoxListBuffer.memory, nullptr);
 
-  vkDestroyBuffer(device, m_transformListBuffer.buffer, nullptr);
-  vkFreeMemory(device, m_transformListBuffer.memory, nullptr);
+    vkDestroyBuffer(device, m_transformListBuffer.buffer, nullptr);
+    vkFreeMemory(device, m_transformListBuffer.memory, nullptr);
 
-  vkDestroyBuffer(device, m_objectIDBuffer.buffer, nullptr);
-  vkFreeMemory(device, m_objectIDBuffer.memory, nullptr);
+    vkDestroyBuffer(device, m_objectIDBuffer.buffer, nullptr);
+    vkFreeMemory(device, m_objectIDBuffer.memory, nullptr);
 
-  m_instanceOffsets.clear();
-  vkDestroyBuffer(device, m_instanceOffsetBuffer.buffer, nullptr);
-  vkFreeMemory(device, m_instanceOffsetBuffer.memory, nullptr);
+    m_instanceOffsets.clear();
+    vkDestroyBuffer(device, m_instanceOffsetBuffer.buffer, nullptr);
+    vkFreeMemory(device, m_instanceOffsetBuffer.memory, nullptr);
 
-  vkDestroyBuffer(device, m_verticesBuffer.buffer, nullptr);
-  vkFreeMemory(device, m_verticesBuffer.memory, nullptr);
+    vkDestroyBuffer(device, m_verticesBuffer.buffer, nullptr);
+    vkFreeMemory(device, m_verticesBuffer.memory, nullptr);
 
-  vkDestroyBuffer(device, m_indicesBuffer.buffer, nullptr);
-  vkFreeMemory(device, m_indicesBuffer.memory, nullptr);
+    vkDestroyBuffer(device, m_indicesBuffer.buffer, nullptr);
+    vkFreeMemory(device, m_indicesBuffer.memory, nullptr);
+  }
 
   CreateBatchManagerBuffers(device, physicalDevice);
   UpdateDescriptorSets(device);

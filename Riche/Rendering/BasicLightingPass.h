@@ -4,6 +4,7 @@
 #include "Components.h"
 #include "CullingRenderPass.h"
 #include "IRenderPass.h"
+#include "Image.h"
 #include "Utils/ThreadPool.h"
 #include "VkUtils/ChooseFunc.h"
 #include "VkUtils/DescriptorManager.h"
@@ -31,9 +32,9 @@ class BasicLightingPass : public IRenderPass {
 
   virtual void Draw(uint32_t imageIndex, VkSemaphore renderAvailable);
 
-  VkImageView& GetFrameBufferImageView() { return m_colourBufferImageView; };
-  VkImageView& GetDepthStencilImageView() { return m_depthStencilBufferImageView; };
-  VkSemaphore& GetSemaphore() { return m_renderAvailable; };
+  VkImageView& GetFrameBufferImageView(uint32_t imageIndex) { return m_colourBufferImages[imageIndex].imageView; };
+  VkImageView& GetDepthStencilImageView(uint32_t imageIndex) { return m_depthStencilBufferImages[imageIndex].imageView; };
+  VkSemaphore& GetSemaphore(uint32_t imageIndex) { return m_renderAvailable[imageIndex]; };
 
  private:
   virtual void CreateRenderPass();
@@ -69,10 +70,10 @@ class BasicLightingPass : public IRenderPass {
   virtual void CreateCommandBuffers();
 
   virtual void RecordCommands(uint32_t currentImage);
-  void RecordLightingPassCommands();
-  void RecordRaytracingShadowCommands();
-  void RecordBoundingBoxCommands();
-  void RecordObjectIDPassCommands();
+  void RecordLightingPassCommands(uint32_t currentImage);
+  void RecordRaytracingShadowCommands(uint32_t currentImage);
+  void RecordBoundingBoxCommands(uint32_t currentImage);
+  void RecordObjectIDPassCommands(uint32_t currentImage);
 
  private:
   Editor* m_pEditor;
@@ -87,6 +88,14 @@ class BasicLightingPass : public IRenderPass {
   uint32_t m_height;
   Camera* m_pCamera;
 
+  VkCommandPool m_pGraphicsCommandPool;
+  std::vector<VkCommandBuffer> m_commandBuffers;
+
+  std::vector<VkSemaphore> m_renderAvailable;
+  std::vector<VkFence> m_fence;
+
+  VkPushConstantRange m_debugPushConstant;
+
   // - Rendering Graphics Pipeline
   VkRenderPass m_renderPass;
   VkRenderPass m_objectIdRenderPass;
@@ -98,13 +107,8 @@ class BasicLightingPass : public IRenderPass {
   VkPipeline m_objectIDPipeline;
   VkPipelineLayout m_graphicsPipelineLayout;
 
-  VkImage m_colourBufferImage;
-  VkDeviceMemory m_colourBufferImageMemory;
-  VkImageView m_colourBufferImageView;
-
-  VkImage m_depthStencilBufferImage;
-  VkDeviceMemory m_depthStencilBufferImageMemory;
-  VkImageView m_depthStencilBufferImageView;
+  std::vector<GpuImage> m_colourBufferImages;
+  std::vector<GpuImage> m_depthStencilBufferImages;
 
   // For ObjectID
   VkImage m_objectIdColourBufferImage;
@@ -134,25 +138,16 @@ class BasicLightingPass : public IRenderPass {
 
   VkBuffer instanceBuffer;
   VkDeviceMemory instanceBufferMemory;
+
+  std::vector<GpuImage> m_raytracingImages;
+
   ScratchBuffer m_scratchBufferTLAS;
 
   VkDescriptorPool m_raytracingPool;
-  VkDescriptorSet m_raytracingSet;
-  VkDescriptorSetLayout m_raytracingSetLayout;
+  std::vector<VkDescriptorSet> m_raytracingSets;
+  std::vector<VkDescriptorSetLayout> m_raytracingSetLayouts;
 
-  VkImage m_raytracingImage;
-  VkDeviceMemory m_raytracingImageMemory;
-  VkImageView m_raytracingImageView;
-
-  VkFramebuffer m_framebuffer;
+  std::vector<VkFramebuffer> m_framebuffers;
   VkFramebuffer m_objectIdFramebuffer;
-  VkFramebuffer m_raytracingFramebuffer;
-
-  VkCommandPool m_pGraphicsCommandPool;
-  VkCommandBuffer m_commandBuffer;
-
-  VkPushConstantRange m_debugPushConstant;
-
-  VkSemaphore m_renderAvailable;
-  VkFence m_fence;
+  std::vector<VkFramebuffer> m_raytracingFramebuffers;
 };
