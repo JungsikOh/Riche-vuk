@@ -42,7 +42,9 @@ void main()
 {
     vec4 color = textureLod(sampler2D(inputColour, linearWrapSS), inFragTexcoord.xy, 0).rgba;
 
-    color.rgb *= blurShadow9x9(u_ShadowTexture, inFragTexcoord.xy);
+    float shadowFactor = blurShadow9x9(u_ShadowTexture, inFragTexcoord.xy);
+
+    color.rgb *= shadowFactor;
 
     vec4 finalColor = vec4(color.rgb, 1.0);
     outColour = finalColor;

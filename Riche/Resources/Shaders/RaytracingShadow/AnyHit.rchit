@@ -44,6 +44,19 @@ layout(set = 1, binding = 2, scalar) buffer Vertices { RayBasicVertex v[]; } ver
 layout(set = 1, binding = 3, scalar) buffer Indices { uint i[]; } indices;
 layout(set = 1, binding = 4) buffer Offsets { Offset o[]; } offset;
 
+layout(set = 2, binding = 3) buffer readonly SSBO_TextureID
+{
+	ObjectID handle[];													// SSBO
+}ssbo_TextureID;
+
+layout(set = 3, binding = 0) uniform texture2D u_DiffuseTextureList[];	// Bindless Textures
+
+layout(set = 4, binding = 0) uniform sampler linearWrapSS;
+layout(set = 4, binding = 1) uniform sampler linearClampSS;
+layout(set = 4, binding = 2) uniform sampler linearBorderSS;
+layout(set = 4, binding = 3) uniform sampler pointWrapSS;
+layout(set = 4, binding = 4) uniform sampler pointClampSS;
+
 void main()
 {
     uint customID = gl_InstanceCustomIndexEXT; 
@@ -60,26 +73,13 @@ void main()
     vec3 normal = normalize(v0.normal.xyz * barycentricCoords.x + v1.normal.xyz * barycentricCoords.y + v2.normal.xyz * barycentricCoords.z);
     vec2 tex = (v0.tex * barycentricCoords.x + v1.tex * barycentricCoords.y + v2.tex * barycentricCoords.z);
 
-    // Basic lighting
-    vec3 lightVector = normalize(u_ShaderSetting.lightPos.xyz);
-    float dot_product = max(dot(lightVector, normal), 0.4);
-    hitValue = vec3(1, 0, 0) * dot_product;
+    float alpha = texture(alphaTestTexture, /* uv */).a;
 
-    // Shadow Casting
-    float tMin = 0.001;
-    float tMax = 10000.0;
-    vec3 origin = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
-    vec3 biasedOrigin = origin + normal * 0.005; // 자기 교차 방지용 offset
-    
-    shadowed = true;
+    // 예: 알파가 특정 임계값(threshold)보다 작으면 레이를 통과시킴
+    if(alpha < 0.5) {
+        // 아무것도 안 맞은 것으로 취급
+        ignoreIntersectionEXT();
+        return;
+    }
 
-    // Trace shadow ray and offset indices to match shadow hit/miss shader group indices
-    traceRayEXT(topLevelAS, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT | gl_RayFlagsSkipClosestHitShaderEXT, 0xFF, 0, 0, 1, biasedOrigin, tMin, lightVector, tMax, 2);
-
-    if(dot(normal, lightVector) < 0.0)
-		shadowed = true;
-
-    if (shadowed) {
-		hitValue *= 0.3;
-	}
 }

@@ -566,6 +566,8 @@ void BasicLightingPass::CreateRaytracingPipelineLayout() {
       g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL"),
       m_raytracingSetLayout,
       g_DescriptorManager.GetVkDescriptorSetLayout("BATCH_ALL"),
+      g_DescriptorManager.GetVkDescriptorSetLayout("DiffuseTextureList"),
+      g_DescriptorManager.GetVkDescriptorSetLayout("SamplerList_ALL"),
   };
 
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
