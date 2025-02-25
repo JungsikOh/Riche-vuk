@@ -139,10 +139,10 @@ void VulkanRenderer::Draw() {
                         VK_NULL_HANDLE, &imageIndex);
 
   m_pCullingRenderPass->Update();
-  m_pCullingRenderPass->Draw(imageAvailable[imageIndex]);
+  m_pCullingRenderPass->Draw(imageIndex, imageAvailable[imageIndex]);
 
   m_pLightingRenderPass->Update();
-  m_pLightingRenderPass->Draw(m_pCullingRenderPass->GetSemaphore());
+  m_pLightingRenderPass->Draw(imageIndex, m_pCullingRenderPass->GetSemaphore());
 
   RecordCommands(imageIndex);
 

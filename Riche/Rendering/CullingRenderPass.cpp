@@ -42,7 +42,7 @@ void CullingRenderPass::Cleanup() {
 
   vkDestroySemaphore(m_pDevice, m_renderAvailable, nullptr);
   vkDestroyFence(m_pDevice, m_fence, nullptr);
-  vkFreeCommandBuffers(m_pDevice, m_pGraphicsCommandPool, 1, &m_commandBuffer);
+  vkFreeCommandBuffers(m_pDevice, m_pGraphicsCommandPool, MAX_FRAME_DRAWS, m_commandBuffers.data());
 
   vkDestroyPipelineLayout(m_pDevice, m_graphicsPipelineLayout, nullptr);
 
@@ -117,11 +117,11 @@ void CullingRenderPass::Update() {
   }
 }
 
-void CullingRenderPass::Draw(VkSemaphore renderAvailable) {
+void CullingRenderPass::Draw(uint32_t imageIndex, VkSemaphore renderAvailable) {
   vkWaitForFences(m_pDevice, 1, &m_fence, VK_TRUE, (std::numeric_limits<uint32_t>::max)());
   vkResetFences(m_pDevice, 1, &m_fence);
 
-  RecordCommands();
+  RecordCommands(imageIndex);
 
   // RenderPass 1.
   VkSubmitInfo basicSubmitInfo = {};
@@ -133,7 +133,7 @@ void CullingRenderPass::Draw(VkSemaphore renderAvailable) {
                                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT};
   basicSubmitInfo.pWaitDstStageMask = basicWaitStages;     // Stages to check semaphores at
   basicSubmitInfo.commandBufferCount = 1;                  // Number of command buffers to submit
-  basicSubmitInfo.pCommandBuffers = &m_commandBuffer;      // Command buffer to submit
+  basicSubmitInfo.pCommandBuffers = &m_commandBuffers[imageIndex];      // Command buffer to submit
   basicSubmitInfo.signalSemaphoreCount = 1;                // Number of semaphores to signal
   basicSubmitInfo.pSignalSemaphores = &m_renderAvailable;  // Semaphores to signal when command buffer finishes
   // Command buffer가 실행을 완료하면, Signaled 상태가 될 semaphore 배열.
@@ -593,8 +593,10 @@ void CullingRenderPass::CreateSemaphores() {
 
 void CullingRenderPass::CreateCommandBuffers() {
   //
-  // Single Command Buffer
+  // Triple Command Buffer
   //
+  m_commandBuffers.resize(MAX_FRAME_DRAWS);
+
   VkCommandBufferAllocateInfo cbAllocInfo = {};
   cbAllocInfo = {};
   cbAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -603,13 +605,13 @@ void CullingRenderPass::CreateCommandBuffers() {
                                                         // queue. cant be called by other buffers
   // VK_COMMAND_BUFFER_LEVEL_SECONDARY	: buffer can't be called directly. Can be called from other buffers via 'vkCmdExecuteCommands'
   // when recording commands in primary buffer.
-  cbAllocInfo.commandBufferCount = 1;
+  cbAllocInfo.commandBufferCount = static_cast<uint32_t>(m_commandBuffers.size());
 
   // Allocate command buffers and place handles in array of buffers
-  VK_CHECK(vkAllocateCommandBuffers(m_pDevice, &cbAllocInfo, &m_commandBuffer));
+  VK_CHECK(vkAllocateCommandBuffers(m_pDevice, &cbAllocInfo, m_commandBuffers.data()));
 }
 
-void CullingRenderPass::RecordCommands() {
+void CullingRenderPass::RecordCommands(uint32_t currentImage) {
   g_RenderSetting.beforeCullingRenderingNum = 0;
   for (auto& miniBatch : g_BatchManager.m_miniBatchList) {
     g_RenderSetting.beforeCullingRenderingNum += miniBatch.m_drawIndexedCommands.size();
@@ -622,9 +624,9 @@ void CullingRenderPass::RecordCommands() {
                                                                          // submitted and is awaiting executi
 
   // Start recording commands to command buffer!
-  VK_CHECK(vkBeginCommandBuffer(m_commandBuffer, &bufferBeginInfo));
+  VK_CHECK(vkBeginCommandBuffer(m_commandBuffers[currentImage], &bufferBeginInfo));
 
-  RecordViewCullingCommands();
+  RecordViewCullingCommands(currentImage);
 
   // Information about how to begin a render pass (only needed for graphical applications)
   VkRenderPassBeginInfo depthOnlyRenderPassBeginInfo = {};
@@ -641,12 +643,12 @@ void CullingRenderPass::RecordCommands() {
   depthOnlyRenderPassBeginInfo.framebuffer = m_depthFramebuffers[0];
 
   // Begin Render Pass
-  vkCmdBeginRenderPass(m_commandBuffer, &depthOnlyRenderPassBeginInfo,
+  vkCmdBeginRenderPass(m_commandBuffers[currentImage], &depthOnlyRenderPassBeginInfo,
                        VK_SUBPASS_CONTENTS_INLINE);  // 렌더 패스의 내용을 직접 명령 버퍼에 기록하는 것을 의미
 
-  RecordOnlyDepthCommands();
+  RecordOnlyDepthCommands(currentImage);
 
-  vkCmdEndRenderPass(m_commandBuffer);
+  vkCmdEndRenderPass(m_commandBuffers[currentImage]);
 
   if (g_RenderSetting.isOcclusionCulling) {
     VkImageMemoryBarrier barrier = {};
@@ -664,7 +666,8 @@ void CullingRenderPass::RecordCommands() {
     barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 
-    vkCmdPipelineBarrier(m_commandBuffer, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
+    vkCmdPipelineBarrier(m_commandBuffers[currentImage], VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                         0, nullptr, 0,
                          nullptr, 1, &barrier);
 
     // 8.3. Blit to generate Mip Levels
@@ -707,11 +710,13 @@ void CullingRenderPass::RecordCommands() {
       dstBarrier.srcAccessMask = 0;
       dstBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
-      vkCmdPipelineBarrier(m_commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr,
+      vkCmdPipelineBarrier(m_commandBuffers[currentImage], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
+                           nullptr, 0, nullptr,
                            1, &dstBarrier);
 
       // Perform the blit
-      vkCmdBlitImage(m_commandBuffer, m_onlyDepthBufferImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_onlyDepthBufferImage,
+      vkCmdBlitImage(m_commandBuffers[currentImage], m_onlyDepthBufferImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                     m_onlyDepthBufferImage,
                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_NEAREST);
 
       // Transition destination Mip Level to TRANSFER_SRC_OPTIMAL for next Blit
@@ -730,7 +735,8 @@ void CullingRenderPass::RecordCommands() {
       srcBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
       srcBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 
-      vkCmdPipelineBarrier(m_commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr,
+      vkCmdPipelineBarrier(m_commandBuffers[currentImage], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
+                           nullptr, 0, nullptr,
                            1, &srcBarrier);
     }
 
@@ -750,29 +756,29 @@ void CullingRenderPass::RecordCommands() {
     finalBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
     finalBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-    vkCmdPipelineBarrier(m_commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+    vkCmdPipelineBarrier(m_commandBuffers[currentImage], VK_PIPELINE_STAGE_TRANSFER_BIT,
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,  // 또는 필요한 셰이더 스테이지
                          0, 0, nullptr, 0, nullptr, 1, &finalBarrier);
 
-    RecordOcclusionCullingCommands();
+    RecordOcclusionCullingCommands(currentImage);
   }
-  VK_CHECK(vkEndCommandBuffer(m_commandBuffer));
+  VK_CHECK(vkEndCommandBuffer(m_commandBuffers[currentImage]));
 }
 
-void CullingRenderPass::RecordViewCullingCommands() {
-  vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipeline);
-  VK_BIND_SET_MVP_COMPUTE(m_commandBuffer, m_viewCullingComputePipelineLayout, 0);
-  vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 1, 1,
+void CullingRenderPass::RecordViewCullingCommands(uint32_t currentImage) {
+  vkCmdBindPipeline(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipeline);
+  VK_BIND_SET_MVP_COMPUTE(m_commandBuffers[currentImage], m_viewCullingComputePipelineLayout, 0);
+  vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 1, 1,
                           &g_DescriptorManager.GetVkDescriptorSet("BATCH_ALL"), 0, nullptr);
-  vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 2, 1,
+  vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 2, 1,
                           &g_DescriptorManager.GetVkDescriptorSet("ViewFrustumCulling_COMPUTE"), 0, nullptr);
 
-  vkCmdDispatch(m_commandBuffer, m_width / 256, 1, 1);
+  vkCmdDispatch(m_commandBuffers[currentImage], m_width / 256, 1, 1);
 }
 
-void CullingRenderPass::RecordOnlyDepthCommands() {
+void CullingRenderPass::RecordOnlyDepthCommands(uint32_t currentImage) {
   // Bind Pipeline to be used in render pass
-  vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_depthGraphicePipeline);
+  vkCmdBindPipeline(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_depthGraphicePipeline);
 
   //
   // mini-batch system
@@ -781,20 +787,21 @@ void CullingRenderPass::RecordOnlyDepthCommands() {
   for (auto& miniBatch : g_BatchManager.m_miniBatchList) {
     // Bind the vertex buffer with the correct offset
     VkDeviceSize vertexOffset = 0;  // Always bind at offset 0 since indirect commands handle offsets
-    vkCmdBindVertexBuffers(m_commandBuffer, 0, 1, &miniBatch.m_vertexBuffer, &vertexOffset);
+    vkCmdBindVertexBuffers(m_commandBuffers[currentImage], 0, 1, &miniBatch.m_vertexBuffer, &vertexOffset);
 
     // Bind the index buffer with the correct offset
-    vkCmdBindIndexBuffer(m_commandBuffer, miniBatch.m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindIndexBuffer(m_commandBuffers[currentImage], miniBatch.m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-    VK_BIND_SET_MVP_GRAPHICS(m_commandBuffer, m_graphicsPipelineLayout, 0);
-    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 1, 1,
+    VK_BIND_SET_MVP_GRAPHICS(m_commandBuffers[currentImage], m_graphicsPipelineLayout, 0);
+    vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 1, 1,
                             &g_DescriptorManager.GetVkDescriptorSet("BATCH_ALL"), 0, nullptr);
 
 
-    vkCmdPushConstants(m_commandBuffer, m_graphicsPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting), &g_ShaderSetting);
+    vkCmdPushConstants(m_commandBuffers[currentImage], m_graphicsPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting),
+                       &g_ShaderSetting);
 
     uint32_t drawCount = static_cast<uint32_t>(miniBatch.m_drawIndexedCommands.size());
-    vkCmdDrawIndexedIndirect(m_commandBuffer, g_BatchManager.m_indirectDrawCommandBuffer.buffer,
+    vkCmdDrawIndexedIndirect(m_commandBuffers[currentImage], g_BatchManager.m_indirectDrawCommandBuffer.buffer,
                              miniBatch.m_indirectCommandsOffset,   // offset
                              drawCount,                            // drawCount
                              sizeof(VkDrawIndexedIndirectCommand)  // stride
@@ -804,23 +811,28 @@ void CullingRenderPass::RecordOnlyDepthCommands() {
   }
 }
 
-void CullingRenderPass::RecordOcclusionCullingCommands() {
+void CullingRenderPass::RecordOcclusionCullingCommands(uint32_t currentImage) {
   //
   // Hi-Z Occlusion Culling
   //
-  vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipeline);
-  vkCmdPushConstants(m_commandBuffer, m_occlusionCullingComputePipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting),
+  vkCmdBindPipeline(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipeline);
+  vkCmdPushConstants(m_commandBuffers[currentImage], m_occlusionCullingComputePipelineLayout, VK_SHADER_STAGE_ALL, 0,
+                     sizeof(ShaderSetting),
                      &g_ShaderSetting);
 
-  vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 0, 1,
+  vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 0,
+                          1,
                           &g_DescriptorManager.GetVkDescriptorSet("SamplerList_ALL"), 0, nullptr);
-  VK_BIND_SET_MVP_COMPUTE(m_commandBuffer, m_occlusionCullingComputePipelineLayout, 1);
-  vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 2, 1,
+  VK_BIND_SET_MVP_COMPUTE(m_commandBuffers[currentImage], m_occlusionCullingComputePipelineLayout, 1);
+  vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 2,
+                          1,
                           &g_DescriptorManager.GetVkDescriptorSet("BATCH_ALL"), 0, nullptr);
-  vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 3, 1,
+  vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 3,
+                          1,
                           &g_DescriptorManager.GetVkDescriptorSet("ViewFrustumCulling_COMPUTE"), 0, nullptr);
-  vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 4, 1,
+  vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 4,
+                          1,
                           &g_DescriptorManager.GetVkDescriptorSet("DepthOnlyImage"), 0, nullptr);
 
-  vkCmdDispatch(m_commandBuffer, m_width / 256, 1, 1);
+  vkCmdDispatch(m_commandBuffers[currentImage], m_width / 256, 1, 1);
 }

@@ -55,7 +55,7 @@ class IRenderPass {
 
   virtual void Update() = 0;
 
-  virtual void Draw(VkSemaphore renderAvailable) = 0;
+  virtual void Draw(uint32_t imageIndex, VkSemaphore renderAvailable) = 0;
 
   VkDeviceAddress GetVkDeviceAddress(VkDevice device, VkBuffer buffer);
   VkStridedDeviceAddressRegionKHR GetSbtEntryStridedDeviceAddressRegion(VkDevice device, VkBuffer buffer, uint32_t handleCount);
@@ -81,5 +81,5 @@ class IRenderPass {
   virtual void CreateBuffers() = 0;
 
   virtual void CreateCommandBuffers() = 0;
-  virtual void RecordCommands() = 0;
+  virtual void RecordCommands(uint32_t currentImage) = 0;
 };

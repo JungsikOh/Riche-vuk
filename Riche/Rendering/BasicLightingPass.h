@@ -29,7 +29,7 @@ class BasicLightingPass : public IRenderPass {
 
   void RebuildAS();
 
-  virtual void Draw(VkSemaphore renderAvailable);
+  virtual void Draw(uint32_t imageIndex, VkSemaphore renderAvailable);
 
   VkImageView& GetFrameBufferImageView() { return m_colourBufferImageView; };
   VkImageView& GetDepthStencilImageView() { return m_depthStencilBufferImageView; };
@@ -68,7 +68,7 @@ class BasicLightingPass : public IRenderPass {
   void CreateSemaphores();
   virtual void CreateCommandBuffers();
 
-  virtual void RecordCommands();
+  virtual void RecordCommands(uint32_t currentImage);
   void RecordLightingPassCommands();
   void RecordRaytracingShadowCommands();
   void RecordBoundingBoxCommands();

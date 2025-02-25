@@ -272,11 +272,11 @@ void BasicLightingPass::RebuildAS() {
   vkUpdateDescriptorSets(m_pDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, VK_NULL_HANDLE);
 }
 
-void BasicLightingPass::Draw(VkSemaphore renderAvailable) {
+void BasicLightingPass::Draw(uint32_t imageIndex, VkSemaphore renderAvailable) {
   vkWaitForFences(m_pDevice, 1, &m_fence, VK_TRUE, (std::numeric_limits<uint32_t>::max)());
   vkResetFences(m_pDevice, 1, &m_fence);
 
-  RecordCommands();
+  RecordCommands(imageIndex);
 
   // RenderPass 1.
   VkSubmitInfo basicSubmitInfo = {};
@@ -1735,7 +1735,7 @@ void BasicLightingPass::CreateCommandBuffers() {
   VK_CHECK(vkAllocateCommandBuffers(m_pDevice, &cbAllocInfo, &m_commandBuffer));
 }
 
-void BasicLightingPass::RecordCommands() {
+void BasicLightingPass::RecordCommands(uint32_t currentImage) {
   VkCommandBufferBeginInfo bufferBeginInfo = {};
   bufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   bufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;  // Buffer can be resubmitted when it has already been
