@@ -621,7 +621,7 @@ void BasicLightingPass::CreatePipelineLayouts() { CreateRaytracingPipelineLayout
 void BasicLightingPass::CreateRaytracingPipelineLayout() {
   // -- PIPELINE LAYOUT (It's like Root signature in D3D12) --
   std::vector<VkDescriptorSetLayout> setLayouts = {
-      g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL"),
+      g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL0"),
       m_raytracingSetLayouts[0],
       g_DescriptorManager.GetVkDescriptorSetLayout("BATCH_ALL"),
       g_DescriptorManager.GetVkDescriptorSetLayout("DiffuseTextureList"),
@@ -782,7 +782,7 @@ void BasicLightingPass::CreateGraphicsPipeline() {
   colourBlendingCreateInfo.pAttachments = &colourState;
 
   // -- PIPELINE LAYOUT (It's like Root signature in D3D12) --
-  std::vector<VkDescriptorSetLayout> setLayouts = {g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL"),
+  std::vector<VkDescriptorSetLayout> setLayouts = {g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL0"),
                                                    g_DescriptorManager.GetVkDescriptorSetLayout("BATCH_ALL"),
                                                    g_DescriptorManager.GetVkDescriptorSetLayout("SamplerList_ALL"),
                                                    g_DescriptorManager.GetVkDescriptorSetLayout("DiffuseTextureList"),

@@ -111,14 +111,6 @@ void VulkanRenderer::Update(uint32_t imageIndex) {
 
   m_camera->Update();
 
-  m_viewProjectionCPU.view = m_camera->View();
-  m_viewProjectionCPU.projection = m_camera->Proj();
-  m_viewProjectionCPU.viewInverse = m_camera->InvView();
-  m_viewProjectionCPU.projInverse = m_camera->InvProj();
-  vkMapMemory(mainDevice.logicalDevice, m_viewProjectionUBOMemory, 0, sizeof(ViewProjection), 0, &pData);
-  memcpy(pData, &m_viewProjectionCPU, sizeof(ViewProjection));
-  vkUnmapMemory(mainDevice.logicalDevice, m_viewProjectionUBOMemory);
-
   m_viewProjections[imageIndex].view = m_camera->View();
   m_viewProjections[imageIndex].projection = m_camera->Proj();
   m_viewProjections[imageIndex].viewInverse = m_camera->InvView();
@@ -203,8 +195,10 @@ void VulkanRenderer::Cleanup() {
   // Wait Until no actions being run on device before destroying
   vkDeviceWaitIdle(mainDevice.logicalDevice);
 
-  vkDestroyBuffer(mainDevice.logicalDevice, m_viewProjectionUBO, nullptr);
-  vkFreeMemory(mainDevice.logicalDevice, m_viewProjectionUBOMemory, nullptr);
+  for (int i = 0; i < MAX_FRAME_DRAWS; ++i) {
+    vkDestroyBuffer(mainDevice.logicalDevice, m_viewProjectionBuffers[i].buffer, nullptr);
+    vkFreeMemory(mainDevice.logicalDevice, m_viewProjectionBuffers[i].memory, nullptr);
+  }
 
   g_ResourceManager.Cleanup();
   g_DescriptorLayoutCache.Cleanup();
@@ -716,22 +710,6 @@ void VulkanRenderer::CreateSamplerBuffers() {
 }
 
 void VulkanRenderer::CreateCameraBuffers() {
-  VkDeviceSize vpBufferSize = sizeof(ViewProjection);
-  VkUtils::CreateBuffer(mainDevice.logicalDevice, mainDevice.physicalDevice, vpBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &m_viewProjectionUBO,
-                        &m_viewProjectionUBOMemory);
-
-  // VIEW PROJECTION DESCRIPTOR
-  // Buffer Info and data offset info
-  VkDescriptorBufferInfo uboViewProjectionBufferInfo = {};
-  uboViewProjectionBufferInfo.buffer = m_viewProjectionUBO;    // Buffer to get data from
-  uboViewProjectionBufferInfo.offset = 0;                      // Position of start of data
-  uboViewProjectionBufferInfo.range = sizeof(ViewProjection);  // size of data
-
-  VkUtils::DescriptorBuilder vpBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
-  vpBuilder.BindBuffer(0, &uboViewProjectionBufferInfo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_ALL);
-  g_DescriptorManager.AddDescriptorSet(&vpBuilder, "ViewProjection_ALL");
-
   m_viewProjections.resize(MAX_FRAME_DRAWS);
   m_viewProjectionBuffers.resize(MAX_FRAME_DRAWS);
   for (int i = 0; i < MAX_FRAME_DRAWS; ++i) {
