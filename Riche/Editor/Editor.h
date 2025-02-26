@@ -44,7 +44,7 @@ class Editor {
 
   void Update();
 
-  void RenderImGui(VkCommandBuffer commandBuffer);
+  void RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage);
 
   void OnLeftMouseClick();
 

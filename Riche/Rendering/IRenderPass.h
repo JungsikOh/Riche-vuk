@@ -53,9 +53,9 @@ class IRenderPass {
                           Editor* editor, const uint32_t width, const uint32_t height) = 0;
   virtual void Cleanup() = 0;
 
-  virtual void Update() = 0;
+  virtual void Update(uint32_t imageIndex) = 0;
 
-  virtual void Draw(uint32_t imageIndex, VkSemaphore renderAvailable) = 0;
+  virtual void Draw(uint32_t imageIndex, VkFence fence, VkSemaphore renderAvailable) = 0;
 
   VkDeviceAddress GetVkDeviceAddress(VkDevice device, VkBuffer buffer);
   VkStridedDeviceAddressRegionKHR GetSbtEntryStridedDeviceAddressRegion(VkDevice device, VkBuffer buffer, uint32_t handleCount);

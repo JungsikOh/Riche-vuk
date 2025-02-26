@@ -273,7 +273,7 @@ void Editor::Update() {
   UpdateKeyboard();
 }
 
-void Editor::RenderImGui(VkCommandBuffer commandBuffer) {
+void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
   static float fps;
   static std::chrono::high_resolution_clock::time_point lastTime;
   static float maxFps = 0.0f;
@@ -346,7 +346,7 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer) {
 
   ImGuizmo::BeginFrame();
 
-  if (m_selectedIndex >= 0 && m_selectedIndex < (int)g_BatchManager.m_trasformList.size() && m_gizmoType != -1) {
+  if (m_selectedIndex >= 0 && m_selectedIndex < (int)g_BatchManager.m_transforms[currentImage].size() && m_gizmoType != -1) {
     g_RenderSetting.changeFlag = true;
     ImGuizmo::SetOrthographic(false);  // Persp / Ortho 설정
     ImGuizmo::Enable(true);
@@ -362,17 +362,24 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer) {
 
     glm::vec3 aabbCenter =
         (g_BatchManager.m_boundingBoxList[m_selectedIndex].min + g_BatchManager.m_boundingBoxList[m_selectedIndex].max) * 0.5f;
-    glm::mat4& tc = g_BatchManager.m_trasformList[m_selectedIndex].currentTransform;
-    glm::mat4 transform = glm::translate(tc, aabbCenter);
-    // ImGuizmo::Manipulate() 함수 호출하여 gizmo를 그리기
-    ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(proj),
-                         (ImGuizmo::OPERATION)m_gizmoType,  // 또는 필요한 조작 종류 (ROTATE, SCALE 등)
-                         ImGuizmo::MODE::LOCAL,             // 월드 좌표계 또는 로컬 좌표계 선택
-                         glm::value_ptr(transform));        // gizmo 행렬
+    {
+      glm::mat4& tc = g_BatchManager.m_transforms[currentImage][m_selectedIndex].currentTransform;
+      glm::mat4 transform = glm::translate(tc, aabbCenter);
+      // ImGuizmo::Manipulate() 함수 호출하여 gizmo를 그리기
+      ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(proj),
+                           (ImGuizmo::OPERATION)m_gizmoType,  // 또는 필요한 조작 종류 (ROTATE, SCALE 등)
+                           ImGuizmo::MODE::LOCAL,             // 월드 좌표계 또는 로컬 좌표계 선택
+                           glm::value_ptr(transform));        // gizmo 행렬
 
-    // 만약 gizmo가 조작되고 있다면 업데이트된 변환 행렬을 객체에 반영
-    if (ImGuizmo::IsUsing()) {
-      tc = transform * glm::translate(glm::mat4(1.0f), -aabbCenter);
+      // 만약 gizmo가 조작되고 있다면 업데이트된 변환 행렬을 객체에 반영
+      if (ImGuizmo::IsUsing()) {
+        tc = transform * glm::translate(glm::mat4(1.0f), -aabbCenter);
+      }
+
+      for (int i = 0; i < MAX_FRAME_DRAWS; ++i) {
+        g_BatchManager.m_transforms[i][m_selectedIndex].currentTransform = tc;
+      }
+
     }
   }
 

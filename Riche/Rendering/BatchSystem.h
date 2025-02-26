@@ -47,7 +47,7 @@ class BatchManager : public Singleton<BatchManager> {
   BatchManager() = default;
   ~BatchManager() = default;
 
-  void Update(VkDevice device);
+  void Update(VkDevice device, uint32_t imageIndex);
   void UpdateDescriptorSets(VkDevice device);
 
   void Cleanup(VkDevice device);
@@ -76,7 +76,8 @@ class BatchManager : public Singleton<BatchManager> {
 
   // Model
   std::vector<Transform> m_trasformList;
-  GpuBuffer m_transformListBuffer;
+  std::vector<Transform> m_transforms[MAX_FRAME_DRAWS];
+  std::vector<GpuBuffer> m_transformListBuffer;
 
   // Material
   std::vector<GpuImage> m_diffuseImages;

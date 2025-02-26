@@ -438,13 +438,14 @@ static bool loadGltfModel(VkDevice device, const std::string& filepath, const st
 
     GpuBuffer vertexBuffer;
     GpuBuffer indexBuffer;
+
     g_ResourceManager.CreateVertexBuffer(partial.vertices.size() * sizeof(BasicVertex), &vertexBuffer.memory, &vertexBuffer.buffer,
                                          partial.vertices.data());
     g_ResourceManager.CreateIndexBuffer(partial.indices.size() * sizeof(uint32_t), &indexBuffer.memory, &indexBuffer.buffer,
                                         partial.indices.data());
 
-    g_BatchManager.m_bbVertexBuffers.push_back(vertexBuffer);
-    g_BatchManager.m_bbIndexBuffers.push_back(indexBuffer);
+    g_BatchManager.m_bbVertexBuffers.push_back(std::move(vertexBuffer));
+    g_BatchManager.m_bbIndexBuffers.push_back(std::move(indexBuffer));
 
     outMeshes.push_back(std::move(partial));
   }

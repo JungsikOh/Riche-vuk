@@ -53,7 +53,7 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
 
     // 물체 배치를 위한 파라미터 설정
     const int numColumns = 1;
-    const int numRows = 3;          // 5 * 4 = 20 개의 물체
+    const int numRows = 1;          // 5 * 4 = 20 개의 물체
     const float spacingX = 200.0f;   // X축 간격
     const float spacingZ = 200.0f;   // Z축 간격
     const float baseHeight = 0.0f;  // 모든 물체의 높이
@@ -127,7 +127,7 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
 void VulkanRenderer::Update(uint32_t imageIndex) {
   void* pData = nullptr;
 
-  g_BatchManager.Update(mainDevice.logicalDevice);
+  g_BatchManager.Update(mainDevice.logicalDevice, imageIndex);
   // Camera Update
   {
     m_camera->Update();
@@ -146,8 +146,8 @@ void VulkanRenderer::Update(uint32_t imageIndex) {
     memcpy(pData, &m_viewProjections[imageIndex], sizeof(ViewProjection));
     vkUnmapMemory(mainDevice.logicalDevice, m_viewProjectionBuffers[imageIndex].memory);
   }
-  m_pCullingRenderPass->Update();
-  m_pLightingRenderPass->Update();
+  m_pCullingRenderPass->Update(imageIndex);
+  m_pLightingRenderPass->Update(imageIndex);
 
   m_pEditor->Update();
 }
@@ -167,11 +167,8 @@ void VulkanRenderer::Draw() {
 
   Update(imageIndex);
 
-  m_pCullingRenderPass->Update();
-  m_pCullingRenderPass->Draw(imageIndex, imageAvailable[imageIndex]);
-
-  m_pLightingRenderPass->Update();
-  m_pLightingRenderPass->Draw(imageIndex, m_pCullingRenderPass->GetSemaphore(imageIndex));
+  m_pCullingRenderPass->Draw(imageIndex, drawFences[currentFrame], imageAvailable[imageIndex]);
+  m_pLightingRenderPass->Draw(imageIndex, drawFences[currentFrame], m_pCullingRenderPass->GetSemaphore(imageIndex));
 
   RecordCommands(imageIndex);
 
@@ -244,10 +241,10 @@ void VulkanRenderer::Cleanup() {
   vkDestroyPipelineLayout(mainDevice.logicalDevice, m_offScreenPipelineLayout, nullptr);
   vkDestroyRenderPass(mainDevice.logicalDevice, m_offScreenRenderPass, nullptr);
 
-  for (auto framebuffer : m_swapchainFramebuffers) {
+  for (auto& framebuffer : m_swapchainFramebuffers) {
     vkDestroyFramebuffer(mainDevice.logicalDevice, framebuffer, nullptr);
   }
-  for (auto image : m_swapchainImages) {
+  for (auto& image : m_swapchainImages) {
     // VkImageView는 VkImage를 직접 참조해서 뷰를 생성한 것이므로, 호출해서 파괴해야한다.
     // 반면, VkImage는 스왑체인이 생성될 때 할당된 메모리 내에서 관리되므로 파괴할 필요가 없다.
     vkDestroyImageView(mainDevice.logicalDevice, image.imageView, nullptr);
@@ -1017,7 +1014,7 @@ void VulkanRenderer::FillOffScreenCommands(uint32_t currentImage) {
 
   vkCmdDraw(m_swapchainCommandBuffers[currentImage], 3, 1, 0, 0);
 
-  m_pEditor->RenderImGui(m_swapchainCommandBuffers[currentImage]);
+  m_pEditor->RenderImGui(m_swapchainCommandBuffers[currentImage] , currentImage);
 
   // End Render Pass
   vkCmdEndRenderPass(m_swapchainCommandBuffers[currentImage]);

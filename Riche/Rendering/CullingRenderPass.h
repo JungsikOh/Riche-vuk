@@ -28,12 +28,12 @@ class CullingRenderPass : public IRenderPass {
                           Editor* editor, const uint32_t width, const uint32_t height);
   virtual void Cleanup();
 
-  virtual void Update();
+  virtual void Update(uint32_t imageIndex);
 
   void SetupQueryPool();
   void GetQueryResults();
 
-  virtual void Draw(uint32_t imageIndex, VkSemaphore renderAvailable);
+  virtual void Draw(uint32_t imageIndex, VkFence fence, VkSemaphore renderAvailable);
 
   VkImageView& GetFrameBufferImageView() { return m_depthOnlyBufferImage.imageView; };
   VkSemaphore& GetSemaphore(uint32_t imageIndex) { return m_renderAvailable[imageIndex]; };
@@ -49,8 +49,6 @@ class CullingRenderPass : public IRenderPass {
   virtual void CreatePipelineLayouts();
   virtual void CreatePipelines();
   void CreateDepthGraphicsPipeline();
-  void CraeteViewCullingComputePipeline();
-  void CreateOcclusionCullingComputePipeline();
 
   virtual void CreateBuffers();
   void CreateShaderStorageBuffers();
@@ -62,8 +60,6 @@ class CullingRenderPass : public IRenderPass {
   void CreateSemaphores();
   virtual void CreateCommandBuffers();
   virtual void RecordCommands(uint32_t currentImage);
-  void RecordViewCullingCommands(uint32_t currentImage);
-  void RecordOnlyDepthCommands(uint32_t currentImage);
   void RecordOcclusionCullingCommands(uint32_t currentImage);
 
  private:
@@ -96,20 +92,7 @@ class CullingRenderPass : public IRenderPass {
   VkQueryPool m_occlusionQueryPool;
   std::vector<uint64_t> m_passedSamples;
 
-  // -- Compute Pipeline
-  VkPipeline m_viewCullingComputePipeline;
-  VkPipelineLayout m_viewCullingComputePipelineLayout;
-
-  VkPipeline m_occlusionCullingComputePipeline;
-  VkPipelineLayout m_occlusionCullingComputePipelineLayout;
-
-  // -- For debuging
-  VkBuffer m_fLODListBuffer;
-  VkDeviceMemory m_fLODListBufferMemory;
-
   VkPushConstantRange m_debugPushConstant;
 
   std::array<FrustumPlane, 6> m_frustumPlanes;
-  VkBuffer m_cameraFrustumBuffer;
-  VkDeviceMemory m_cameraFrustumBufferMemory;
 };

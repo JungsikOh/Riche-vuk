@@ -25,12 +25,12 @@ class BasicLightingPass : public IRenderPass {
                           Editor* editor, const uint32_t width, const uint32_t height);
   virtual void Cleanup();
 
-  virtual void Update();
-  void UpdateTLAS();
+  virtual void Update(uint32_t imageIndex);
+  void UpdateTLAS(uint32_t imageIndex);
 
   void RebuildAS();
 
-  virtual void Draw(uint32_t imageIndex, VkSemaphore renderAvailable);
+  virtual void Draw(uint32_t imageIndex, VkFence fence, VkSemaphore renderAvailable);
 
   VkImageView& GetFrameBufferImageView(uint32_t imageIndex) { return m_colourBufferImages[imageIndex].imageView; };
   VkImageView& GetDepthStencilImageView(uint32_t imageIndex) { return m_depthStencilBufferImages[imageIndex].imageView; };
@@ -120,10 +120,14 @@ class BasicLightingPass : public IRenderPass {
   VkImageView m_objectIdDepthStencilBufferImageView;
 
   // For Raytracing
-  std::vector<AccelerationStructure> m_bottomLevelASList;
-  AccelerationStructure m_topLevelAS;
+  std::vector<GpuImage> m_raytracingImages;
 
+  std::vector<AccelerationStructure> m_bottomLevelASList;
   std::vector<ScratchBuffer> scratchBuffers;
+
+  std::vector<AccelerationStructure> m_topLevelASList;
+  std::vector<GpuBuffer> m_instancesBuffers;
+  std::vector<ScratchBuffer> m_scratchBufferTLAS;
 
   VkPipeline m_raytracingPipeline;
   VkPipelineLayout m_raytracingPipelineLayout;
@@ -136,18 +140,10 @@ class BasicLightingPass : public IRenderPass {
     ShaderBindingTable hit;
   } shaderBindingTables;
 
-  VkBuffer instanceBuffer;
-  VkDeviceMemory instanceBufferMemory;
-
-  std::vector<GpuImage> m_raytracingImages;
-
-  ScratchBuffer m_scratchBufferTLAS;
-
   VkDescriptorPool m_raytracingPool;
   std::vector<VkDescriptorSet> m_raytracingSets;
   std::vector<VkDescriptorSetLayout> m_raytracingSetLayouts;
 
   std::vector<VkFramebuffer> m_framebuffers;
   VkFramebuffer m_objectIdFramebuffer;
-  std::vector<VkFramebuffer> m_raytracingFramebuffers;
 };

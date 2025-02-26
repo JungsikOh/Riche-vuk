@@ -1,12 +1,13 @@
 #include "BatchSystem.h"
 
-void BatchManager::Update(VkDevice device) {
+void BatchManager::Update(VkDevice device, uint32_t imageIndex) {
   void* pData = nullptr;
   // 1. Update Transform List Buffer
   {
-    vkMapMemory(device, g_BatchManager.m_transformListBuffer.memory, 0, g_BatchManager.m_transformListBuffer.size, 0, &pData);
-    memcpy(pData, g_BatchManager.m_trasformList.data(), g_BatchManager.m_transformListBuffer.size);
-    vkUnmapMemory(device, g_BatchManager.m_transformListBuffer.memory);
+    vkMapMemory(device, g_BatchManager.m_transformListBuffer[imageIndex].memory, 0,
+                g_BatchManager.m_transformListBuffer[imageIndex].size, 0, &pData);
+    memcpy(pData, g_BatchManager.m_transforms[imageIndex].data(), g_BatchManager.m_transformListBuffer[imageIndex].size);
+    vkUnmapMemory(device, g_BatchManager.m_transformListBuffer[imageIndex].memory);
   }
   // 2. Update BoundingBox
   {
@@ -18,34 +19,35 @@ void BatchManager::Update(VkDevice device) {
 }
 
 void BatchManager::UpdateDescriptorSets(VkDevice device) {
-  VkDescriptorBufferInfo transformUBOInfo = {};
-  transformUBOInfo.buffer = g_BatchManager.m_transformListBuffer.buffer;  // Buffer to get data from
-  transformUBOInfo.offset = 0;                                            // Position of start of data
-  transformUBOInfo.range = g_BatchManager.m_transformListBuffer.size;     // size of data
+  for (int i = 0; i < MAX_FRAME_DRAWS; ++i) {
+    VkDescriptorBufferInfo transformUBOInfo = {};
+    transformUBOInfo.buffer = g_BatchManager.m_transformListBuffer[i].buffer;  // Buffer to get data from
+    transformUBOInfo.offset = 0;                                               // Position of start of data
+    transformUBOInfo.range = g_BatchManager.m_transformListBuffer[i].size;     // size of data
 
-  VkDescriptorBufferInfo indirectBufferInfo = {};
-  indirectBufferInfo.buffer = g_BatchManager.m_indirectDrawCommandBuffer.buffer;  // Buffer to get data from
-  indirectBufferInfo.offset = 0;                                                  // Position of start of data
-  indirectBufferInfo.range = g_BatchManager.m_indirectDrawCommandBuffer.size;     // size of data
+    VkDescriptorBufferInfo indirectBufferInfo = {};
+    indirectBufferInfo.buffer = g_BatchManager.m_indirectDrawCommandBuffer.buffer;  // Buffer to get data from
+    indirectBufferInfo.offset = 0;                                                  // Position of start of data
+    indirectBufferInfo.range = g_BatchManager.m_indirectDrawCommandBuffer.size;     // size of data
 
-  VkDescriptorBufferInfo aabbIndirectInfo = {};
-  aabbIndirectInfo.buffer = g_BatchManager.m_boundingBoxListBuffer.buffer;  // Buffer to get data from
-  aabbIndirectInfo.offset = 0;                                              // Position of start of data
-  aabbIndirectInfo.range = g_BatchManager.m_boundingBoxListBuffer.size;     // size of data
+    VkDescriptorBufferInfo aabbIndirectInfo = {};
+    aabbIndirectInfo.buffer = g_BatchManager.m_boundingBoxListBuffer.buffer;  // Buffer to get data from
+    aabbIndirectInfo.offset = 0;                                              // Position of start of data
+    aabbIndirectInfo.range = g_BatchManager.m_boundingBoxListBuffer.size;     // size of data
 
-  VkDescriptorBufferInfo idUBOInfo = {};
-  idUBOInfo.buffer = g_BatchManager.m_objectIDBuffer.buffer;  // Buffer to get data from
-  idUBOInfo.offset = 0;                                       // Position of start of data
-  idUBOInfo.range = g_BatchManager.m_objectIDBuffer.size;     // size of data
+    VkDescriptorBufferInfo idUBOInfo = {};
+    idUBOInfo.buffer = g_BatchManager.m_objectIDBuffer.buffer;  // Buffer to get data from
+    idUBOInfo.offset = 0;                                       // Position of start of data
+    idUBOInfo.range = g_BatchManager.m_objectIDBuffer.size;     // size of data
 
-  VkUtils::DescriptorBuilder batchBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
-  batchBuilder.BindBuffer(0, &transformUBOInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL);
-  batchBuilder.BindBuffer(1, &indirectBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL);
-  batchBuilder.BindBuffer(2, &aabbIndirectInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL);
-  batchBuilder.BindBuffer(3, &idUBOInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL);
+    VkUtils::DescriptorBuilder batchBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
+    batchBuilder.BindBuffer(0, &transformUBOInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL);
+    batchBuilder.BindBuffer(1, &indirectBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL);
+    batchBuilder.BindBuffer(2, &aabbIndirectInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL);
+    batchBuilder.BindBuffer(3, &idUBOInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL);
 
-  g_DescriptorManager.UpdateDescriptorSet(&batchBuilder, g_DescriptorManager.GetVkDescriptorSet("BATCH_ALL"));
-
+    g_DescriptorManager.UpdateDescriptorSet(&batchBuilder, g_DescriptorManager.GetVkDescriptorSet("BATCH_ALL" + std::to_string(i)));
+  }
   /*
    * Textures (for Lighting)
    */
@@ -74,9 +76,10 @@ void BatchManager::Cleanup(VkDevice device) {
   vkDestroyBuffer(device, m_boundingBoxListBuffer.buffer, nullptr);
   vkFreeMemory(device, m_boundingBoxListBuffer.memory, nullptr);
 
-  vkDestroyBuffer(device, m_transformListBuffer.buffer, nullptr);
-  vkFreeMemory(device, m_transformListBuffer.memory, nullptr);
-
+  for (int i = 0; i < MAX_FRAME_DRAWS; ++i) {
+    vkDestroyBuffer(device, m_transformListBuffer[i].buffer, nullptr);
+    vkFreeMemory(device, m_transformListBuffer[i].memory, nullptr);
+  }
   vkDestroyBuffer(device, m_objectIDBuffer.buffer, nullptr);
   vkFreeMemory(device, m_objectIDBuffer.memory, nullptr);
 
@@ -101,6 +104,13 @@ void BatchManager::Cleanup(VkDevice device) {
 
     vkDestroyBuffer(device, m_boundingBoxBufferList[i].indexBuffer, nullptr);
     vkFreeMemory(device, m_boundingBoxBufferList[i].indexBufferMemory, nullptr);
+  }
+
+  for (int i = 0; i < m_meshes.size(); ++i) {
+    vkDestroyBuffer(device, m_bbVertexBuffers[i].buffer, nullptr);
+    vkFreeMemory(device, m_bbVertexBuffers[i].memory, nullptr);
+    vkDestroyBuffer(device, m_bbIndexBuffers[i].buffer, nullptr);
+    vkFreeMemory(device, m_bbIndexBuffers[i].memory, nullptr);
   }
 }
 
@@ -205,33 +215,35 @@ void BatchManager::CreateBatchManagerBuffers(VkDevice device, VkPhysicalDevice p
 }
 
 void BatchManager::CreateDescriptorSets(VkDevice device, VkPhysicalDevice physicalDevice) {
-  VkDescriptorBufferInfo transformUBOInfo = {};
-  transformUBOInfo.buffer = g_BatchManager.m_transformListBuffer.buffer;  // Buffer to get data from
-  transformUBOInfo.offset = 0;                                            // Position of start of data
-  transformUBOInfo.range = g_BatchManager.m_transformListBuffer.size;     // size of data
+  for (int i = 0; i < MAX_FRAME_DRAWS; ++i) {
+    VkDescriptorBufferInfo transformUBOInfo = {};
+    transformUBOInfo.buffer = g_BatchManager.m_transformListBuffer[i].buffer;  // Buffer to get data from
+    transformUBOInfo.offset = 0;                                               // Position of start of data
+    transformUBOInfo.range = g_BatchManager.m_transformListBuffer[i].size;     // size of data
 
-  VkDescriptorBufferInfo indirectBufferInfo = {};
-  indirectBufferInfo.buffer = g_BatchManager.m_indirectDrawCommandBuffer.buffer;  // Buffer to get data from
-  indirectBufferInfo.offset = 0;                                                  // Position of start of data
-  indirectBufferInfo.range = g_BatchManager.m_indirectDrawCommandBuffer.size;     // size of data
+    VkDescriptorBufferInfo indirectBufferInfo = {};
+    indirectBufferInfo.buffer = g_BatchManager.m_indirectDrawCommandBuffer.buffer;  // Buffer to get data from
+    indirectBufferInfo.offset = 0;                                                  // Position of start of data
+    indirectBufferInfo.range = g_BatchManager.m_indirectDrawCommandBuffer.size;     // size of data
 
-  VkDescriptorBufferInfo aabbIndirectInfo = {};
-  aabbIndirectInfo.buffer = g_BatchManager.m_boundingBoxListBuffer.buffer;  // Buffer to get data from
-  aabbIndirectInfo.offset = 0;                                              // Position of start of data
-  aabbIndirectInfo.range = g_BatchManager.m_boundingBoxListBuffer.size;     // size of data
+    VkDescriptorBufferInfo aabbIndirectInfo = {};
+    aabbIndirectInfo.buffer = g_BatchManager.m_boundingBoxListBuffer.buffer;  // Buffer to get data from
+    aabbIndirectInfo.offset = 0;                                              // Position of start of data
+    aabbIndirectInfo.range = g_BatchManager.m_boundingBoxListBuffer.size;     // size of data
 
-  VkDescriptorBufferInfo idUBOInfo = {};
-  idUBOInfo.buffer = g_BatchManager.m_objectIDBuffer.buffer;  // Buffer to get data from
-  idUBOInfo.offset = 0;                                       // Position of start of data
-  idUBOInfo.range = g_BatchManager.m_objectIDBuffer.size;     // size of data
+    VkDescriptorBufferInfo idUBOInfo = {};
+    idUBOInfo.buffer = g_BatchManager.m_objectIDBuffer.buffer;  // Buffer to get data from
+    idUBOInfo.offset = 0;                                       // Position of start of data
+    idUBOInfo.range = g_BatchManager.m_objectIDBuffer.size;     // size of data
 
-  VkUtils::DescriptorBuilder batchBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
-  batchBuilder.BindBuffer(0, &transformUBOInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL);
-  batchBuilder.BindBuffer(1, &indirectBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL);
-  batchBuilder.BindBuffer(2, &aabbIndirectInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL);
-  batchBuilder.BindBuffer(3, &idUBOInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL);
+    VkUtils::DescriptorBuilder batchBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
+    batchBuilder.BindBuffer(0, &transformUBOInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL);
+    batchBuilder.BindBuffer(1, &indirectBufferInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL);
+    batchBuilder.BindBuffer(2, &aabbIndirectInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL);
+    batchBuilder.BindBuffer(3, &idUBOInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL);
 
-  g_DescriptorManager.AddDescriptorSet(&batchBuilder, "BATCH_ALL");
+    g_DescriptorManager.AddDescriptorSet(&batchBuilder, "BATCH_ALL" + std::to_string(i));
+  }
 
   /*
    * Textures (for Lighting)
@@ -262,9 +274,10 @@ void BatchManager::RebuildBatchManager(VkDevice device, VkPhysicalDevice physica
     vkDestroyBuffer(device, m_boundingBoxListBuffer.buffer, nullptr);
     vkFreeMemory(device, m_boundingBoxListBuffer.memory, nullptr);
 
-    vkDestroyBuffer(device, m_transformListBuffer.buffer, nullptr);
-    vkFreeMemory(device, m_transformListBuffer.memory, nullptr);
-
+    for (int i = 0; i < MAX_FRAME_DRAWS; ++i) {
+      vkDestroyBuffer(device, m_transformListBuffer[i].buffer, nullptr);
+      vkFreeMemory(device, m_transformListBuffer[i].memory, nullptr);
+    }
     vkDestroyBuffer(device, m_objectIDBuffer.buffer, nullptr);
     vkFreeMemory(device, m_objectIDBuffer.memory, nullptr);
 
@@ -285,17 +298,21 @@ void BatchManager::RebuildBatchManager(VkDevice device, VkPhysicalDevice physica
 
 void BatchManager::CreateTransformListBuffers(VkDevice device, VkPhysicalDevice physicalDevice) {
   void* pData = nullptr;
-
+  m_transformListBuffer.resize(MAX_FRAME_DRAWS);
   // Transform
   VkDeviceSize transformBufferSize = static_cast<uint64_t>(m_trasformList.size() * sizeof(Transform));
-  m_transformListBuffer.size = transformBufferSize;
-  VkUtils::CreateBuffer(device, physicalDevice, transformBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &m_transformListBuffer.buffer,
-                        &m_transformListBuffer.memory);
+  for (int i = 0; i < MAX_FRAME_DRAWS; ++i) {
+    m_transforms[i] = m_trasformList;
+    m_transformListBuffer[i].size = transformBufferSize;
 
-  vkMapMemory(device, m_transformListBuffer.memory, 0, transformBufferSize, 0, &pData);
-  memcpy(pData, m_trasformList.data(), (size_t)transformBufferSize);
-  vkUnmapMemory(device, m_transformListBuffer.memory);
+    VkUtils::CreateBuffer(device, physicalDevice, transformBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &m_transformListBuffer[i].buffer,
+                          &m_transformListBuffer[i].memory);
+
+    vkMapMemory(device, m_transformListBuffer[i].memory, 0, transformBufferSize, 0, &pData);
+    memcpy(pData, m_trasformList.data(), (size_t)transformBufferSize);
+    vkUnmapMemory(device, m_transformListBuffer[i].memory);
+  }
 }
 
 void BatchManager::CreateIndirectDrawBuffers(VkDevice device, VkPhysicalDevice physicalDevice) {

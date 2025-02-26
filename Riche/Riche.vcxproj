@@ -189,6 +189,7 @@
     <ClInclude Include="Rendering\CullingRenderPass.h" />
     <ClInclude Include="Rendering\Mesh.h" />
     <ClInclude Include="Rendering\Core.h" />
+    <ClInclude Include="Rendering\PostprocessingPass.h" />
     <ClInclude Include="Rendering\RenderSetting.h" />
     <ClInclude Include="Rendering\Swapchain.h" />
     <ClInclude Include="Utils\BoundingBox.h" />
