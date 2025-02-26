@@ -51,8 +51,27 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
     m_pEditor->Initialize(window, instance, mainDevice.logicalDevice, mainDevice.physicalDevice, m_queueFamilyIndices, m_graphicsQueue,
                           m_camera);
 
+    // 물체 배치를 위한 파라미터 설정
+    const int numColumns = 1;
+    const int numRows = 3;          // 5 * 4 = 20 개의 물체
+    const float spacingX = 200.0f;   // X축 간격
+    const float spacingZ = 200.0f;   // Z축 간격
+    const float baseHeight = 0.0f;  // 모든 물체의 높이
+
+    // Mesh들을 저장할 벡터 (기존 코드와 동일)
     std::vector<Mesh>& outMeshes = g_BatchManager.m_meshes;
-    loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f);
+
+    // 각 그리드 위치에 대해 물체를 로드합니다.
+    for (int row = 0; row < numRows; ++row) {
+      for (int col = 0; col < numColumns; ++col) {
+        // 계산된 위치: x와 z는 격자에 따라, y는 고정
+        glm::vec3 pos(col * spacingX, baseHeight, row * spacingZ);
+        // 위치 정보를 인자로 추가한 오버로딩된 loadGltfModel 호출
+        loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f, pos);
+      }
+    }
+
+    // 이후 기존 코드에 따라 BatchManager의 데이터를 flush하거나 추가 작업 진행
     g_BatchManager.FlushMiniBatch(g_BatchManager.m_miniBatchList, g_ResourceManager);
 
     int rayCount = 0, count = 0;
@@ -88,7 +107,8 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
     m_pLightingRenderPass->Initialize(mainDevice.logicalDevice, mainDevice.physicalDevice, m_graphicsQueue, m_graphicsCommandPool,
                                       m_camera, m_pEditor.get(), swapChainExtent.width, swapChainExtent.height);
 
-    m_pEditor->SetPass(m_pLightingRenderPass.get());
+    m_pEditor->m_pCullingPass = m_pCullingRenderPass.get();
+    m_pEditor->m_pLightingPass = m_pLightingRenderPass.get();
 
     /// OffScreen Pipeline
     CreateRenderPass();
@@ -108,17 +128,24 @@ void VulkanRenderer::Update(uint32_t imageIndex) {
   void* pData = nullptr;
 
   g_BatchManager.Update(mainDevice.logicalDevice);
+  // Camera Update
+  {
+    m_camera->Update();
 
-  m_camera->Update();
+    m_viewProjections[imageIndex].prevView = m_viewProjections[imageIndex].view;
+    m_viewProjections[imageIndex].prevProjection = m_viewProjections[imageIndex].projection;
+    m_viewProjections[imageIndex].prevViewInverse = m_viewProjections[imageIndex].viewInverse;
+    m_viewProjections[imageIndex].prevProjInverse = m_viewProjections[imageIndex].projInverse;
 
-  m_viewProjections[imageIndex].view = m_camera->View();
-  m_viewProjections[imageIndex].projection = m_camera->Proj();
-  m_viewProjections[imageIndex].viewInverse = m_camera->InvView();
-  m_viewProjections[imageIndex].projInverse = m_camera->InvProj();
-  vkMapMemory(mainDevice.logicalDevice, m_viewProjectionBuffers[imageIndex].memory, 0, sizeof(ViewProjection), 0, &pData);
-  memcpy(pData, &m_viewProjections[imageIndex], sizeof(ViewProjection));
-  vkUnmapMemory(mainDevice.logicalDevice, m_viewProjectionBuffers[imageIndex].memory);
+    m_viewProjections[imageIndex].view = m_camera->View();
+    m_viewProjections[imageIndex].projection = m_camera->Proj();
+    m_viewProjections[imageIndex].viewInverse = m_camera->InvView();
+    m_viewProjections[imageIndex].projInverse = m_camera->InvProj();
 
+    vkMapMemory(mainDevice.logicalDevice, m_viewProjectionBuffers[imageIndex].memory, 0, sizeof(ViewProjection), 0, &pData);
+    memcpy(pData, &m_viewProjections[imageIndex], sizeof(ViewProjection));
+    vkUnmapMemory(mainDevice.logicalDevice, m_viewProjectionBuffers[imageIndex].memory);
+  }
   m_pCullingRenderPass->Update();
   m_pLightingRenderPass->Update();
 

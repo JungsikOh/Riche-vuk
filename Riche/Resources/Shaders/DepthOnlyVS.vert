@@ -17,6 +17,11 @@ layout(set = 0, binding = 0) uniform U_Camera
 	mat4 projection;
     mat4 viewInverse;
     mat4 projInverse;
+
+	mat4 prevView;
+	mat4 prevProjection;
+	mat4 prevViewInverse;
+	mat4 prevProjInverse;
 } u_Camera;
 
 layout(set = 1, binding = 0) readonly buffer SSBO_Model
@@ -26,6 +31,6 @@ layout(set = 1, binding = 0) readonly buffer SSBO_Model
 
 
 void main() {
-	mat4 model = nonuniformEXT(ssbo_Model.transform[u_ShaderSetting.batchIdx + gl_BaseInstanceARB].currentModel);
+	mat4 model = nonuniformEXT(ssbo_Model.transform[u_ShaderSetting.batchIdx].currentModel);
 	gl_Position = u_Camera.projection * u_Camera.view * model * vec4(inPosition, 1.0);
 }

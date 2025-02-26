@@ -90,6 +90,10 @@ class BatchManager : public Singleton<BatchManager> {
   // - Each bounding box array (for visible bounding box)
   std::vector<AABBBufferList> m_boundingBoxBufferList;
 
+  // TEst
+  std::vector<GpuBuffer> m_bbVertexBuffers;
+  std::vector<GpuBuffer> m_bbIndexBuffers;
+
   /*
     Ray Tracing
   */

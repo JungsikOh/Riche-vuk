@@ -29,9 +29,9 @@ class Editor {
   VkDescriptorPool m_ImguiDescriptorPool;
   VkRenderPass renderPass;
 
+ public:
+  CullingRenderPass* m_pCullingPass;
   BasicLightingPass* m_pLightingPass;
-
-
 
  public:
   Editor() = default;
@@ -39,8 +39,6 @@ class Editor {
 
   void Initialize(GLFWwindow* window, VkInstance instance, VkDevice device, VkPhysicalDevice physicalDevice,
                   VkUtils::QueueFamilyIndices queueFamily, VkQueue graphicsQueue, Camera* camera);
-
-  void SetPass(BasicLightingPass* pass);
 
   void Cleanup();
 

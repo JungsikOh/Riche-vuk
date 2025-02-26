@@ -30,9 +30,12 @@ class CullingRenderPass : public IRenderPass {
 
   virtual void Update();
 
+  void SetupQueryPool();
+  void GetQueryResults();
+
   virtual void Draw(uint32_t imageIndex, VkSemaphore renderAvailable);
 
-  VkImageView& GetFrameBufferImageView() { return m_onlyDepthBufferImageViews[0]; };
+  VkImageView& GetFrameBufferImageView() { return m_depthOnlyBufferImage.imageView; };
   VkSemaphore& GetSemaphore(uint32_t imageIndex) { return m_renderAvailable[imageIndex]; };
 
  private:
@@ -87,11 +90,11 @@ class CullingRenderPass : public IRenderPass {
   VkPipeline m_depthGraphicePipeline;  // Use a same GraphicsPipelineLayout
   VkPipelineLayout m_graphicsPipelineLayout;
 
-  VkImage m_onlyDepthBufferImage;
-  VkDeviceMemory m_onlyDepthBufferImageMemory;
-  std::vector<VkImageView> m_onlyDepthBufferImageViews;
+  GpuImage m_depthOnlyBufferImage;
+  VkFramebuffer m_depthOnlyFramebuffer;  // mipmap 喊肺 积己.
 
-  std::vector<VkFramebuffer> m_depthFramebuffers;  // mipmap 喊肺 积己.
+  VkQueryPool m_occlusionQueryPool;
+  std::vector<uint64_t> m_passedSamples;
 
   // -- Compute Pipeline
   VkPipeline m_viewCullingComputePipeline;
@@ -106,6 +109,7 @@ class CullingRenderPass : public IRenderPass {
 
   VkPushConstantRange m_debugPushConstant;
 
+  std::array<FrustumPlane, 6> m_frustumPlanes;
   VkBuffer m_cameraFrustumBuffer;
   VkDeviceMemory m_cameraFrustumBufferMemory;
 };

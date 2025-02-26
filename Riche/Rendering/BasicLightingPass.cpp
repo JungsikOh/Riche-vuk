@@ -117,6 +117,7 @@ void BasicLightingPass::Update() {
   if (m_pCamera->isMousePressed) {
     m_pCamera->result = g_ResourceManager.ReadPixelFromImage(m_objectIdColourBufferImage, m_width, m_height, m_pCamera->MousePos().x,
                                                              m_pCamera->MousePos().y);
+    std::cout << m_pCamera->result.r << std::endl;
   }
 
   UpdateTLAS();
@@ -577,7 +578,7 @@ void BasicLightingPass::CreateRaytracingFramebuffer() {
       imageCreateInfo.arrayLayers = 1;                          // Number of levels in image array
       imageCreateInfo.format = colourImageFormat;               // Format type of image
       imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;         // How image data should be "tiled" (arranged for optimal reading)
-      imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_GENERAL;  // Layout of image data on creation (프레임버퍼에 맞게 변형됨)
+      imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;  // Layout of image data on creation (프레임버퍼에 맞게 변형됨)
       imageCreateInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
                               VK_IMAGE_USAGE_STORAGE_BIT;       // Bit flags defining what image will be used for
       imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;          // Number of samples for multi-sampling
@@ -608,7 +609,7 @@ void BasicLightingPass::CreateRaytracingFramebuffer() {
     raytracingBuilder.BindImage(0, &shadowImageInfo, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_ALL);
     g_DescriptorManager.AddDescriptorSet(&raytracingBuilder, "ShadowTexture_ALL" + std::to_string(i));
 
-    VkUtils::CmdImageBarrier(commandBuffer, m_raytracingImages[i].image, VK_IMAGE_LAYOUT_GENERAL,
+    VkUtils::CmdImageBarrier(commandBuffer, m_raytracingImages[i].image, VK_IMAGE_LAYOUT_UNDEFINED,
                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, VK_ACCESS_SHADER_READ_BIT,
                              VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                              VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR);
@@ -1067,7 +1068,7 @@ void BasicLightingPass::CreateBoundingBoxPipeline() {
   VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
   inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
   // List versus Strip: 연속된 점(Strip), 딱 딱 끊어서 (List)
-  inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;  // Primitive type to assemble vertices
+  inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;  // Primitive type to assemble vertices
   inputAssembly.primitiveRestartEnable = VK_FALSE;           // Allow overriding of "strip" topology to start new primitives
 
   // -- VIPEPORT & SCISSOR --
@@ -1838,13 +1839,6 @@ void BasicLightingPass::RecordCommands(uint32_t currentImage) {
   // End Render Pass
   vkCmdEndRenderPass(m_commandBuffers[currentImage]);
 
-  VkUtils::CmdImageBarrier(m_commandBuffers[currentImage], m_colourBufferImages[currentImage].image,
-                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                           VK_IMAGE_ASPECT_COLOR_BIT);
-  VkUtils::CmdImageBarrier(m_commandBuffers[currentImage], m_depthStencilBufferImages[currentImage].image,
-                           VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                           VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
-
   /*
    * Object Id commands
    */
@@ -1869,6 +1863,14 @@ void BasicLightingPass::RecordCommands(uint32_t currentImage) {
   RecordObjectIDPassCommands(currentImage);
 
   vkCmdEndRenderPass(m_commandBuffers[currentImage]);
+
+  
+  VkUtils::CmdImageBarrier(m_commandBuffers[currentImage], m_colourBufferImages[currentImage].image,
+                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                           VK_IMAGE_ASPECT_COLOR_BIT);
+  VkUtils::CmdImageBarrier(m_commandBuffers[currentImage], m_depthStencilBufferImages[currentImage].image,
+                           VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                           VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
 
   // Stop recording commands to command buffer!
   VK_CHECK(vkEndCommandBuffer(m_commandBuffers[currentImage]));
@@ -1941,6 +1943,11 @@ void BasicLightingPass::RecordBoundingBoxCommands(uint32_t currentImage) {
   /*
    * BoundingBox Renderer
    */
+  std::vector<VkDrawIndexedIndirectCommand> commands{};
+  for (auto& batch : g_BatchManager.m_miniBatchList) {
+    commands.insert(commands.end(), batch.m_drawIndexedCommands.begin(), batch.m_drawIndexedCommands.end());
+  }
+
   g_ShaderSetting.batchIdx = 0;
   if (g_RenderSetting.isRenderBoundingBox) {
     vkCmdBindPipeline(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_boundingBoxPipeline);
@@ -1962,7 +1969,7 @@ void BasicLightingPass::RecordBoundingBoxCommands(uint32_t currentImage) {
       vkCmdPushConstants(m_commandBuffers[currentImage], m_graphicsPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting),
                          &g_ShaderSetting);
 
-      vkCmdDrawIndexed(m_commandBuffers[currentImage], 24, 1, 0, 0, 0);
+      vkCmdDrawIndexed(m_commandBuffers[currentImage], 36, commands[i].instanceCount, 0, 0, 0);
       g_ShaderSetting.batchIdx += 1;
     }
   }

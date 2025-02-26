@@ -14,6 +14,11 @@ struct ViewProjection {
   glm::mat4 projection;
   glm::mat4 viewInverse;
   glm::mat4 projInverse;
+
+  glm::mat4 prevView;
+  glm::mat4 prevProjection;
+  glm::mat4 prevViewInverse;
+  glm::mat4 prevProjInverse;
 };
 
 struct ShaderSetting : public Singleton<ShaderSetting> {

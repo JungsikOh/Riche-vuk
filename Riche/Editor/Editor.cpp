@@ -98,6 +98,7 @@ void Editor::ShowFileBrowserUI(const std::string& filter) {
           }
 
           g_BatchManager.RebuildBatchManager(mainDevice.logicalDevice, mainDevice.physicalDevice);
+          m_pCullingPass->SetupQueryPool();
           m_pLightingPass->RebuildAS();
           // 선택 후 브라우저 닫기
           g_ShowFileBrowser = false;
@@ -258,8 +259,6 @@ void Editor::Initialize(GLFWwindow* window, VkInstance instance, VkDevice device
   ImGui_ImplVulkan_DestroyFontsTexture();
 }
 
-void Editor::SetPass(BasicLightingPass* pass) { m_pLightingPass = pass; }
-
 void Editor::Cleanup() {
   ImGui_ImplVulkan_Shutdown();
   ImGui_ImplGlfw_Shutdown();
@@ -338,6 +337,7 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer) {
   ImGui::End();
 
   ImGui::Begin("Rendering");
+  ImGui::Checkbox("Multi Threading Culling", &(g_RenderSetting.isMultiThreading));
   ImGui::Checkbox("Wire Frame", &(g_RenderSetting.isWireRendering));
   ImGui::Checkbox("Occlusion Culling", &(g_RenderSetting.isOcclusionCulling));
   ImGui::Checkbox("View BoundingBox", &(g_RenderSetting.isRenderBoundingBox));

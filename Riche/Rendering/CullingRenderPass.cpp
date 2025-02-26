@@ -30,6 +30,8 @@ void CullingRenderPass::Initialize(VkDevice device, VkPhysicalDevice physicalDev
   CreatePipelineLayouts();
   CreatePipelines();
 
+  SetupQueryPool();
+
   /*
    * Synchronization + Command Buffer
    */
@@ -62,13 +64,10 @@ void CullingRenderPass::Cleanup() {
 #endif  // _DEBUG
 
   // DepthOnly
-  for (int i = 0; i < HIZ_MIP_LEVEL; ++i) {
-    vkDestroyFramebuffer(m_pDevice, m_depthFramebuffers[i], nullptr);
-    vkDestroyImageView(m_pDevice, m_onlyDepthBufferImageViews[i], nullptr);
-  }
-  vkDestroyImageView(m_pDevice, m_onlyDepthBufferImageViews[HIZ_MIP_LEVEL], nullptr);
-  vkDestroyImage(m_pDevice, m_onlyDepthBufferImage, nullptr);
-  vkFreeMemory(m_pDevice, m_onlyDepthBufferImageMemory, nullptr);
+  vkDestroyFramebuffer(m_pDevice, m_depthOnlyFramebuffer, nullptr);
+  vkDestroyImageView(m_pDevice, m_depthOnlyBufferImage.imageView, nullptr);
+  vkDestroyImage(m_pDevice, m_depthOnlyBufferImage.image, nullptr);
+  vkFreeMemory(m_pDevice, m_depthOnlyBufferImage.memory, nullptr);
 
   vkDestroyPipeline(m_pDevice, m_depthGraphicePipeline, nullptr);
   vkDestroyRenderPass(m_pDevice, m_depthRenderPass, nullptr);
@@ -78,11 +77,32 @@ void CullingRenderPass::Update() {
   void* pData = nullptr;
   // Update Camera frustum
   {
+    m_frustumPlanes = CalculateFrustumPlanes(m_pCamera->ViewProj());
     std::array<FrustumPlane, 6> cameraFrustumPlanes = CalculateFrustumPlanes(m_pCamera->ViewProj());
     VkDeviceSize cameraPlaneSize = sizeof(FrustumPlane) * cameraFrustumPlanes.size();
     vkMapMemory(m_pDevice, m_cameraFrustumBufferMemory, 0, cameraPlaneSize, 0, &pData);
     memcpy(pData, cameraFrustumPlanes.data(), cameraPlaneSize);
     vkUnmapMemory(m_pDevice, m_cameraFrustumBufferMemory);
+  }
+
+  if (g_RenderSetting.isOcclusionCulling) {
+    int accumulatedIndex = 0;
+    std::vector<VkDrawIndexedIndirectCommand> commands{};
+    for (auto& batch : g_BatchManager.m_miniBatchList) {
+      for (int i = 0; i < batch.m_drawIndexedCommands.size(); ++i) {
+        if (m_passedSamples[accumulatedIndex++] != 0) {
+          batch.m_drawIndexedCommands[i].instanceCount = 1;
+        } else {
+          batch.m_drawIndexedCommands[i].instanceCount = 0;
+        }
+        // if(accumulatedIndex != m_passedSamples.size()) std::cout << m_passedSamples[accumulatedIndex] << ", ";
+      }
+      commands.insert(commands.end(), batch.m_drawIndexedCommands.begin(), batch.m_drawIndexedCommands.end());
+    }
+    vkMapMemory(m_pDevice, g_BatchManager.m_indirectDrawCommandBuffer.memory, 0, g_BatchManager.m_indirectDrawCommandBuffer.size, 0,
+                &pData);
+    memcpy(pData, commands.data(), g_BatchManager.m_indirectDrawCommandBuffer.size);
+    vkUnmapMemory(m_pDevice, g_BatchManager.m_indirectDrawCommandBuffer.memory);
   }
 
   /*
@@ -129,6 +149,10 @@ void CullingRenderPass::Draw(uint32_t imageIndex, VkSemaphore renderAvailable) {
   // Command buffer가 실행을 완료하면, Signaled 상태가 될 semaphore 배열.
 
   VK_CHECK(vkQueueSubmit(m_pGraphicsQueue, 1, &basicSubmitInfo, m_fence[imageIndex]));
+
+  if (g_RenderSetting.isOcclusionCulling) {
+    GetQueryResults();
+  }
 }
 
 void CullingRenderPass::CreateRenderPass() { CreateDepthRenderPass(); }
@@ -205,33 +229,27 @@ void CullingRenderPass::CreateDepthFramebuffer() {
   VkFormat depthImageFormat = VkUtils::ChooseSupportedFormat(m_pPhyscialDevice, {VK_FORMAT_D32_SFLOAT}, VK_IMAGE_TILING_OPTIMAL,
                                                              VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-  VkUtils::CreateImage2D(m_pDevice, m_pPhyscialDevice, m_width, m_height, &m_onlyDepthBufferImageMemory, &m_onlyDepthBufferImage,
-                         depthImageFormat,
+  VkUtils::CreateImage2D(m_pDevice, m_pPhyscialDevice, m_width, m_height, &m_depthOnlyBufferImage.memory,
+                         &m_depthOnlyBufferImage.image, depthImageFormat,
                          VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                              VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, HIZ_MIP_LEVEL);
+                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-  m_onlyDepthBufferImageViews.resize(HIZ_MIP_LEVEL + 1);
-  m_depthFramebuffers.resize(HIZ_MIP_LEVEL);
-  for (int i = 0; i < HIZ_MIP_LEVEL; ++i) {
-    VkUtils::CreateImageView(m_pDevice, m_onlyDepthBufferImage, &m_onlyDepthBufferImageViews[i], depthImageFormat,
-                             VK_IMAGE_ASPECT_DEPTH_BIT, i, 1);
+  VkUtils::CreateImageView(m_pDevice, m_depthOnlyBufferImage.image, &m_depthOnlyBufferImage.imageView, depthImageFormat,
+                           VK_IMAGE_ASPECT_DEPTH_BIT);
 
-    std::array<VkImageView, 1> attachments = {m_onlyDepthBufferImageViews[i]};
+  std::array<VkImageView, 1> attachments = {m_depthOnlyBufferImage.imageView};
 
-    VkFramebufferCreateInfo framebufferCreateInfo = {};
-    framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    framebufferCreateInfo.renderPass = m_depthRenderPass;  // Render pass layout the framebuffer will be used with
-    framebufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-    framebufferCreateInfo.pAttachments = attachments.data();     // List of attachments (1:1 with render pass)
-    framebufferCreateInfo.width = std::max(m_width >> i, 1u);    // framebuffer width
-    framebufferCreateInfo.height = std::max(m_height >> i, 1u);  // framebuffer height
-    framebufferCreateInfo.layers = 1;                            // framebuffer layers
+  VkFramebufferCreateInfo framebufferCreateInfo = {};
+  framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+  framebufferCreateInfo.renderPass = m_depthRenderPass;  // Render pass layout the framebuffer will be used with
+  framebufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+  framebufferCreateInfo.pAttachments = attachments.data();  // List of attachments (1:1 with render pass)
+  framebufferCreateInfo.width = m_width;                    // framebuffer width
+  framebufferCreateInfo.height = m_height;                  // framebuffer height
+  framebufferCreateInfo.layers = 1;                         // framebuffer layers
 
-    VK_CHECK(vkCreateFramebuffer(m_pDevice, &framebufferCreateInfo, nullptr, &m_depthFramebuffers[i]));
-  }
-  VkUtils::CreateImageView(m_pDevice, m_onlyDepthBufferImage, &m_onlyDepthBufferImageViews[HIZ_MIP_LEVEL], depthImageFormat,
-                           VK_IMAGE_ASPECT_DEPTH_BIT, 0, HIZ_MIP_LEVEL);
+  VK_CHECK(vkCreateFramebuffer(m_pDevice, &framebufferCreateInfo, nullptr, &m_depthOnlyFramebuffer));
 }
 
 void CullingRenderPass::CreatePipelineLayouts() {
@@ -253,47 +271,10 @@ void CullingRenderPass::CreatePipelineLayouts() {
 
     VK_CHECK(vkCreatePipelineLayout(m_pDevice, &grahpicsPipelineLayoutCreateInfo, nullptr, &m_graphicsPipelineLayout));
   }
-  // Hi-z Occlusion Culling
-  {
-    std::array<VkDescriptorSetLayout, 5> setCullingLayouts = {
-        g_DescriptorManager.GetVkDescriptorSetLayout("SamplerList_ALL"),
-        g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL0"), g_DescriptorManager.GetVkDescriptorSetLayout("BATCH_ALL"),
-        g_DescriptorManager.GetVkDescriptorSetLayout("ViewFrustumCulling_COMPUTE"),
-        g_DescriptorManager.GetVkDescriptorSetLayout("DepthOnlyImage")};
-
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
-    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = setCullingLayouts.size();
-    pipelineLayoutInfo.pSetLayouts = setCullingLayouts.data();
-    pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &m_debugPushConstant;
-
-    VK_CHECK(vkCreatePipelineLayout(m_pDevice, &pipelineLayoutInfo, nullptr, &m_occlusionCullingComputePipelineLayout));
-  }
-
-  // View Frustum culling
-  {
-    std::array<VkDescriptorSetLayout, 3> setViewCullingLayouts = {
-        g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL0"),
-        g_DescriptorManager.GetVkDescriptorSetLayout("BATCH_ALL"),
-        g_DescriptorManager.GetVkDescriptorSetLayout("ViewFrustumCulling_COMPUTE"),
-    };
-
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
-    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = setViewCullingLayouts.size();
-    pipelineLayoutInfo.pSetLayouts = setViewCullingLayouts.data();
-    pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &m_debugPushConstant;
-
-    VK_CHECK(vkCreatePipelineLayout(m_pDevice, &pipelineLayoutInfo, nullptr, &m_viewCullingComputePipelineLayout));
-  }
 }
 
 void CullingRenderPass::CreatePipelines() {
   CreateDepthGraphicsPipeline();
-  CraeteViewCullingComputePipeline();
-  CreateOcclusionCullingComputePipeline();
 }
 
 void CullingRenderPass::CreateDepthGraphicsPipeline() {
@@ -503,6 +484,26 @@ void CullingRenderPass::CreateOcclusionCullingComputePipeline() {
   vkDestroyShaderModule(m_pDevice, computeShaderModule, nullptr);
 }
 
+void CullingRenderPass::SetupQueryPool() {
+  m_passedSamples.resize(g_BatchManager.m_meshes.size());
+
+  VkQueryPoolCreateInfo queryPoolInfo = {};
+  queryPoolInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+  queryPoolInfo.queryType = VK_QUERY_TYPE_OCCLUSION;
+  queryPoolInfo.queryCount = static_cast<uint32_t>(g_BatchManager.m_meshes.size());
+  VK_CHECK(vkCreateQueryPool(m_pDevice, &queryPoolInfo, nullptr, &m_occlusionQueryPool));
+}
+
+void CullingRenderPass::GetQueryResults() {
+  // We use vkGetQueryResults to copy the results into a host visible buffer
+  vkGetQueryPoolResults(m_pDevice, m_occlusionQueryPool, 0, static_cast<uint32_t>(g_BatchManager.m_meshes.size()),
+                        m_passedSamples.size() * sizeof(uint64_t), m_passedSamples.data(), sizeof(uint64_t),
+                        // Store results a 64 bit values and wait until the results have been finished
+                        // If you don't want to wait, you can use VK_QUERY_RESULT_WITH_AVAILABILITY_BIT
+                        // which also returns the state of the result (ready) in the result
+                        VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+}
+
 void CullingRenderPass::CreateBuffers() {
   CreateUniformBuffers();
   CreateShaderStorageBuffers();
@@ -510,7 +511,7 @@ void CullingRenderPass::CreateBuffers() {
 
 void CullingRenderPass::CreateShaderStorageBuffers() {
   void* pData = nullptr;
-
+  m_frustumPlanes = CalculateFrustumPlanes(m_pCamera->ViewProj());
   std::array<FrustumPlane, 6> cameraFrustumPlanes = CalculateFrustumPlanes(m_pCamera->ViewProj());
   VkDeviceSize cameraPlaneSize = sizeof(FrustumPlane) * cameraFrustumPlanes.size();
   VkUtils::CreateBuffer(m_pDevice, m_pPhyscialDevice, cameraPlaneSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
@@ -549,17 +550,6 @@ void CullingRenderPass::CreateShaderStorageBuffers() {
 void CullingRenderPass::CreateUniformBuffers() {}
 
 void CullingRenderPass::CreateDesrciptorSets() {
-  VkUtils::DescriptorBuilder depthOnlyImageBuilder =
-      VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
-  for (int i = 0; i < 1; ++i) {
-    VkDescriptorImageInfo depthOnlyImageInfo = {};
-    depthOnlyImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    depthOnlyImageInfo.imageView = m_onlyDepthBufferImageViews[HIZ_MIP_LEVEL];
-    depthOnlyImageInfo.sampler = VK_NULL_HANDLE;
-
-    depthOnlyImageBuilder.BindImage(i, &depthOnlyImageInfo, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
-  }
-  g_DescriptorManager.AddDescriptorSet(&depthOnlyImageBuilder, "DepthOnlyImage");
 }
 
 void CullingRenderPass::CreatePushConstantRange() {
@@ -620,8 +610,6 @@ void CullingRenderPass::RecordCommands(uint32_t currentImage) {
   // Start recording commands to command buffer!
   VK_CHECK(vkBeginCommandBuffer(m_commandBuffers[currentImage], &bufferBeginInfo));
 
-  RecordViewCullingCommands(currentImage);
-
   // Information about how to begin a render pass (only needed for graphical applications)
   VkRenderPassBeginInfo depthOnlyRenderPassBeginInfo = {};
   depthOnlyRenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -634,137 +622,42 @@ void CullingRenderPass::RecordCommands(uint32_t currentImage) {
 
   depthOnlyRenderPassBeginInfo.pClearValues = depthOnlyClearValue.data();  // List of clear values
   depthOnlyRenderPassBeginInfo.clearValueCount = static_cast<uint32_t>(depthOnlyClearValue.size());
-  depthOnlyRenderPassBeginInfo.framebuffer = m_depthFramebuffers[0];
-
-  // Begin Render Pass
-  vkCmdBeginRenderPass(m_commandBuffers[currentImage], &depthOnlyRenderPassBeginInfo,
-                       VK_SUBPASS_CONTENTS_INLINE);  // 렌더 패스의 내용을 직접 명령 버퍼에 기록하는 것을 의미
-
-  RecordOnlyDepthCommands(currentImage);
-
-  vkCmdEndRenderPass(m_commandBuffers[currentImage]);
+  depthOnlyRenderPassBeginInfo.framebuffer = m_depthOnlyFramebuffer;
 
   if (g_RenderSetting.isOcclusionCulling) {
-    VkImageMemoryBarrier barrier = {};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = m_onlyDepthBufferImage;
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = 1;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
-    barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    // Must be done outside of render pass
+    vkCmdResetQueryPool(m_commandBuffers[currentImage], m_occlusionQueryPool, 0,
+                        static_cast<uint32_t>(g_BatchManager.m_meshes.size()));
 
-    vkCmdPipelineBarrier(m_commandBuffers[currentImage], VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
-                         0, nullptr, 0, nullptr, 1, &barrier);
-
-    // 8.3. Blit to generate Mip Levels
-    for (uint32_t i = 1; i < HIZ_MIP_LEVEL; ++i) {
-      // Define source and destination Mip Levels
-      uint32_t srcMip = i - 1;
-      uint32_t dstMip = i;
-
-      // Define source and destination regions
-      VkImageBlit blit = {};
-      blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-      blit.srcSubresource.mipLevel = srcMip;
-      blit.srcSubresource.baseArrayLayer = 0;
-      blit.srcSubresource.layerCount = 1;
-      blit.srcOffsets[0] = {0, 0, 0};
-      blit.srcOffsets[1] = {static_cast<int32_t>(std::max(m_width >> srcMip, 1u)),
-                            static_cast<int32_t>(std::max(m_height >> srcMip, 1u)), 1};
-
-      blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-      blit.dstSubresource.mipLevel = dstMip;
-      blit.dstSubresource.baseArrayLayer = 0;
-      blit.dstSubresource.layerCount = 1;
-      blit.dstOffsets[0] = {0, 0, 0};
-      blit.dstOffsets[1] = {static_cast<int32_t>(std::max(m_width >> dstMip, 1u)),
-                            static_cast<int32_t>(std::max(m_height >> dstMip, 1u)), 1};
-
-      // Transition destination Mip Level to TRANSFER_DST_OPTIMAL
-      VkImageMemoryBarrier dstBarrier = {};
-      dstBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-      dstBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-      dstBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-      dstBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-      dstBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-      dstBarrier.image = m_onlyDepthBufferImage;
-      dstBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-      dstBarrier.subresourceRange.baseMipLevel = dstMip;
-      dstBarrier.subresourceRange.levelCount = 1;
-      dstBarrier.subresourceRange.baseArrayLayer = 0;
-      dstBarrier.subresourceRange.layerCount = 1;
-      dstBarrier.srcAccessMask = 0;
-      dstBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-      vkCmdPipelineBarrier(m_commandBuffers[currentImage], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
-                           nullptr, 0, nullptr, 1, &dstBarrier);
-
-      // Perform the blit
-      vkCmdBlitImage(m_commandBuffers[currentImage], m_onlyDepthBufferImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                     m_onlyDepthBufferImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_NEAREST);
-
-      // Transition destination Mip Level to TRANSFER_SRC_OPTIMAL for next Blit
-      VkImageMemoryBarrier srcBarrier = {};
-      srcBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-      srcBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-      srcBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-      srcBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-      srcBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-      srcBarrier.image = m_onlyDepthBufferImage;
-      srcBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-      srcBarrier.subresourceRange.baseMipLevel = dstMip;
-      srcBarrier.subresourceRange.levelCount = 1;
-      srcBarrier.subresourceRange.baseArrayLayer = 0;
-      srcBarrier.subresourceRange.layerCount = 1;
-      srcBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-      srcBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-
-      vkCmdPipelineBarrier(m_commandBuffers[currentImage], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
-                           nullptr, 0, nullptr, 1, &srcBarrier);
-    }
-
-    // 8.4. Transition all Mip Levels to SHADER_READ_ONLY_OPTIMAL
-    VkImageMemoryBarrier finalBarrier = {};
-    finalBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    finalBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    finalBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    finalBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    finalBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    finalBarrier.image = m_onlyDepthBufferImage;
-    finalBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    finalBarrier.subresourceRange.baseMipLevel = 0;
-    finalBarrier.subresourceRange.levelCount = HIZ_MIP_LEVEL;
-    finalBarrier.subresourceRange.baseArrayLayer = 0;
-    finalBarrier.subresourceRange.layerCount = 1;
-    finalBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
-    finalBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-    vkCmdPipelineBarrier(m_commandBuffers[currentImage], VK_PIPELINE_STAGE_TRANSFER_BIT,
-                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,  // 또는 필요한 셰이더 스테이지
-                         0, 0, nullptr, 0, nullptr, 1, &finalBarrier);
+    // Begin Render Pass
+    vkCmdBeginRenderPass(m_commandBuffers[currentImage], &depthOnlyRenderPassBeginInfo,
+                         VK_SUBPASS_CONTENTS_INLINE);  // 렌더 패스의 내용을 직접 명령 버퍼에 기록하는 것을 의미
 
     RecordOcclusionCullingCommands(currentImage);
+
+    vkCmdEndRenderPass(m_commandBuffers[currentImage]);
   }
   VK_CHECK(vkEndCommandBuffer(m_commandBuffers[currentImage]));
 }
 
 void CullingRenderPass::RecordViewCullingCommands(uint32_t currentImage) {
-  vkCmdBindPipeline(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipeline);
-  vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 0, 1,
-                          &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL" + std::to_string(currentImage)), 0, nullptr);
-  vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 1, 1,
-                          &g_DescriptorManager.GetVkDescriptorSet("BATCH_ALL"), 0, nullptr);
-  vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 2, 1,
-                          &g_DescriptorManager.GetVkDescriptorSet("ViewFrustumCulling_COMPUTE"), 0, nullptr);
+  // vkCmdBindPipeline(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipeline);
+  // vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 0, 1,
+  //                         &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL" + std::to_string(currentImage)), 0, nullptr);
+  // vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 1, 1,
+  //                         &g_DescriptorManager.GetVkDescriptorSet("BATCH_ALL"), 0, nullptr);
+  // vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_viewCullingComputePipelineLayout, 2, 1,
+  //                         &g_DescriptorManager.GetVkDescriptorSet("ViewFrustumCulling_COMPUTE"), 0, nullptr);
 
-  vkCmdDispatch(m_commandBuffers[currentImage], m_width / 256, 1, 1);
+  // vkCmdDispatch(m_commandBuffers[currentImage], m_width / 256, 1, 1);
+
+  std::vector<VkDrawIndexedIndirectCommand> commands{};
+  for (auto& batch : g_BatchManager.m_miniBatchList) {
+    commands.insert(commands.end(), batch.m_drawIndexedCommands.begin(), batch.m_drawIndexedCommands.end());
+  }
+  for (int i = 0; i < commands.size(); ++i) {
+    commands[i].instanceCount = (int)isAABBInsideFrustum(m_frustumPlanes, g_BatchManager.m_boundingBoxList[i]);
+  }
 }
 
 void CullingRenderPass::RecordOnlyDepthCommands(uint32_t currentImage) {
@@ -803,23 +696,68 @@ void CullingRenderPass::RecordOnlyDepthCommands(uint32_t currentImage) {
 }
 
 void CullingRenderPass::RecordOcclusionCullingCommands(uint32_t currentImage) {
-  //
-  // Hi-Z Occlusion Culling
-  //
-  vkCmdBindPipeline(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipeline);
-  vkCmdPushConstants(m_commandBuffers[currentImage], m_occlusionCullingComputePipelineLayout, VK_SHADER_STAGE_ALL, 0,
-                     sizeof(ShaderSetting), &g_ShaderSetting);
+  /*
+   * BoundingBox Renderer
+   */
+  std::vector<VkDrawIndexedIndirectCommand> commands{};
+  for (auto& batch : g_BatchManager.m_miniBatchList) {
+    commands.insert(commands.end(), batch.m_drawIndexedCommands.begin(), batch.m_drawIndexedCommands.end());
+  }
 
-  vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 0,
-                          1, &g_DescriptorManager.GetVkDescriptorSet("SamplerList_ALL"), 0, nullptr);
-  vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 1,
-                          1, &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL" + std::to_string(currentImage)), 0, nullptr);
-  vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 2,
-                          1, &g_DescriptorManager.GetVkDescriptorSet("BATCH_ALL"), 0, nullptr);
-  vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 3,
-                          1, &g_DescriptorManager.GetVkDescriptorSet("ViewFrustumCulling_COMPUTE"), 0, nullptr);
-  vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_COMPUTE, m_occlusionCullingComputePipelineLayout, 4,
-                          1, &g_DescriptorManager.GetVkDescriptorSet("DepthOnlyImage"), 0, nullptr);
+  std::array<FrustumPlane, 6>& frustumPlanes = m_frustumPlanes;
+  std::vector<std::future<void>> futures;
+  futures.reserve(commands.size());
 
-  vkCmdDispatch(m_commandBuffers[currentImage], m_width / 256, 1, 1);
+  for (int i = 0; i < commands.size(); ++i) {
+    if (g_RenderSetting.isMultiThreading) {
+      futures.push_back(g_ThreadPool.Submit([i, &commands, &frustumPlanes]() -> void {
+        AABB aabb = g_BatchManager.m_boundingBoxList[i];
+        glm::mat4& transform = g_BatchManager.m_trasformList[i].currentTransform;
+        aabb.max = transform * aabb.max;
+        aabb.min = transform * aabb.min;
+
+        commands[i].instanceCount = (int)isAABBInsideFrustum(frustumPlanes, aabb);
+      }));
+    } else {
+      AABB aabb = g_BatchManager.m_boundingBoxList[i];
+      glm::mat4& transform = g_BatchManager.m_trasformList[i].currentTransform;
+      aabb.max = transform * aabb.max;
+      aabb.min = transform * aabb.min;
+
+      commands[i].instanceCount = (int)isAABBInsideFrustum(m_frustumPlanes, aabb);
+    }
+  }
+  if (g_RenderSetting.isMultiThreading) {
+    for (auto& future : futures) {
+      future.get();
+    }
+  }
+
+  g_ShaderSetting.batchIdx = 0;
+  {
+    vkCmdBindPipeline(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_depthGraphicePipeline);
+
+    for (int i = 0; i < commands.size(); ++i) {
+      {
+        VkDeviceSize vertexOffset = 0;  // Always bind at offset 0 since indirect commands handle offsets
+        vkCmdBindVertexBuffers(m_commandBuffers[currentImage], 0, 1, &g_BatchManager.m_bbVertexBuffers[i].buffer, &vertexOffset);
+
+        // Bind the index buffer with the correct offset
+        vkCmdBindIndexBuffer(m_commandBuffers[currentImage], g_BatchManager.m_bbIndexBuffers[i].buffer, 0, VK_INDEX_TYPE_UINT32);
+
+        vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 0, 1,
+                                &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL" + std::to_string(currentImage)), 0,
+                                nullptr);
+        vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout, 1, 1,
+                                &g_DescriptorManager.GetVkDescriptorSet("BATCH_ALL"), 0, nullptr);
+        vkCmdPushConstants(m_commandBuffers[currentImage], m_graphicsPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting),
+                           &g_ShaderSetting);
+
+        vkCmdBeginQuery(m_commandBuffers[currentImage], m_occlusionQueryPool, g_ShaderSetting.batchIdx, 0);
+        vkCmdDrawIndexed(m_commandBuffers[currentImage], g_BatchManager.m_meshes[i].indexCount, commands[i].instanceCount, 0, 0, 0);
+        vkCmdEndQuery(m_commandBuffers[currentImage], m_occlusionQueryPool, g_ShaderSetting.batchIdx);
+      }
+      g_ShaderSetting.batchIdx += 1;
+    }
+  }
 }

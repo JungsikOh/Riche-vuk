@@ -72,6 +72,27 @@ static std::array<FrustumPlane, 6> CalculateFrustumPlanes(const glm::mat4& viewP
   return planes;
 }
 
+static bool isAABBInsideFrustum(const std::array<FrustumPlane, 6>& frustum, const AABB& aabb) {
+  for (int i = 0; i < 6; i++) {
+    const FrustumPlane& plane = frustum[i];
+
+    // 바운딩 박스의 "가장 먼 쪽" 점 선택
+    glm::vec3 positiveVertex =
+        glm::vec3((plane.normal.x < 0) ? aabb.min.x : aabb.max.x, (plane.normal.y < 0) ? aabb.min.y : aabb.max.y,
+                  (plane.normal.z < 0) ? aabb.min.z : aabb.max.z);
+
+    // 평면과 점 사이의 거리 계산
+    float distance = glm::dot(plane.normal, positiveVertex) + plane.distance;
+
+    // 오브젝트가 프러스텀 밖에 있음
+    if (distance < 0) {
+      return false;
+    }
+  }
+  return true;  // AABB가 프러스텀 안에 있음
+}
+
+
 template <typename VERTEX>
 static AABB ComputeAABB(const std::vector<VERTEX>& vertices) {
   glm::vec3 min(std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
@@ -124,12 +145,30 @@ static std::vector<uint32_t> CreateAABBIndexBuffer() {
   // Top face (y = max):    edges: 3-2, 2-6, 6-7, 7-3
   // Vertical edges:       edges: 0-3, 1-2, 5-6, 4-7
 
-  std::vector<uint32_t> indices = {// 밑면 (y = min): v0, v1, v5, v4
-                                   0, 1, 1, 5, 5, 4, 4, 0,
-                                   // 윗면 (y = max): v3, v2, v6, v7
-                                   3, 2, 2, 6, 6, 7, 7, 3,
-                                   // 수직선 (측면)
-                                   0, 3, 1, 2, 5, 6, 4, 7};
+  //std::vector<uint32_t> indices = {// 밑면 (y = min): v0, v1, v5, v4
+  //                                 0, 1, 1, 5, 5, 4, 4, 0,
+  //                                 // 윗면 (y = max): v3, v2, v6, v7
+  //                                 3, 2, 2, 6, 6, 7, 7, 3,
+  //                                 // 수직선 (측면)
+  //                                 0, 3, 1, 2, 5, 6, 4, 7};
+
+      std::vector<uint32_t> indices = {// --- Front (z=min)
+                                   0, 1, 2, 2, 3, 0,
+
+                                   // --- Back (z=max)
+                                   4, 5, 6, 6, 7, 4,
+
+                                   // --- Bottom (y=min)
+                                   0, 1, 5, 5, 4, 0,
+
+                                   // --- Top (y=max)
+                                   3, 2, 6, 6, 7, 3,
+
+                                   // --- Left (x=min)
+                                   0, 4, 7, 7, 3, 0,
+
+                                   // --- Right (x=max)
+                                   1, 2, 6, 6, 5, 1};
 
 
   return indices;

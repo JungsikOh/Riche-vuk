@@ -120,7 +120,7 @@ static bool loadObjModel(VkDevice device, const std::string& filepath, const std
 }
 
 static bool loadGltfModel(VkDevice device, const std::string& filepath, const std::string& gltfName, std::vector<Mesh>& outMeshes,
-                          float scale = 1.0f) {
+                          float scale = 1.0f, glm::vec3 pos = glm::vec3(0.0f)) {
   tinygltf::TinyGLTF loader;
   tinygltf::Model model;
   std::string warn, err;
@@ -417,6 +417,8 @@ static bool loadGltfModel(VkDevice device, const std::string& filepath, const st
     Transform _transform = {};
     _transform.startTransform = glm::scale(glm::mat4(1.0f), glm::vec3(scale));
     _transform.currentTransform = glm::scale(glm::mat4(1.0f), glm::vec3(scale));
+    _transform.currentTransform = glm::translate(_transform.currentTransform, pos);
+
     g_BatchManager.m_trasformList.push_back(_transform);
     g_Registry.emplace<Transform>(object, _transform);
 
@@ -433,6 +435,16 @@ static bool loadGltfModel(VkDevice device, const std::string& filepath, const st
     g_ResourceManager.CreateIndexBuffer(AABBIndics.size() * sizeof(uint32_t), &_aabbBufferList.indexBufferMemory,
                                         &_aabbBufferList.indexBuffer, AABBIndics.data());
     g_BatchManager.m_boundingBoxBufferList.push_back(_aabbBufferList);
+
+    GpuBuffer vertexBuffer;
+    GpuBuffer indexBuffer;
+    g_ResourceManager.CreateVertexBuffer(partial.vertices.size() * sizeof(BasicVertex), &vertexBuffer.memory, &vertexBuffer.buffer,
+                                         partial.vertices.data());
+    g_ResourceManager.CreateIndexBuffer(partial.indices.size() * sizeof(uint32_t), &indexBuffer.memory, &indexBuffer.buffer,
+                                        partial.indices.data());
+
+    g_BatchManager.m_bbVertexBuffers.push_back(vertexBuffer);
+    g_BatchManager.m_bbIndexBuffers.push_back(indexBuffer);
 
     outMeshes.push_back(std::move(partial));
   }
