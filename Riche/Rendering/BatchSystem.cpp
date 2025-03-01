@@ -4,6 +4,8 @@ void BatchManager::Update(VkDevice device, uint32_t imageIndex) {
   void* pData = nullptr;
   // 1. Update Transform List Buffer
   {
+    m_trasformList = m_transforms[0];
+
     vkMapMemory(device, g_BatchManager.m_transformListBuffer[imageIndex].memory, 0,
                 g_BatchManager.m_transformListBuffer[imageIndex].size, 0, &pData);
     memcpy(pData, g_BatchManager.m_transforms[imageIndex].data(), g_BatchManager.m_transformListBuffer[imageIndex].size);
@@ -58,10 +60,15 @@ void BatchManager::UpdateDescriptorSets(VkDevice device) {
 
   std::vector<VkDescriptorImageInfo> imageInfos;
   imageInfos.resize(m_diffuseImages.size());
+  m_textureIdList.resize(m_diffuseImages.size());
   for (size_t i = 0; i < m_diffuseImages.size(); ++i) {
     imageInfos[i].imageView = m_diffuseImages[i].imageView;
-    imageInfos[i].sampler = VK_NULL_HANDLE;
+    imageInfos[i].sampler = m_sampler;
     imageInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkDescriptorSet imguiTextureID =
+        ImGui_ImplVulkan_AddTexture(imageInfos[i].sampler, m_diffuseImages[i].imageView, imageInfos[i].imageLayout);
+    m_textureIdList[i] = imguiTextureID;
   }
 
   VkUtils::DescriptorBuilder materialBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
@@ -253,12 +260,19 @@ void BatchManager::CreateDescriptorSets(VkDevice device, VkPhysicalDevice physic
     imageListSize += image.size;
   }
 
+  if (m_sampler == VK_NULL_HANDLE) VkUtils::CreateSampler(device, VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_FILTER_LINEAR, &m_sampler, false);
+
   std::vector<VkDescriptorImageInfo> imageInfos;
   imageInfos.resize(m_diffuseImages.size());
+  m_textureIdList.resize(m_diffuseImages.size());
   for (size_t i = 0; i < m_diffuseImages.size(); ++i) {
     imageInfos[i].imageView = m_diffuseImages[i].imageView;
-    imageInfos[i].sampler = VK_NULL_HANDLE;
+    imageInfos[i].sampler = m_sampler;
     imageInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkDescriptorSet imguiTextureID =
+        ImGui_ImplVulkan_AddTexture(imageInfos[i].sampler, m_diffuseImages[i].imageView, imageInfos[i].imageLayout);
+    m_textureIdList[i] = imguiTextureID;
   }
 
   VkUtils::DescriptorBuilder materialBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
@@ -294,6 +308,39 @@ void BatchManager::RebuildBatchManager(VkDevice device, VkPhysicalDevice physica
 
   CreateBatchManagerBuffers(device, physicalDevice);
   UpdateDescriptorSets(device);
+}
+
+void BatchManager::ChangeTexture(VkDevice device, VkPhysicalDevice physicalDevice, int idx, std::string& path) {
+  GpuImage newImage;
+  oldImage = m_diffuseImages[idx];
+
+  g_ResourceManager.CreateTexture(path, &newImage.memory, &newImage.image, &newImage.size);
+  VkUtils::CreateImageView(device, newImage.image, &newImage.imageView, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+
+  m_diffuseImages[idx] = newImage;
+
+  VkDeviceSize imageListSize = 0;
+  for (GpuImage& image : m_diffuseImages) {
+    imageListSize += image.size;
+  }
+
+  std::vector<VkDescriptorImageInfo> imageInfos;
+  imageInfos.resize(m_diffuseImages.size());
+  m_textureIdList.resize(m_diffuseImages.size());
+  for (size_t i = 0; i < m_diffuseImages.size(); ++i) {
+    imageInfos[i].imageView = m_diffuseImages[i].imageView;
+    imageInfos[i].sampler = m_sampler;
+    imageInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkDescriptorSet imguiTextureID =
+        ImGui_ImplVulkan_AddTexture(imageInfos[i].sampler, m_diffuseImages[i].imageView, imageInfos[i].imageLayout);
+    m_textureIdList[i] = imguiTextureID;
+  }
+
+  VkUtils::DescriptorBuilder materialBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
+  materialBuilder.BindImage(0, imageInfos.data(), VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_ALL, true, imageInfos.size());
+  g_DescriptorManager.UpdateDescriptorSet(&materialBuilder, g_DescriptorManager.GetVkDescriptorSet("DiffuseTextureList"));
+
 }
 
 void BatchManager::CreateTransformListBuffers(VkDevice device, VkPhysicalDevice physicalDevice) {

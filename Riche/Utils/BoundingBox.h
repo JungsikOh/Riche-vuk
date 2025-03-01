@@ -85,11 +85,11 @@ static bool isAABBInsideFrustum(const std::array<FrustumPlane, 6>& frustum, cons
     float distance = glm::dot(plane.normal, positiveVertex) + plane.distance;
 
     // 오브젝트가 프러스텀 밖에 있음
-    if (distance < 0) {
-      return false;
+    if (distance >= 0) {
+      return true;
     }
   }
-  return true;  // AABB가 프러스텀 안에 있음
+  return false;  // AABB가 프러스텀 안에 있음
 }
 
 

@@ -122,25 +122,28 @@ int main() {
 
     deltaTime = smoothedDeltaTime;
 
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-      g_camera.MoveFoward(deltaTime);
-    }
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-      g_camera.MoveFoward(-deltaTime);
-    }
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-      g_camera.MoveRight(-deltaTime);
-    }
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-      g_camera.MoveRight(deltaTime);
-    }
-    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) {
-      g_camera.MoveUp(deltaTime);
-    }
-    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) {
-      g_camera.MoveUp(-deltaTime);
-    }
+    ImGuiIO& io = ImGui::GetIO();
 
+    if (!io.WantCaptureKeyboard) {
+      if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        g_camera.MoveFoward(deltaTime);
+      }
+      if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        g_camera.MoveFoward(-deltaTime);
+      }
+      if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        g_camera.MoveRight(-deltaTime);
+      }
+      if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        g_camera.MoveRight(deltaTime);
+      }
+      if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) {
+        g_camera.MoveUp(deltaTime);
+      }
+      if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) {
+        g_camera.MoveUp(-deltaTime);
+      }
+    }
     glfwPollEvents();
 
     vulkanRenderer.Draw();

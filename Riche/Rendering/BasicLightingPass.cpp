@@ -119,7 +119,6 @@ void BasicLightingPass::Update(uint32_t imageIndex) {
   if (m_pCamera->isMousePressed) {
     m_pCamera->result = g_ResourceManager.ReadPixelFromImage(m_objectIdColourBufferImage, m_width, m_height, m_pCamera->MousePos().x,
                                                              m_pCamera->MousePos().y);
-    std::cout << m_pCamera->result.r << std::endl;
   }
 
   UpdateTLAS(imageIndex);

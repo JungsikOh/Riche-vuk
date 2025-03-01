@@ -58,6 +58,7 @@ class BatchManager : public Singleton<BatchManager> {
   void CreateBatchManagerBuffers(VkDevice device, VkPhysicalDevice physicalDevice);
   void CreateDescriptorSets(VkDevice device, VkPhysicalDevice physicalDevice);
   void RebuildBatchManager(VkDevice device, VkPhysicalDevice physicalDevice);
+  void ChangeTexture(VkDevice device, VkPhysicalDevice physicalDevice, int idx, std::string& path);
 
  public:
   std::vector<MiniBatch> m_miniBatchList;
@@ -81,6 +82,9 @@ class BatchManager : public Singleton<BatchManager> {
 
   // Material
   std::vector<GpuImage> m_diffuseImages;
+  std::vector<VkDescriptorSet> m_textureIdList;
+  VkSampler m_sampler;
+  GpuImage oldImage;
 
   // Indirect Draw Call
   GpuBuffer m_indirectDrawCommandBuffer;

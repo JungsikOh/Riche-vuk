@@ -54,8 +54,8 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
     // 물체 배치를 위한 파라미터 설정
     const int numColumns = 1;
     const int numRows = 1;          // 5 * 4 = 20 개의 물체
-    const float spacingX = 200.0f;   // X축 간격
-    const float spacingZ = 200.0f;   // Z축 간격
+    const float spacingX = 200.0f;  // X축 간격
+    const float spacingZ = 200.0f;  // Z축 간격
     const float baseHeight = 0.0f;  // 모든 물체의 높이
 
     // Mesh들을 저장할 벡터 (기존 코드와 동일)
@@ -67,9 +67,9 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
         // 계산된 위치: x와 z는 격자에 따라, y는 고정
         glm::vec3 pos(col * spacingX, baseHeight, row * spacingZ);
         // 위치 정보를 인자로 추가한 오버로딩된 loadGltfModel 호출
-        loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f, pos);
       }
     }
+    loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f);
 
     // 이후 기존 코드에 따라 BatchManager의 데이터를 flush하거나 추가 작업 진행
     g_BatchManager.FlushMiniBatch(g_BatchManager.m_miniBatchList, g_ResourceManager);
@@ -210,7 +210,14 @@ void VulkanRenderer::Draw() {
   if (result != VK_SUCCESS) {
     throw std::runtime_error("Failed to Present swapchain!");
   }
+  if (g_BatchManager.oldImage.image != VK_NULL_HANDLE) {
+    vkQueueWaitIdle(m_graphicsQueue);
+    vkDestroyImageView(mainDevice.logicalDevice, g_BatchManager.oldImage.imageView, nullptr);
+    vkDestroyImage(mainDevice.logicalDevice, g_BatchManager.oldImage.image, nullptr);
+    vkFreeMemory(mainDevice.logicalDevice, g_BatchManager.oldImage.memory, nullptr);
 
+    g_BatchManager.oldImage.image = VK_NULL_HANDLE;
+  }
   // Get next frame
   currentFrame = (currentFrame + 1) % MAX_FRAME_DRAWS;
 }
@@ -1014,7 +1021,7 @@ void VulkanRenderer::FillOffScreenCommands(uint32_t currentImage) {
 
   vkCmdDraw(m_swapchainCommandBuffers[currentImage], 3, 1, 0, 0);
 
-  m_pEditor->RenderImGui(m_swapchainCommandBuffers[currentImage] , currentImage);
+  m_pEditor->RenderImGui(m_swapchainCommandBuffers[currentImage], currentImage);
 
   // End Render Pass
   vkCmdEndRenderPass(m_swapchainCommandBuffers[currentImage]);

@@ -194,6 +194,9 @@
     <ClInclude Include="Rendering\PostprocessingPass.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="tiny-stable-diffusion-main\TinyStableDiffusion.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

@@ -51,5 +51,7 @@ class Editor {
  private:
   void CreateImGuiDescriptorPool();
   void ShowFileBrowserUI(const std::string& filter);
+  void ShowStableDiffusionUI();
+  void DrawTextureListUI();
   void UpdateKeyboard();
 };

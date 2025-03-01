@@ -559,9 +559,9 @@ void CullingRenderPass::RecordOcclusionCullingCommands(uint32_t currentImage) {
 
   for (int i = 0; i < commands.size(); ++i) {
     if (g_RenderSetting.isMultiThreading) {
-      futures.push_back(g_ThreadPool.Submit([i, &commands, &frustumPlanes]() -> void {
+      futures.push_back(g_ThreadPool.Submit([i, currentImage, & commands, &frustumPlanes]() -> void {
         AABB aabb = g_BatchManager.m_boundingBoxList[i];
-        glm::mat4& transform = g_BatchManager.m_trasformList[i].currentTransform;
+        glm::mat4& transform = g_BatchManager.m_transforms[currentImage][i].currentTransform;
         aabb.max = transform * aabb.max;
         aabb.min = transform * aabb.min;
 
@@ -569,7 +569,7 @@ void CullingRenderPass::RecordOcclusionCullingCommands(uint32_t currentImage) {
       }));
     } else {
       AABB aabb = g_BatchManager.m_boundingBoxList[i];
-      glm::mat4& transform = g_BatchManager.m_trasformList[i].currentTransform;
+      glm::mat4& transform = g_BatchManager.m_transforms[currentImage][i].currentTransform;
       aabb.max = transform * aabb.max;
       aabb.min = transform * aabb.min;
 

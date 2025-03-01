@@ -1,7 +1,9 @@
 #include "Editor.h"
-#include "Rendering/Camera.h"
+#include <windows.h>
+#include <commdlg.h>
 #include "Rendering/BasicLightingPass.h"
-
+#include "Rendering/Camera.h"
+#include "tiny-stable-diffusion-main/TinyStableDiffusion.h"
 
 // 파일 브라우저 열림 여부
 static bool g_ShowFileBrowser = false;
@@ -15,6 +17,32 @@ static std::string g_SelectedFilePath = "";
 // 예: 허용할 확장자 목록 (.cpp, .h, .hpp)
 static std::vector<std::string> g_AllowedExtensions = {".gltf"};
 static bool g_EnableFilter = true;  // 필터 사용 여부
+
+std::string ShowOpenFileDialog() {
+  // OPENFILENAME 구조체 초기화
+  OPENFILENAMEA ofn;
+  char szFile[260] = {0};  // 선택된 파일 경로를 저장할 버퍼
+
+  ZeroMemory(&ofn, sizeof(ofn));
+  ofn.lStructSize = sizeof(ofn);
+  ofn.hwndOwner = nullptr;  // 소유자 윈도우 핸들 (필요하면 ImGui 창의 HWND를 넣을 수 있음)
+  ofn.lpstrFile = szFile;
+  ofn.nMaxFile = sizeof(szFile);
+  // 파일 필터 (여러 확장자 가능)
+  ofn.lpstrFilter = "All Files\0*.*\0PNG Files\0*.png\0JPEG Files\0*.jpg;*.jpeg\0\0";
+  ofn.nFilterIndex = 1;
+  // 경로/파일이 유효한지 체크 옵션
+  ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+  // 파일 선택 대화상자 열기
+  if (GetOpenFileNameA(&ofn) == TRUE) {
+    // 사용자가 파일을 정상적으로 선택함
+    return std::string(szFile);
+  }
+
+  // 사용자가 취소를 눌렀거나 에러가 발생
+  return std::string();
+}
 
 bool IsAllowedExtension(const std::filesystem::path& path) {
   // 폴더는 항상 표시
@@ -114,12 +142,99 @@ void Editor::ShowFileBrowserUI(const std::string& filter) {
   ImGui::End();
 }
 
-// 메인 UI(메뉴바 + 그 외)
-void ShowMainUI() {}
+void Editor::ShowStableDiffusionUI() {
+  // 정적 변수들
+  static char s_promptBuf[256] = "A peaceful lakeside cabin";
+  static bool s_isGenerating = false;
+  static std::future<void> s_genFuture;
+  static std::string s_statusMessage = "";
+
+  // 1) 별도의 ImGui 윈도우(패널)를 시작
+  ImGui::Begin("Stable Diffusion", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+
+  // 2) "Prompt" 라벨 + 텍스트 입력
+  //    - "Enter Prompt:" 라벨을 보여주고, 옆에 InputText를 배치
+  ImGui::Text("Enter Prompt:");
+  ImGui::SameLine();
+  // 폭을 지정해주면 InputText가 조금 더 정돈되어 보일 수 있음
+  ImGui::SetNextItemWidth(300.0f);
+  ImGui::InputText("##PromptInput", s_promptBuf, IM_ARRAYSIZE(s_promptBuf));
+
+  // 3) 간단히 구분을 위해 Spacing(줄 간격) 추가
+  ImGui::Spacing();
+
+  // 4) "Generate" 버튼 + 상태 메시지
+  //    - 버튼을 누르면 비동기로 이미지 생성 요청
+  if (ImGui::Button("Generate", ImVec2(120, 0))) {
+    if (!s_isGenerating) {
+      s_isGenerating = true;
+      s_statusMessage = "Generating...";
+
+      std::string prompt = s_promptBuf;
+      s_genFuture = g_ThreadPool.Submit([prompt]() { GenerateImage(prompt); });
+    }
+  }
+  //  같은 줄에 상태 메시지 표시
+  ImGui::SameLine();
+  ImGui::TextUnformatted(s_statusMessage.c_str());
+
+  // 5) 비동기 작업 확인 로직
+  //    - 이전과 동일하게 future의 상태를 확인하되,
+  //      매 프레임마다 get()을 호출하지 않도록 주의
+  if (s_isGenerating) {
+    auto status = s_genFuture.wait_for(std::chrono::milliseconds(0));
+    if (status == std::future_status::ready) {
+      // 스레드 작업 완료
+      s_genFuture.get();  // 결과 수령 (void이므로 단순 완료)
+      s_statusMessage = "Generation Completed!";
+      s_isGenerating = false;
+    }
+  }
+
+  // 6) 윈도우 끝
+  ImGui::End();
+}
+
+
+
+void Editor::DrawTextureListUI() {
+  ImGui::Begin("Texture Manager");
+
+  static int selectedIndex = -1;
+  static bool showFilePicker = false;  // 파일 선택 창 열기/닫기 플래그
+
+  // 5열 테이블
+  if (ImGui::BeginTable("TextureTable", 5)) {
+    for (int i = 0; i < (int)g_BatchManager.m_diffuseImages.size(); i++) {
+      ImGui::PushID(i);
+      ImGui::TableNextColumn();
+
+      // 썸네일 표시 (64x64)
+      // 보통 (ImTextureID)m_previewDescriptors[i] 로 표시해야 하지만,
+      // 여기서는 간단히 "ImageButton" 클릭 감지용
+      ImGui::Text(std::string("Texture #" + std::to_string(i)).c_str());
+      if (ImGui::ImageButton("", (ImTextureID)g_BatchManager.m_textureIdList[i], ImVec2(64, 64))) {
+        // 클릭하면 -> "이 텍스처를 교체하겠다" 라고 targetIndex 에 저장
+        selectedIndex = i;
+
+        std::string selectedFile = ShowOpenFileDialog();
+        if (!selectedFile.empty()) {
+
+            g_BatchManager.ChangeTexture(mainDevice.logicalDevice, mainDevice.physicalDevice, i, selectedFile);
+            std::cout << selectedFile << std::endl;
+        }
+
+        showFilePicker = true;
+      }
+      ImGui::PopID();
+    }
+    ImGui::EndTable();
+  }
+  ImGui::End();
+}
 
 void Editor::Initialize(GLFWwindow* window, VkInstance instance, VkDevice device, VkPhysicalDevice physicalDevice,
-                        VkUtils::QueueFamilyIndices queueFamily, VkQueue graphicsQueue,
-                        Camera* camera) {
+                        VkUtils::QueueFamilyIndices queueFamily, VkQueue graphicsQueue, Camera* camera) {
   m_Window = window;
   m_pCamera = camera;
 
@@ -325,6 +440,9 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
     ShowFileBrowserUI(".gltf");
   }
 
+  ShowStableDiffusionUI();
+  DrawTextureListUI();
+
   // 디버그: 현재 선택된 파일
   ImGui::Text("Selected File: %s", g_SelectedFilePath.c_str());
 
@@ -379,7 +497,6 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
       for (int i = 0; i < MAX_FRAME_DRAWS; ++i) {
         g_BatchManager.m_transforms[i][m_selectedIndex].currentTransform = tc;
       }
-
     }
   }
 
