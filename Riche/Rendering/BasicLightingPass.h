@@ -3,7 +3,6 @@
 #include "BatchSystem.h"
 #include "Components.h"
 #include "CullingRenderPass.h"
-#include "IRenderPass.h"
 #include "Image.h"
 #include "Utils/ThreadPool.h"
 #include "VkUtils/ChooseFunc.h"

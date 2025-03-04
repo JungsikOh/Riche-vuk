@@ -1,46 +1,30 @@
 #include "Editor.h"
-#include <windows.h>
-#include <commdlg.h>
+
 #include "Rendering/BasicLightingPass.h"
 #include "Rendering/Camera.h"
-#include "tiny-stable-diffusion-main/TinyStableDiffusion.h"
+#include "extern/tiny-stable-diffusion/TinyStableDiffusionhi.h"
 
-// 파일 브라우저 열림 여부
 static bool g_ShowFileBrowser = false;
-
-// 현재 디렉터리
-static std::string g_CurrentDir = ".";
-
-// 선택된 파일
 static std::string g_SelectedFilePath = "";
-
-// 예: 허용할 확장자 목록 (.cpp, .h, .hpp)
 static std::vector<std::string> g_AllowedExtensions = {".gltf"};
-static bool g_EnableFilter = true;  // 필터 사용 여부
 
 std::string ShowOpenFileDialog() {
-  // OPENFILENAME 구조체 초기화
   OPENFILENAMEA ofn;
-  char szFile[260] = {0};  // 선택된 파일 경로를 저장할 버퍼
+  char szFile[260] = {0};
 
   ZeroMemory(&ofn, sizeof(ofn));
   ofn.lStructSize = sizeof(ofn);
-  ofn.hwndOwner = nullptr;  // 소유자 윈도우 핸들 (필요하면 ImGui 창의 HWND를 넣을 수 있음)
+  ofn.hwndOwner = nullptr;
   ofn.lpstrFile = szFile;
   ofn.nMaxFile = sizeof(szFile);
-  // 파일 필터 (여러 확장자 가능)
   ofn.lpstrFilter = "All Files\0*.*\0PNG Files\0*.png\0JPEG Files\0*.jpg;*.jpeg\0\0";
   ofn.nFilterIndex = 1;
-  // 경로/파일이 유효한지 체크 옵션
   ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
 
-  // 파일 선택 대화상자 열기
   if (GetOpenFileNameA(&ofn) == TRUE) {
-    // 사용자가 파일을 정상적으로 선택함
     return std::string(szFile);
   }
 
-  // 사용자가 취소를 눌렀거나 에러가 발생
   return std::string();
 }
 
@@ -55,56 +39,51 @@ bool IsAllowedExtension(const std::filesystem::path& path) {
   return false;
 }
 
-// 파일 브라우저 UI
-// g_ShowFileBrowser가 true일 때만 호출
+/*
+ * File BrowserUI using ImGui
+ */
 void Editor::ShowFileBrowserUI(const std::string& filter) {
+  static bool s_enableFilter = true;
+  static std::string s_currentDir = std::filesystem::current_path().string();
   ImGui::Begin("File Browser", &g_ShowFileBrowser);
 
-  ImGui::Text("Current Directory: %s", g_CurrentDir.c_str());
+  ImGui::Text("Current Directory: %s", s_currentDir.c_str());
 
-  // 상위 폴더(Up) 버튼
   if (ImGui::Button("Up")) {
-    std::filesystem::path parent = std::filesystem::path(g_CurrentDir).parent_path();
-    if (!parent.empty()) g_CurrentDir = parent.string();
+    std::filesystem::path parent = std::filesystem::path(s_currentDir).parent_path();
+    if (!parent.empty()) s_currentDir = parent.string();
   }
   ImGui::SameLine();
   ImGui::TextUnformatted("(Go up one directory)");
 
-  // 확장자 필터 체크박스
-  ImGui::Checkbox("Enable Filter", &g_EnableFilter);
+  ImGui::Checkbox("Enable Filter", &s_enableFilter);
   ImGui::SameLine();
   ImGui::Text("(Allowed: %s)", filter.c_str());
 
   ImGui::Separator();
 
-  // 디렉터리 탐색
+  // Check directory
   try {
-    for (const auto& entry : std::filesystem::directory_iterator(g_CurrentDir)) {
+    for (const auto& entry : std::filesystem::directory_iterator(s_currentDir)) {
       bool isDir = entry.is_directory();
       std::string name = entry.path().filename().string();
 
-      if (g_EnableFilter && !isDir) {
+      if (s_enableFilter && !isDir) {
         if (!IsAllowedExtension(entry.path())) continue;
       }
 
-      // 폴더
       if (isDir) {
         if (ImGui::Selectable((std::string("[DIR] ") + name).c_str(), false)) {
-          g_CurrentDir = entry.path().string();
+          s_currentDir = entry.path().string();
         }
-      }
-      // 파일
-      else {
-        // 파일 클릭 → 즉시 loadGltfModel 호출 → 브라우저 닫기
-        // "딱 한번만" 로드하고 종료
+      } else {
+        // Click File → Execute 'loadGltfModel()' → Exit Browser
         if (ImGui::Selectable(name.c_str(), false)) {
           g_SelectedFilePath = entry.path().string();
 
-          // directoryPath = 부모 경로
           std::string directoryPath = entry.path().parent_path().string() + "/";
           directoryPath.erase(0, 2);  // remove "./"
 
-          // fileName = 파일명
           std::string fileName = entry.path().filename().string();
 
           std::vector<Mesh> meshes = {};
@@ -128,7 +107,7 @@ void Editor::ShowFileBrowserUI(const std::string& filter) {
           g_BatchManager.RebuildBatchManager(mainDevice.logicalDevice, mainDevice.physicalDevice);
           m_pCullingPass->SetupQueryPool();
           m_pLightingPass->RebuildAS();
-          // 선택 후 브라우저 닫기
+
           g_ShowFileBrowser = false;
 
           break;
@@ -143,28 +122,20 @@ void Editor::ShowFileBrowserUI(const std::string& filter) {
 }
 
 void Editor::ShowStableDiffusionUI() {
-  // 정적 변수들
   static char s_promptBuf[256] = "A peaceful lakeside cabin";
   static bool s_isGenerating = false;
   static std::future<void> s_genFuture;
   static std::string s_statusMessage = "";
 
-  // 1) 별도의 ImGui 윈도우(패널)를 시작
   ImGui::Begin("Stable Diffusion", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
-  // 2) "Prompt" 라벨 + 텍스트 입력
-  //    - "Enter Prompt:" 라벨을 보여주고, 옆에 InputText를 배치
   ImGui::Text("Enter Prompt:");
   ImGui::SameLine();
-  // 폭을 지정해주면 InputText가 조금 더 정돈되어 보일 수 있음
   ImGui::SetNextItemWidth(300.0f);
   ImGui::InputText("##PromptInput", s_promptBuf, IM_ARRAYSIZE(s_promptBuf));
 
-  // 3) 간단히 구분을 위해 Spacing(줄 간격) 추가
   ImGui::Spacing();
 
-  // 4) "Generate" 버튼 + 상태 메시지
-  //    - 버튼을 누르면 비동기로 이미지 생성 요청
   if (ImGui::Button("Generate", ImVec2(120, 0))) {
     if (!s_isGenerating) {
       s_isGenerating = true;
@@ -174,54 +145,40 @@ void Editor::ShowStableDiffusionUI() {
       s_genFuture = g_ThreadPool.Submit([prompt]() { GenerateImage(prompt); });
     }
   }
-  //  같은 줄에 상태 메시지 표시
   ImGui::SameLine();
   ImGui::TextUnformatted(s_statusMessage.c_str());
 
-  // 5) 비동기 작업 확인 로직
-  //    - 이전과 동일하게 future의 상태를 확인하되,
-  //      매 프레임마다 get()을 호출하지 않도록 주의
   if (s_isGenerating) {
     auto status = s_genFuture.wait_for(std::chrono::milliseconds(0));
     if (status == std::future_status::ready) {
-      // 스레드 작업 완료
-      s_genFuture.get();  // 결과 수령 (void이므로 단순 완료)
+      s_genFuture.get();
       s_statusMessage = "Generation Completed!";
       s_isGenerating = false;
     }
   }
 
-  // 6) 윈도우 끝
   ImGui::End();
 }
-
-
 
 void Editor::DrawTextureListUI() {
   ImGui::Begin("Texture Manager");
 
   static int selectedIndex = -1;
-  static bool showFilePicker = false;  // 파일 선택 창 열기/닫기 플래그
+  static bool showFilePicker = false;
 
-  // 5열 테이블
   if (ImGui::BeginTable("TextureTable", 5)) {
     for (int i = 0; i < (int)g_BatchManager.m_diffuseImages.size(); i++) {
       ImGui::PushID(i);
       ImGui::TableNextColumn();
 
-      // 썸네일 표시 (64x64)
-      // 보통 (ImTextureID)m_previewDescriptors[i] 로 표시해야 하지만,
-      // 여기서는 간단히 "ImageButton" 클릭 감지용
       ImGui::Text(std::string("Texture #" + std::to_string(i)).c_str());
       if (ImGui::ImageButton("", (ImTextureID)g_BatchManager.m_textureIdList[i], ImVec2(64, 64))) {
-        // 클릭하면 -> "이 텍스처를 교체하겠다" 라고 targetIndex 에 저장
         selectedIndex = i;
 
         std::string selectedFile = ShowOpenFileDialog();
         if (!selectedFile.empty()) {
-
-            g_BatchManager.ChangeTexture(mainDevice.logicalDevice, mainDevice.physicalDevice, i, selectedFile);
-            std::cout << selectedFile << std::endl;
+          g_BatchManager.ChangeTexture(mainDevice.logicalDevice, mainDevice.physicalDevice, i, selectedFile);
+          std::cout << selectedFile << std::endl;
         }
 
         showFilePicker = true;
@@ -425,8 +382,6 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
    */
   if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("File")) {
-      // "Load Model" 메뉴 아이템
-      // 클릭하면 파일 브라우저를 연다
       if (ImGui::MenuItem("Load Model")) {
         g_ShowFileBrowser = true;  // 파일 브라우저 열기
       }
@@ -435,7 +390,6 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
     ImGui::EndMainMenuBar();
   }
 
-  // g_ShowFileBrowser가 true이면 파일 브라우저 UI 표시
   if (g_ShowFileBrowser) {
     ShowFileBrowserUI(".gltf");
   }
@@ -443,10 +397,6 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
   ShowStableDiffusionUI();
   DrawTextureListUI();
 
-  // 디버그: 현재 선택된 파일
-  ImGui::Text("Selected File: %s", g_SelectedFilePath.c_str());
-
-  // FPS 정보를 표시하는 창
   ImGui::Begin("Performance");
   ImGui::Text("Current FPS: %.1f", fps);
   ImGui::Text("Max FPS: %.1f | Average FPS: %.1f", maxFps, averageFps);
@@ -460,6 +410,7 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
   ImGui::Checkbox("Occlusion Culling", &(g_RenderSetting.isOcclusionCulling));
   ImGui::Checkbox("View BoundingBox", &(g_RenderSetting.isRenderBoundingBox));
   ImGui::SliderFloat4("Light Pos", glm::value_ptr(g_ShaderSetting.lightPos), -5.0f, 5.0f);
+  ImGui::Text("Selected File: %s", g_SelectedFilePath.c_str());
   ImGui::End();
 
   ImGuizmo::BeginFrame();
@@ -469,7 +420,6 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
     ImGuizmo::SetOrthographic(false);  // Persp / Ortho 설정
     ImGuizmo::Enable(true);
 
-    // 뷰포트 크기
     float width = ImGui::GetIO().DisplaySize.x;
     float height = ImGui::GetIO().DisplaySize.y;
     ImGuizmo::SetRect(0, 0, width, height);
@@ -483,13 +433,11 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
     {
       glm::mat4& tc = g_BatchManager.m_transforms[currentImage][m_selectedIndex].currentTransform;
       glm::mat4 transform = glm::translate(tc, aabbCenter);
-      // ImGuizmo::Manipulate() 함수 호출하여 gizmo를 그리기
       ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(proj),
                            (ImGuizmo::OPERATION)m_gizmoType,  // 또는 필요한 조작 종류 (ROTATE, SCALE 등)
                            ImGuizmo::MODE::LOCAL,             // 월드 좌표계 또는 로컬 좌표계 선택
                            glm::value_ptr(transform));        // gizmo 행렬
 
-      // 만약 gizmo가 조작되고 있다면 업데이트된 변환 행렬을 객체에 반영
       if (ImGuizmo::IsUsing()) {
         tc = transform * glm::translate(glm::mat4(1.0f), -aabbCenter);
       }
@@ -500,7 +448,6 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
     }
   }
 
-  // ImGui 렌더링
   ImGui::Render();
   ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
 }
@@ -535,7 +482,6 @@ void Editor::CreateImGuiDescriptorPool() {
 void Editor::UpdateKeyboard() {
   ImGuiIO& io = ImGui::GetIO();
 
-  // 또는 바로 아래와 같이 ImGui의 헬퍼 함수를 사용할 수도 있습니다.
   if (ImGui::IsKeyDown(ImGuiKey_Z)) {
     m_gizmoType = ImGuizmo::OPERATION::TRANSLATE;
   }

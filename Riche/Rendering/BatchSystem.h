@@ -71,6 +71,10 @@ class BatchManager : public Singleton<BatchManager> {
   uint64_t m_accmulatedVertexOffset = 0;
   uint64_t m_accmulatedIndexOffset = 0;
 
+  // Descriptor Set
+  VkDescriptorSetLayout m_batchSetLayout;
+  std::vector<VkDescriptorSet> m_batchSets;
+
   // Material ID
   std::vector<ObjectID> m_objectIDList;
   GpuBuffer m_objectIDBuffer;
@@ -95,7 +99,7 @@ class BatchManager : public Singleton<BatchManager> {
   // - Each bounding box array (for visible bounding box)
   std::vector<AABBBufferList> m_boundingBoxBufferList;
 
-  // TEst
+  // Test
   std::vector<GpuBuffer> m_bbVertexBuffers;
   std::vector<GpuBuffer> m_bbIndexBuffers;
 

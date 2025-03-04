@@ -12,6 +12,10 @@
 #include <fstream>
 #include <assert.h>
 #include <random>
+#include <windows.h>
+#include <commdlg.h>
+#include <filesystem>
+#include <cstdlib>
 
 //
 // 3rd party
@@ -24,7 +28,7 @@
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>
 
-#include <stb_image.h>
+#include <stb_image/stb_image.h>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"

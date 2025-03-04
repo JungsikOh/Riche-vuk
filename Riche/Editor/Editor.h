@@ -1,6 +1,4 @@
 #pragma once
-#include <filesystem>
-
 #include "Utils/ModelLoader.h"
 #include "VkUtils/ChooseFunc.h"
 #include "VkUtils/QueueFamilyIndices.h"

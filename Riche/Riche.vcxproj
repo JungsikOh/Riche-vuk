@@ -109,7 +109,7 @@
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:/VulkanSDK/1.3.290.0/Include;$(SolutionDir)/ThirdParty/GLFW/include;$(SolutionDir)/ThirdParty/GLM;$(SolutionDir)/ThirdParty/imgui;$(SolutionDir)/ThirdParty;$(SolutionDir)/Riche;$(SolutionDir)/ThirdParty/tinyobjloader;$(SolutionDir)/ThirdParty/ImGuiFileDialog;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:/VulkanSDK/1.3.290.0/Include;$(SolutionDir)/ThirdParty/GLFW/include;$(SolutionDir)/ThirdParty/GLM;$(SolutionDir)/ThirdParty/imgui;$(SolutionDir)/ThirdParty;$(SolutionDir)/Riche;$(SolutionDir)/ThirdParty/tinyobjloader;$(SolutionDir)/ThirdParty/ImGuiFileDialog;$(SolutionDir)/Riche/tiny-stable-diffusion-main;$(SolutionDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
@@ -170,6 +170,7 @@
     <ClCompile Include="VkUtils\ResourceManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\extern\tiny-stable-diffusion\TinyStableDiffusion.h" />
     <ClInclude Include="..\ThirdParty\imgui\imconfig.h" />
     <ClInclude Include="..\ThirdParty\imgui\imgui.h" />
     <ClInclude Include="..\ThirdParty\imgui\ImGuizmo.h" />
@@ -199,7 +200,6 @@
     <ClInclude Include="Utils\TaskQueue.h" />
     <ClInclude Include="Utils\TextureUtils.h" />
     <ClInclude Include="Utils\ThreadPool.h" />
-    <ClInclude Include="tiny-stable-diffusion-main\TinyStableDiffusion.h" />
     <ClInclude Include="VkUtils\DescriptorBuilder.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Rendering\Components.h" />
