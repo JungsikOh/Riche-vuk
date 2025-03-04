@@ -1,3 +1,3 @@
 [submodule "extern/tiny-stable-diffusion"]
-	path = extern/tiny-stable-diffusion
+	path = Riche/extern/tiny-stable-diffusion
 	url = https://github.com/ThisisBillhe/tiny-stable-diffusion.git
