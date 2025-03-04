@@ -109,7 +109,7 @@
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:/VulkanSDK/1.3.290.0/Include;$(SolutionDir)/ThirdParty/GLFW/include;$(SolutionDir)/ThirdParty/GLM;$(SolutionDir)/ThirdParty/imgui;$(SolutionDir)/ThirdParty;$(SolutionDir)/Riche;$(SolutionDir)/ThirdParty/tinyobjloader;$(SolutionDir)/ThirdParty/ImGuiFileDialog;$(SolutionDir)/Riche/tiny-stable-diffusion-main;$(SolutionDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:/VulkanSDK/1.3.290.0/Include;$(SolutionDir)/ThirdParty/GLFW/include;$(SolutionDir)/ThirdParty/GLM;$(SolutionDir)/ThirdParty/imgui;$(SolutionDir)/ThirdParty;$(SolutionDir)/Riche;$(SolutionDir)/ThirdParty/tinyobjloader;$(SolutionDir)/ThirdParty/ImGuiFileDialog;$(SolutionDir)/Riche/tiny-stable-diffusion;$(SolutionDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
@@ -170,7 +170,6 @@
     <ClCompile Include="VkUtils\ResourceManager.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\extern\tiny-stable-diffusion\TinyStableDiffusion.h" />
     <ClInclude Include="..\ThirdParty\imgui\imconfig.h" />
     <ClInclude Include="..\ThirdParty\imgui\imgui.h" />
     <ClInclude Include="..\ThirdParty\imgui\ImGuizmo.h" />
@@ -181,6 +180,7 @@
     <ClInclude Include="..\ThirdParty\imgui\imstb_textedit.h" />
     <ClInclude Include="..\ThirdParty\imgui\imstb_truetype.h" />
     <ClInclude Include="Editor\Editor.h" />
+    <ClInclude Include="extern\tiny-stable-diffusion\TinyStableDiffusionhi.h" />
     <ClInclude Include="Rendering\BasicLightingPass.h" />
     <ClInclude Include="Rendering\BatchSystem.h" />
     <ClInclude Include="Rendering\Buffer.h" />
@@ -193,6 +193,8 @@
     <ClInclude Include="Rendering\PostprocessingPass.h" />
     <ClInclude Include="Rendering\RenderSetting.h" />
     <ClInclude Include="Rendering\Swapchain.h" />
+    <ClInclude Include="tiny-stable-diffusion-main\TinyStableDiffusion.h" />
+    <ClInclude Include="tiny-stable-diffusion\TinyStableDiffusionhi.h" />
     <ClInclude Include="Utils\BoundingBox.h" />
     <ClInclude Include="Utils\ModelLoader.h" />
     <ClInclude Include="Utils\Singleton.h" />

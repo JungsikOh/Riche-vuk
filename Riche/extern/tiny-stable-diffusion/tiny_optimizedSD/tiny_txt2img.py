@@ -4,7 +4,6 @@ sys.path.append('.')
 sys.path.append('/home/hyf/latent-diffusion/taming-transformers')
 script_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(os.path.join(script_dir, "tiny_optimizedSD"))
-sys.path.append(os.path.join(script_dir, "..", "tiny-stable-diffusion"))
 import torch
 import numpy as np
 from random import randint
@@ -39,15 +38,15 @@ def load_model_from_config(ckpt, verbose=False):
     return sd
 
 
-config = "extern/tinty-stable-diffusion/tiny_optimizedSD/v1-inference.yaml"
-DEFAULT_CKPT = "full_int2_sd.pth"
+config = "extern/tiny-stable-diffusion/tiny_optimizedSD/v1-inference.yaml"
+DEFAULT_CKPT = "extern/tiny-stable-diffusion/full_int2_sd.pth"
 
 parser = argparse.ArgumentParser()
 ## a painting of a virus monster playing guitar
 parser.add_argument(
     "--prompt", type=str, nargs="?", default="A peaceful lakeside cabin with a dock, surrounded by tall pine trees and a clear blue sky", help="the prompt to render"
 )
-parser.add_argument("--outdir", type=str, nargs="?", help="dir to write results to", default="outputs/txt2img-int2-samples")
+parser.add_argument("--outdir", type=str, nargs="?", help="dir to write results to", default="extern/tiny-stable-diffusion/outputs/txt2img-int2-samples")
 parser.add_argument(
     "--skip_grid",
     action="store_true",
@@ -191,7 +190,7 @@ if opt.seed == None:
 seed_everything(opt.seed)
 
 # Logging
-logger(vars(opt), log_csv = "logs/txt2img_logs.csv")
+logger(vars(opt), log_csv = "extern/tiny-stable-diffusion/logs/txt2img_logs.csv")
 
 sd = load_model_from_config(f"{opt.ckpt}")
 li, lo = [], []

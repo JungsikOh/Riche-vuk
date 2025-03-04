@@ -194,7 +194,13 @@
     <ClInclude Include="Rendering\PostprocessingPass.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="..\extern\tiny-stable-diffusion\TinyStableDiffusion.h">
+    <ClInclude Include="extern\tiny-stable-diffusion\TinyStableDiffusionhi.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="tiny-stable-diffusion\TinyStableDiffusionhi.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="tiny-stable-diffusion-main\TinyStableDiffusion.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

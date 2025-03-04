@@ -1,11 +1,11 @@
 #pragma once
 
 static void GenerateImage(const std::string& prompt) {
-	//std::string pythonPath = R"(C:\Users\story\anaconda3\envs\ldm\python.exe)";
+	std::string pythonPath = R"(C:\Users\story\anaconda3\envs\ldm\python.exe)";
 	//std::string scriptPath = "tiny-stable-diffusion-main\\tiny_optimizedSD\\tiny_txt2img.py";
 	//std::string scriptPath = "..\\extern\\tiny-stable-diffusion\\tiny_optimizedSD\\tiny_txt2img.py";
-	std::string pythonPath = R"(conda run -n ldm python)";
-	std::string scriptPath = "..\\extern\\tiny-stable-diffusion\\tiny_optimizedSD\\tiny_txt2img.py";
+	//std::string pythonPath = R"(conda run -n ldm python)";
+	std::string scriptPath = "extern\\tiny-stable-diffusion\\tiny_optimizedSD\\tiny_txt2img.py";
 
 	std::string cmd = pythonPath + " " + scriptPath + " --prompt " + '"' + prompt + '"' + " --H 512 --W 512 --seed 27";
 	std::cout << "Running cmd: " << cmd << std::endl;
