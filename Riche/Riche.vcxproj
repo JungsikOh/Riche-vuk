@@ -180,7 +180,7 @@
     <ClInclude Include="..\ThirdParty\imgui\imstb_textedit.h" />
     <ClInclude Include="..\ThirdParty\imgui\imstb_truetype.h" />
     <ClInclude Include="Editor\Editor.h" />
-    <ClInclude Include="extern\tiny-stable-diffusion\TinyStableDiffusionhi.h" />
+    <ClInclude Include="extern\tiny-stable-diffusion\TinyStableDiffusion.h" />
     <ClInclude Include="Rendering\BasicLightingPass.h" />
     <ClInclude Include="Rendering\BatchSystem.h" />
     <ClInclude Include="Rendering\Buffer.h" />

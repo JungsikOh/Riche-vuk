@@ -2,7 +2,7 @@
 
 #include "Rendering/BasicLightingPass.h"
 #include "Rendering/Camera.h"
-#include "extern/tiny-stable-diffusion/TinyStableDiffusionhi.h"
+#include "extern/tiny-stable-diffusion/TinyStableDiffusion.h"
 
 static bool g_ShowFileBrowser = false;
 static std::string g_SelectedFilePath = "";
@@ -142,7 +142,7 @@ void Editor::ShowStableDiffusionUI() {
       s_statusMessage = "Generating...";
 
       std::string prompt = s_promptBuf;
-      s_genFuture = g_ThreadPool.Submit([prompt]() { GenerateImage(prompt); });
+      s_genFuture = g_ThreadPool.Submit([prompt]() { GenerateImage2D(prompt); });
     }
   }
   ImGui::SameLine();
