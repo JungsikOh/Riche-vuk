@@ -278,6 +278,41 @@ void BatchManager::CreateDescriptorSets(VkDevice device, VkPhysicalDevice physic
   VkUtils::DescriptorBuilder materialBuilder = VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache, &g_DescriptorAllocator);
   materialBuilder.BindImage(0, imageInfos.data(), VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_SHADER_STAGE_ALL, true, imageInfos.size());
   g_DescriptorManager.AddDescriptorSet(&materialBuilder, "DiffuseTextureList", true);
+
+
+
+  for (int i = 0; i < m_meshes.size(); ++i) {
+    VkDescriptorSet set;
+
+    VkDescriptorBufferInfo positionInfo = {};
+    positionInfo.buffer = g_BatchManager.m_positionBuffers[i].buffer;       // Buffer to get data from
+    positionInfo.offset = 0;                                               // Position of start of data
+    positionInfo.range = g_BatchManager.m_positionBuffers[i].size;          // size of data
+
+    VkDescriptorBufferInfo meshletInfo = {};
+    meshletInfo.buffer = g_BatchManager.m_meshletBuffers[i].buffer;      // Buffer to get data from
+    meshletInfo.offset = 0;                                              // Position of start of data
+    meshletInfo.range = g_BatchManager.m_meshletBuffers[i].size;         // size of data
+
+    VkDescriptorBufferInfo meshletVerticesInfo = {};
+    meshletVerticesInfo.buffer = g_BatchManager.m_meshletVerticesBuffers[i].buffer;      // Buffer to get data from
+    meshletVerticesInfo.offset = 0;                                                      // Position of start of data
+    meshletVerticesInfo.range = g_BatchManager.m_meshletVerticesBuffers[i].size;         // size of data
+
+    VkDescriptorBufferInfo meshletTrianglesInfo = {};
+    meshletTrianglesInfo.buffer = g_BatchManager.m_meshletTrianglesBuffers[i].buffer;      // Buffer to get data from
+    meshletTrianglesInfo.offset = 0;                                                       // Position of start of data
+    meshletTrianglesInfo.range = g_BatchManager.m_meshletTrianglesBuffers[i].size;         // size of data
+
+    VkUtils::DescriptorBuilder builder =
+        VkUtils::DescriptorBuilder::Begin(&g_DescriptorLayoutCache.Get(), &g_DescriptorAllocator.Get());
+    builder.BindBuffer(0, &positionInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL);
+    builder.BindBuffer(1, &meshletInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL);
+    builder.BindBuffer(2, &meshletVerticesInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL);
+    builder.BindBuffer(3, &meshletTrianglesInfo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_ALL);
+    builder.Build(set, g_BatchManager.m_meshletSetLayout);
+    g_BatchManager.m_meshletSets.push_back(set);
+  }
 }
 
 void BatchManager::RebuildBatchManager(VkDevice device, VkPhysicalDevice physicalDevice) {
@@ -305,6 +340,8 @@ void BatchManager::RebuildBatchManager(VkDevice device, VkPhysicalDevice physica
     vkDestroyBuffer(device, m_indicesBuffer.buffer, nullptr);
     vkFreeMemory(device, m_indicesBuffer.memory, nullptr);
   }
+
+
 
   CreateBatchManagerBuffers(device, physicalDevice);
   UpdateDescriptorSets(device);

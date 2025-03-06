@@ -45,6 +45,10 @@ class IRenderPass {
   VkPhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingPipelineProperties{};
   VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures{};
 
+  PFN_vkCmdDrawMeshTasksEXT vkCmdDrawMeshTasksEXT;
+
+  VkPhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures{};
+
   IRenderPass() = default;
   IRenderPass(VkDevice device, VkPhysicalDevice physicalDevice);
   ~IRenderPass() = default;

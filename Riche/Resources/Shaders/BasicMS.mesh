@@ -1,0 +1,118 @@
+#version 460
+#extension GL_EXT_mesh_shader : require
+#extension GL_ARB_shading_language_include : enable
+#extension GL_ARB_shader_draw_parameters : enable
+#extension GL_EXT_nonuniform_qualifier : require
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_samplerless_texture_functions : require
+
+#include "CommonData.glsl"
+
+#define TASK_WORKGROUP_SIZE 32
+#define MESH_WORKGROUP_SIZE 128
+#define MESHLET_VERTEX_COUNT 64
+#define MESHLET_PRIMITIVE_COUNT 124
+
+const uint MESHLET_VERTEX_ITERATIONS = (MESHLET_VERTEX_COUNT + MESH_WORKGROUP_SIZE - 1) / MESH_WORKGROUP_SIZE;
+const uint MESHLET_PRIMITIVE_ITERATIONS = (MESHLET_PRIMITIVE_COUNT + MESH_WORKGROUP_SIZE - 1) / MESH_WORKGROUP_SIZE;
+
+layout(local_size_x = MESH_WORKGROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
+layout(triangles, max_vertices = MESHLET_VERTEX_COUNT, max_primitives = MESHLET_PRIMITIVE_COUNT) out;
+
+layout(location = 0) out MeshOutput {
+	vec3 color;
+	vec4 normal;
+    vec2 tex;
+} meshOuptuts[];
+
+struct Payload {
+	uint meshletIndices[TASK_WORKGROUP_SIZE];
+};
+
+taskPayloadSharedEXT Payload s_Payload;
+
+struct Vertex {
+	vec3 position;
+};
+
+struct RayBasicVertex {
+    vec4 position;
+    vec4 normal;
+    vec2 tex;
+    vec2 padd;
+};
+
+struct Meshlet {
+	uint vertexOffset;
+	uint triangleOffset;
+	uint vertexCount;
+	uint triangleCount;
+};
+
+layout(set = 0, binding = 0) uniform U_Camera
+{
+	mat4 view;
+	mat4 projection;
+    mat4 viewInverse;
+    mat4 projInverse;
+
+	mat4 prevView;
+	mat4 prevProjection;
+	mat4 prevViewInverse;
+	mat4 prevProjInverse;
+} u_Camera;
+
+layout(set = 1, binding = 0) readonly buffer MeshletVertexBuffer
+{
+	RayBasicVertex meshletVertices[];
+};
+layout(set = 1, binding = 1) readonly buffer MeshletBuffer
+{
+	Meshlet meshlets[];
+};
+layout(set = 1, binding = 2) readonly buffer MeshletVertexIndexBuffer
+{
+	uint meshletVertexIndices[];
+};
+layout(set = 1, binding = 3) readonly buffer MeshletTriangleIndexBuffer
+{
+	uint meshletTriangleIndices[];
+};
+
+layout(set = 2, binding = 0) readonly buffer SSBO_Model
+{
+	Transform transform[];
+}ssbo_Model;
+
+
+void main() {
+	uint gtid = gl_LocalInvocationID.x;
+	uint gid = gl_WorkGroupID.x;
+
+	uint meshletIndex = s_Payload.meshletIndices[gid];
+
+	// Meshlet m = meshlets[gid];
+	Meshlet m = meshlets[meshletIndex];
+	SetMeshOutputsEXT(m.vertexCount, m.triangleCount);
+	
+	if(gtid < m.triangleCount) {
+		uint packed = meshletTriangleIndices[m.triangleOffset + gtid];
+        uint vIdx0  = (packed >>  0) & 0xFF;
+        uint vIdx1  = (packed >>  8) & 0xFF;
+        uint vIdx2  = (packed >> 16) & 0xFF;
+		gl_PrimitiveTriangleIndicesEXT[gtid] = uvec3(vIdx0, vIdx1, vIdx2);
+	}
+
+	if(gtid < m.vertexCount) {
+		uint vertexIndex = gtid + m.vertexOffset;
+		vertexIndex = meshletVertexIndices[vertexIndex];
+
+		mat4 model = nonuniformEXT(ssbo_Model.transform[u_ShaderSetting.batchIdx].currentModel);
+		gl_MeshVerticesEXT[gtid].gl_Position = u_Camera.projection * u_Camera.view * model * vec4(meshletVertices[vertexIndex].position.xyz, 1.0);
+
+		vec3 color = vec3(float(gid & 1u), float(gid & 3u) / 4.0, float(gid & 7u) / 8.0);
+		meshOuptuts[gtid].color = color;
+		meshOuptuts[gtid].normal = meshletVertices[vertexIndex].normal;
+		meshOuptuts[gtid].tex = meshletVertices[vertexIndex].tex;
+	}
+}

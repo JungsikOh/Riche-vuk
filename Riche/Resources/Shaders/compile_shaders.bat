@@ -17,6 +17,10 @@ C:/VulkanSDK/1.3.290.0/Bin/glslangValidator.exe -o RenderingQuadPS.spv -V Render
 
 C:/VulkanSDK/1.3.290.0/Bin/glslangValidator.exe --version
 
+C:/VulkanSDK/1.3.290.0/Bin/glslangValidator.exe -o BasicTS.spv -V --target-env vulkan1.3 BasicTS.task
+C:/VulkanSDK/1.3.290.0/Bin/glslangValidator.exe -o BasicMS.spv -V --target-env vulkan1.3 BasicMS.mesh
+C:/VulkanSDK/1.3.290.0/Bin/glslangValidator.exe -o BasicPS.spv -V --target-env vulkan1.3 BasicPS.frag
+
 C:/VulkanSDK/1.3.290.0/Bin/glslangValidator.exe -o RaytracingShadow/Raygen.rgen.spv -V --target-env vulkan1.3 RaytracingShadow/Raygen.rgen
 C:/VulkanSDK/1.3.290.0/Bin/glslangValidator.exe -o RaytracingShadow/ClosestHit.rchit.spv -V --target-env vulkan1.3 RaytracingShadow/ClosestHit.rchit
 C:/VulkanSDK/1.3.290.0/Bin/glslangValidator.exe -o RaytracingShadow/Miss.rmiss.spv -V --target-env vulkan1.3 RaytracingShadow/Miss.rmiss

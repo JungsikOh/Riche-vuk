@@ -447,6 +447,8 @@ static bool loadGltfModel(VkDevice device, const std::string& filepath, const st
     g_BatchManager.m_bbVertexBuffers.push_back(std::move(vertexBuffer));
     g_BatchManager.m_bbIndexBuffers.push_back(std::move(indexBuffer));
 
+
+
     outMeshes.push_back(std::move(partial));
   }
 

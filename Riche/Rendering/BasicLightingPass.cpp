@@ -617,7 +617,10 @@ void BasicLightingPass::CreateRaytracingFramebuffer() {
   g_ResourceManager.EndAndSummitCommandBuffer(commandBuffer);
 }
 
-void BasicLightingPass::CreatePipelineLayouts() { CreateRaytracingPipelineLayout(); }
+void BasicLightingPass::CreatePipelineLayouts() {
+  CreateRaytracingPipelineLayout();
+  CreateMeshShaderPipelineLayout();
+}
 
 void BasicLightingPass::CreateRaytracingPipelineLayout() {
   // -- PIPELINE LAYOUT (It's like Root signature in D3D12) --
@@ -638,12 +641,33 @@ void BasicLightingPass::CreateRaytracingPipelineLayout() {
   VK_CHECK(vkCreatePipelineLayout(m_pDevice, &pipelineLayoutCreateInfo, nullptr, &m_raytracingPipelineLayout));
 }
 
+void BasicLightingPass::CreateMeshShaderPipelineLayout() {
+  // -- PIPELINE LAYOUT (It's like Root signature in D3D12) --
+  std::vector<VkDescriptorSetLayout> setLayouts = {
+      g_DescriptorManager.GetVkDescriptorSetLayout("ViewProjection_ALL0"),
+      g_BatchManager.m_meshletSetLayout,
+      g_DescriptorManager.GetVkDescriptorSetLayout("BATCH_ALL0"),
+      g_DescriptorManager.GetVkDescriptorSetLayout("SamplerList_ALL"),
+      g_DescriptorManager.GetVkDescriptorSetLayout("DiffuseTextureList"),
+  };
+
+  VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
+  pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+  pipelineLayoutCreateInfo.setLayoutCount = setLayouts.size();
+  pipelineLayoutCreateInfo.pSetLayouts = setLayouts.data();
+  pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+  pipelineLayoutCreateInfo.pPushConstantRanges = &m_debugPushConstant;
+
+  VK_CHECK(vkCreatePipelineLayout(m_pDevice, &pipelineLayoutCreateInfo, nullptr, &m_meshPipelineLayout));
+}
+
 void BasicLightingPass::CreatePipelines() {
   CreateGraphicsPipeline();
   CreateWireGraphicsPipeline();
   CreateBoundingBoxPipeline();
   CreateObjectIDPipeline();
   CreateRaytracingPipeline();
+  CreateMeshShaderPipeline();
 }
 
 void BasicLightingPass::CreateGraphicsPipeline() {
@@ -1448,6 +1472,148 @@ void BasicLightingPass::CreateRaytracingPipeline() {
   }
 }
 
+void BasicLightingPass::CreateMeshShaderPipeline() {
+  auto taskShaderCode = VkUtils::ReadFile("Resources/Shaders/BasicTS.spv");
+  auto meshShaderCode = VkUtils::ReadFile("Resources/Shaders/BasicMS.spv");
+  auto fragmentShaderCode = VkUtils::ReadFile("Resources/Shaders/BasicPS.spv");
+
+  // Build Shaders
+  VkShaderModule taskShaderModule = VkUtils::CreateShaderModule(m_pDevice, taskShaderCode);
+  VkShaderModule meshShaderModule = VkUtils::CreateShaderModule(m_pDevice, meshShaderCode);
+  VkShaderModule fragmentShaderModule = VkUtils::CreateShaderModule(m_pDevice, fragmentShaderCode);
+
+  // Set new shaders
+  VkPipelineShaderStageCreateInfo taskShaderCreateInfo = {};
+  taskShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  taskShaderCreateInfo.stage = VK_SHADER_STAGE_TASK_BIT_EXT;    // Shader stage name
+  taskShaderCreateInfo.module = taskShaderModule;             // Shader moudle to be used by stage
+  taskShaderCreateInfo.pName = "main";                          // Entry point in to shader
+  // Vertex Stage Creation information
+  VkPipelineShaderStageCreateInfo vertexShaderCreateInfo = {};
+  vertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  vertexShaderCreateInfo.stage = VK_SHADER_STAGE_MESH_BIT_EXT;  // Shader stage name
+  vertexShaderCreateInfo.module = meshShaderModule;             // Shader moudle to be used by stage
+  vertexShaderCreateInfo.pName = "main";                        // Entry point in to shader
+  // Fragment Stage Creation information
+  VkPipelineShaderStageCreateInfo fragmentShaderCreateInfo = {};
+  fragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  fragmentShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;  // Shader stage name
+  fragmentShaderCreateInfo.module = fragmentShaderModule;         // Shader moudle to be used by stage
+  fragmentShaderCreateInfo.pName = "main";                        // Entry point in to shader
+
+  VkPipelineShaderStageCreateInfo shaderStages[] = {taskShaderCreateInfo, vertexShaderCreateInfo, fragmentShaderCreateInfo};
+
+  // -- VERTEX INPUT --
+  // -- INPUT ASSEMBLY --
+  // Mesh Shader directly build attribute in each work group, So we don't activate vertex input and input assembly.
+
+  // -- VIPEPORT & SCISSOR --
+  // Create a viewport info struct
+  VkViewport viewport = {};
+  viewport.x = 0.0f;                  // x start coordinate
+  viewport.y = 0.0f;                  // y start coordinate
+  viewport.width = (float)m_width;    // width of viewport
+  viewport.height = (float)m_height;  // height of viewport
+  viewport.minDepth = 0.0f;           // min framebuffer depth
+  viewport.maxDepth = 1.0f;           // max framebuffer depth
+
+  // Create a scissor info struct
+  VkRect2D scissor = {};
+  scissor.offset = {0, 0};               // offset to use region from
+  scissor.extent = {m_width, m_height};  // extent to describe region to use, starting at offset
+
+  VkPipelineViewportStateCreateInfo viewportStateCreateInfo = {};
+  viewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+  viewportStateCreateInfo.viewportCount = 1;
+  viewportStateCreateInfo.pViewports = &viewport;
+  viewportStateCreateInfo.scissorCount = 1;
+  viewportStateCreateInfo.pScissors = &scissor;
+
+  // -- RASTERIZER --
+  VkPipelineRasterizationStateCreateInfo rasterizerCreateInfo = {};
+  rasterizerCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+  rasterizerCreateInfo.depthClampEnable =
+      VK_FALSE;  // Change if fragments beyond near/far planes are clipped (default) or clamped to
+                 // plane, you can only use this to accept depthBiasClamp of physical device VK_TRUE
+  rasterizerCreateInfo.rasterizerDiscardEnable = VK_FALSE;  // Whether tp discard data and skip rasterizer. Never creates fragments
+                                                            // only suitable for pipline without framebuffer output.
+  rasterizerCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;  // How to handle filling points between vertices.
+  rasterizerCreateInfo.lineWidth = 1.0f;                    // How thick lines should be when drawn
+  rasterizerCreateInfo.cullMode = VK_CULL_MODE_NONE;        // Which face of a tri to cull
+  rasterizerCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;  // Winding to determine which side in front
+  rasterizerCreateInfo.depthBiasEnable =
+      VK_FALSE;  // Whether to add depth bias to fragments (good for stopping "shadow acne" in shadow mapping
+
+  // -- MULTISAMPLING --
+  VkPipelineMultisampleStateCreateInfo multisamplingCreateInfo = {};
+  multisamplingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+  multisamplingCreateInfo.sampleShadingEnable = VK_FALSE;                // Enable multisample shading or not
+  multisamplingCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;  // Number of samples to use per fragment (e.g. 4xMSAA, 8xMSAA)
+
+  // -- BLENDING --
+  // Blending decides how to blend a new colour being written to a fragment, with the old value
+  // Blend Attacment State (how blending is handled)
+  VkPipelineColorBlendAttachmentState colourState = {};
+  colourState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
+                               VK_COLOR_COMPONENT_A_BIT;  // Colours to apply blending to
+  colourState.blendEnable = VK_TRUE;                      // Enable Blending
+
+  // Blending uses equation: (srcColorBlendFactor * new colour) colorBlendOp (dstColorBlendFactor * old colour)
+  colourState.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;            // if it is 0.3
+  colourState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;  // this is (1.0 - 0.3)
+  colourState.colorBlendOp = VK_BLEND_OP_ADD;
+  // Summarised: (SRC_ALPHA * new colour) + (MINUS_SRC_ALPHA * old colour) == (alpha * new ) + (1 - alpha * old)
+
+  colourState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+  colourState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+  colourState.alphaBlendOp = VK_BLEND_OP_ADD;
+  // Summarised: (1 * new alpha) + (0 * old alpha) == new alpha
+
+  VkPipelineColorBlendStateCreateInfo colourBlendingCreateInfo = {};
+  colourBlendingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+  colourBlendingCreateInfo.logicOpEnable = VK_FALSE;  // Alternative to calculations is to use logical operations
+  colourBlendingCreateInfo.attachmentCount = 1;
+  colourBlendingCreateInfo.pAttachments = &colourState;
+
+  // Don't want to write to depth buffer
+  // -- DEPTH STENCIL TESTING --
+  VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo = {};
+  depthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+  depthStencilCreateInfo.depthTestEnable = VK_TRUE;            // Enable checking depth to determine fragment wrtie
+  depthStencilCreateInfo.depthWriteEnable = VK_TRUE;           // Enable writing to depth buffer (to replace old values)
+  depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;  // Comparison operation that allows an overwrite (is in front)
+  depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;     // Depth Bounds Test: Does the depth value exist between two bounds, 즉
+                                                            // 픽셀의 깊이 값이 특정 범위 안에 있는지를 체크하는 검사
+  depthStencilCreateInfo.stencilTestEnable = VK_FALSE;  // Enable Stencil Test
+
+  // -- GRAPHICS PIPELINE CREATION --
+  VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
+  pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+  pipelineCreateInfo.stageCount = 3;                      // Number of shader stages
+  pipelineCreateInfo.pStages = shaderStages;              // List of shader stages
+  pipelineCreateInfo.pVertexInputState = VK_NULL_HANDLE;  // All the fixed function pipeline states
+  pipelineCreateInfo.pInputAssemblyState = VK_NULL_HANDLE;
+  pipelineCreateInfo.pViewportState = &viewportStateCreateInfo;
+  pipelineCreateInfo.pDynamicState = nullptr;
+  pipelineCreateInfo.pRasterizationState = &rasterizerCreateInfo;
+  pipelineCreateInfo.pMultisampleState = &multisamplingCreateInfo;
+  pipelineCreateInfo.pColorBlendState = &colourBlendingCreateInfo;
+  pipelineCreateInfo.pDepthStencilState = &depthStencilCreateInfo;
+  pipelineCreateInfo.layout = m_meshPipelineLayout;  // Pipeline Laytout pipeline should use
+  pipelineCreateInfo.renderPass = m_renderPass;      // Render pass description the pipeline is compatible with
+  pipelineCreateInfo.subpass = 0;                    // Subpass of render pass to use with pipeline
+
+  // Pipeline Derivatives : can create multiple pipeline that derive from one another for optimization
+  pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;  // Existing pipline to derive from
+  pipelineCreateInfo.basePipelineIndex = -1;  // or index of pipeline being created to derive from (in case createing multiple at once)
+
+  VK_CHECK(vkCreateGraphicsPipelines(m_pDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_meshPipeline));
+
+  // Destroy second shader modules
+  vkDestroyShaderModule(m_pDevice, meshShaderModule, nullptr);
+  vkDestroyShaderModule(m_pDevice, fragmentShaderModule, nullptr);
+}
+
 void BasicLightingPass::CreateBuffers() {
   CreateLightingPassBuffers();
   CreateRaytracingBuffers();
@@ -1845,7 +2011,9 @@ void BasicLightingPass::RecordCommands(uint32_t currentImage) {
   // Begin Render Pass
   vkCmdBeginRenderPass(m_commandBuffers[currentImage], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-  RecordLightingPassCommands(currentImage);
+  if (g_RenderSetting.UseMeshShader) RecordMeshletCommands(currentImage);
+  else RecordLightingPassCommands(currentImage);
+  
   RecordBoundingBoxCommands(currentImage);
 
   // End Render Pass
@@ -1885,6 +2053,32 @@ void BasicLightingPass::RecordCommands(uint32_t currentImage) {
 
   // Stop recording commands to command buffer!
   VK_CHECK(vkEndCommandBuffer(m_commandBuffers[currentImage]));
+}
+
+void BasicLightingPass::RecordMeshletCommands(uint32_t currentImage) {
+  vkCmdBindPipeline(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_meshPipeline);
+
+  g_ShaderSetting.batchIdx = 0;
+  for (int i = 0; i < g_BatchManager.m_meshes.size(); ++i) {
+    if (g_BatchManager.m_meshes[i].visible) {
+      vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_meshPipelineLayout, 0, 1,
+                              &g_DescriptorManager.GetVkDescriptorSet("ViewProjection_ALL" + std::to_string(currentImage)), 0,
+                              nullptr);
+      vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_meshPipelineLayout, 1, 1,
+                              &g_BatchManager.m_meshletSets[i], 0, nullptr);
+      vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_meshPipelineLayout, 2, 1,
+                              &g_DescriptorManager.GetVkDescriptorSet("BATCH_ALL" + std::to_string(currentImage)), 0, nullptr);
+      vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_meshPipelineLayout, 3, 1,
+                              &g_DescriptorManager.GetVkDescriptorSet("SamplerList_ALL"), 0, nullptr);
+      vkCmdBindDescriptorSets(m_commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_meshPipelineLayout, 4, 1,
+                              &g_DescriptorManager.GetVkDescriptorSet("DiffuseTextureList"), 0, nullptr);
+      vkCmdPushConstants(m_commandBuffers[currentImage], m_meshPipelineLayout, VK_SHADER_STAGE_ALL, 0, sizeof(ShaderSetting),
+                         &g_ShaderSetting);
+
+      vkCmdDrawMeshTasksEXT(m_commandBuffers[currentImage], g_BatchManager.m_meshes[i].m_meshlets.size(), 1, 1);
+    }
+    g_ShaderSetting.batchIdx += 1;
+  }
 }
 
 void BasicLightingPass::RecordLightingPassCommands(uint32_t currentImage) {

@@ -6,9 +6,19 @@ class Mesh {
   glm::mat4 m_Model;
 
  public:
+  bool visible = true;
+
   std::vector<BasicVertex> vertices;
   std::vector<RayTracingVertex> ray_vertices;
   std::vector<uint32_t> indices;
+
+  /*
+  * Use Mesh shader
+  */
+  std::vector<glm::vec3> m_positions;
+  std::vector<meshopt_Meshlet> m_meshlets;
+  std::vector<uint32_t> m_meshletVertices;
+  std::vector<uint8_t> m_meshletTriangles;
 
   uint64_t vertexOffset;
   uint64_t indexOffset;

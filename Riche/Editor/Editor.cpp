@@ -406,7 +406,17 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
 
   ImGui::Begin("Rendering");
   ImGui::Checkbox("Multi Threading Culling", &(g_RenderSetting.isMultiThreading));
-  ImGui::Checkbox("Wire Frame", &(g_RenderSetting.isWireRendering));
+  ImGui::Checkbox("Use Mesh Shader", &(g_RenderSetting.UseMeshShader));
+  
+  bool meshletRendering = (g_ShaderSetting.isMeshletRender != 0);
+  if (g_RenderSetting.UseMeshShader) {
+    if (ImGui::Checkbox("Meshlet Rendering", &meshletRendering)) {
+      // Checkbox 값이 바뀌면 int 필드에도 반영
+      g_ShaderSetting.isMeshletRender = meshletRendering ? 1 : 0;
+    }
+  } else {
+    ImGui::Checkbox("Wire Frame", &(g_RenderSetting.isWireRendering));
+  }
   ImGui::Checkbox("Occlusion Culling", &(g_RenderSetting.isOcclusionCulling));
   ImGui::Checkbox("View BoundingBox", &(g_RenderSetting.isRenderBoundingBox));
   ImGui::SliderFloat4("Light Pos", glm::value_ptr(g_ShaderSetting.lightPos), -5.0f, 5.0f);

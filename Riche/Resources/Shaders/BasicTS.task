@@ -1,0 +1,31 @@
+#version 460
+#extension GL_EXT_mesh_shader : require
+#extension GL_ARB_shading_language_include : enable
+#extension GL_ARB_shader_draw_parameters : enable
+#extension GL_EXT_nonuniform_qualifier : require
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_samplerless_texture_functions : require
+
+#include "CommonData.glsl"
+
+#define TASK_WORKGROUP_SIZE 32
+#define MESH_WORKGROUP_SIZE 128
+
+layout(local_size_x = TASK_WORKGROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
+
+struct Payload {
+	uint meshletIndices[TASK_WORKGROUP_SIZE];
+};
+
+taskPayloadSharedEXT Payload s_Payload;
+
+void main()
+{
+	uint gtid = gl_LocalInvocationID.x;
+	uint gid = gl_WorkGroupID.x;
+	uint dtid = gl_WorkGroupID.x * gl_WorkGroupSize.x + gtid;
+
+	s_Payload.meshletIndices[gtid] = dtid;
+
+	EmitMeshTasksEXT(TASK_WORKGROUP_SIZE, 1, 1);
+}

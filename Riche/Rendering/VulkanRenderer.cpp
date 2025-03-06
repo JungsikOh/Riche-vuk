@@ -52,7 +52,7 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
                           m_camera);
 
     // 물체 배치를 위한 파라미터 설정
-    const int numColumns = 1;
+    const int numColumns = 5;
     const int numRows = 1;          // 5 * 4 = 20 개의 물체
     const float spacingX = 200.0f;  // X축 간격
     const float spacingZ = 200.0f;  // Z축 간격
@@ -66,7 +66,7 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
       for (int col = 0; col < numColumns; ++col) {
         // 계산된 위치: x와 z는 격자에 따라, y는 고정
         glm::vec3 pos(col * spacingX, baseHeight, row * spacingZ);
-        // 위치 정보를 인자로 추가한 오버로딩된 loadGltfModel 호출
+        //loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f, pos);
       }
     }
     loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f);
@@ -75,6 +75,10 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
     g_BatchManager.FlushMiniBatch(g_BatchManager.m_miniBatchList, g_ResourceManager);
 
     int rayCount = 0, count = 0;
+    const size_t kMaxVertices = 64;
+    const size_t kMaxTriangles = 124;
+    const float kConeWeight = 0.0f;
+
     for (Mesh& mesh : outMeshes) {
       for (RayTracingVertex& vertex : mesh.ray_vertices) {
         g_BatchManager.m_allMeshVertices.push_back(vertex);
@@ -86,6 +90,110 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
       mesh.indexOffset = g_BatchManager.m_accmulatedIndexOffset;
       g_BatchManager.m_accmulatedVertexOffset += mesh.ray_vertices.size() * sizeof(RayTracingVertex);
       g_BatchManager.m_accmulatedIndexOffset += mesh.indices.size() * sizeof(uint32_t);
+
+      /*
+       * Use Mesh Shader
+       */
+      const size_t maxMeshlets = meshopt_buildMeshletsBound(mesh.indices.size(), kMaxVertices, kMaxTriangles);
+      mesh.m_meshlets.resize(maxMeshlets);
+      mesh.m_meshletVertices.resize(maxMeshlets * kMaxVertices);
+      mesh.m_meshletTriangles.resize(maxMeshlets * kMaxTriangles * 3);
+
+      for (BasicVertex& v : mesh.vertices) {
+        mesh.m_positions.push_back(v.pos);
+      }
+      /*size_t meshletCount =
+          meshopt_buildMeshlets(mesh.m_meshlets.data(), mesh.m_meshletVertices.data(), mesh.m_meshletTriangles.data(),
+                                reinterpret_cast<const uint32_t*>(mesh.indices.data()), mesh.indices.size(),
+                                reinterpret_cast<const float*>(mesh.m_positions.data()), mesh.m_positions.size(), sizeof(glm::vec3),
+                                kMaxVertices, kMaxTriangles, kConeWeight);*/
+      size_t meshletCount = meshopt_buildMeshlets(
+          mesh.m_meshlets.data(), mesh.m_meshletVertices.data(), mesh.m_meshletTriangles.data(),
+          reinterpret_cast<const uint32_t*>(mesh.indices.data()), mesh.indices.size(), &mesh.ray_vertices.data()->pos.x,
+          mesh.ray_vertices.size(), sizeof(RayTracingVertex), kMaxVertices, kMaxTriangles, kConeWeight);
+
+      auto& last = mesh.m_meshlets[meshletCount - 1];
+      mesh.m_meshletVertices.resize(last.vertex_offset + last.vertex_count);
+      mesh.m_meshletTriangles.resize(last.triangle_offset + ((last.triangle_count * 3 + 3) & ~3));
+      mesh.m_meshlets.resize(meshletCount);
+
+      /*
+       * Repack triangles from 3 consecutive bytes to 4byte uint32_t to make it easier to unpack on GPU.
+       */
+      std::vector<uint32_t> meshletTrianglesU32;
+      for (auto& m : mesh.m_meshlets) {
+        // Save triangle offset for current meshlet
+        uint32_t triangleOffset = static_cast<uint32_t>(meshletTrianglesU32.size());
+
+        // Repack to uint32_t
+        for (uint32_t i = 0; i < m.triangle_count; ++i) {
+          uint32_t i0 = 3 * i + 0 + m.triangle_offset;
+          uint32_t i1 = 3 * i + 1 + m.triangle_offset;
+          uint32_t i2 = 3 * i + 2 + m.triangle_offset;
+
+          uint8_t vIdx0 = mesh.m_meshletTriangles[i0];
+          uint8_t vIdx1 = mesh.m_meshletTriangles[i1];
+          uint8_t vIdx2 = mesh.m_meshletTriangles[i2];
+          uint32_t packed = ((static_cast<uint32_t>(vIdx0) & 0xFF) << 0) | ((static_cast<uint32_t>(vIdx1) & 0xFF) << 8) |
+                            ((static_cast<uint32_t>(vIdx2) & 0xFF) << 16);
+          meshletTrianglesU32.push_back(packed);
+        }
+
+        // Update triangle offset for current meshlet
+        m.triangle_offset = triangleOffset;
+      }
+
+      /*
+       * Create Meshlet buffers
+       */
+      GpuBuffer positionBuffer;
+      GpuBuffer meshletBuffer;
+      GpuBuffer meshletVerticesBuffer;
+      GpuBuffer meshletTrianglesBuffer;
+
+      //positionBuffer.size = (uint64_t)(sizeof(mesh.m_positions[0]) * mesh.m_positions.size());
+      positionBuffer.size = (uint64_t)(sizeof(RayTracingVertex) * mesh.ray_vertices.size());
+      meshletBuffer.size = (uint64_t)(sizeof(mesh.m_meshlets[0]) * mesh.m_meshlets.size());
+      meshletVerticesBuffer.size = (uint64_t)(sizeof(mesh.m_meshletVertices[0]) * mesh.m_meshletVertices.size());
+      meshletTrianglesBuffer.size = (uint64_t)(sizeof(meshletTrianglesU32[0]) * meshletTrianglesU32.size());
+
+      VkUtils::CreateBuffer(
+          mainDevice.logicalDevice, mainDevice.physicalDevice, positionBuffer.size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &positionBuffer.buffer, &positionBuffer.memory);
+      VkUtils::CreateBuffer(
+          mainDevice.logicalDevice, mainDevice.physicalDevice, meshletBuffer.size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &meshletBuffer.buffer, &meshletBuffer.memory);
+      VkUtils::CreateBuffer(mainDevice.logicalDevice, mainDevice.physicalDevice, meshletVerticesBuffer.size,
+                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &meshletVerticesBuffer.buffer,
+                            &meshletVerticesBuffer.memory);
+      VkUtils::CreateBuffer(mainDevice.logicalDevice, mainDevice.physicalDevice, meshletTrianglesBuffer.size,
+                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &meshletTrianglesBuffer.buffer,
+                            &meshletTrianglesBuffer.memory);
+
+      void* pData = nullptr;
+      vkMapMemory(mainDevice.logicalDevice, positionBuffer.memory, 0, positionBuffer.size, 0, &pData);
+      memcpy(pData, mesh.ray_vertices.data(), positionBuffer.size);
+      vkUnmapMemory(mainDevice.logicalDevice, positionBuffer.memory);
+
+      vkMapMemory(mainDevice.logicalDevice, meshletBuffer.memory, 0, meshletBuffer.size, 0, &pData);
+      memcpy(pData, mesh.m_meshlets.data(), meshletBuffer.size);
+      vkUnmapMemory(mainDevice.logicalDevice, meshletBuffer.memory);
+
+      vkMapMemory(mainDevice.logicalDevice, meshletVerticesBuffer.memory, 0, meshletVerticesBuffer.size, 0, &pData);
+      memcpy(pData, mesh.m_meshletVertices.data(), meshletVerticesBuffer.size);
+      vkUnmapMemory(mainDevice.logicalDevice, meshletVerticesBuffer.memory);
+
+      vkMapMemory(mainDevice.logicalDevice, meshletTrianglesBuffer.memory, 0, meshletTrianglesBuffer.size, 0, &pData);
+      memcpy(pData, meshletTrianglesU32.data(), meshletTrianglesBuffer.size);
+      vkUnmapMemory(mainDevice.logicalDevice, meshletTrianglesBuffer.memory);
+
+      g_BatchManager.m_positionBuffers.push_back(positionBuffer);
+      g_BatchManager.m_meshletBuffers.push_back(meshletBuffer);
+      g_BatchManager.m_meshletVerticesBuffers.push_back(meshletVerticesBuffer);
+      g_BatchManager.m_meshletTrianglesBuffers.push_back(meshletTrianglesBuffer);
+
       rayCount += mesh.ray_vertices.size();
       count += mesh.vertices.size();
     }
@@ -384,9 +492,18 @@ void VulkanRenderer::CreateLogicalDevice() {
 
   vkGetPhysicalDeviceFeatures2(mainDevice.physicalDevice, &deviceFeatures2);
 
+  VkPhysicalDeviceMaintenance4Features maintenanceFeatures = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES};
+  maintenanceFeatures.maintenance4 = VK_TRUE;
+
+  VkPhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT};
+  meshShaderFeatures.meshShader = VK_TRUE;
+  meshShaderFeatures.taskShader = VK_TRUE;
+  meshShaderFeatures.pNext = &maintenanceFeatures;
+
   VkPhysicalDeviceBufferDeviceAddressFeaturesKHR bufferDeviceAddressFeatures = {};
   bufferDeviceAddressFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR;
   bufferDeviceAddressFeatures.bufferDeviceAddress = VK_TRUE;
+  bufferDeviceAddressFeatures.pNext = &meshShaderFeatures;
 
   VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures = {};
   accelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;

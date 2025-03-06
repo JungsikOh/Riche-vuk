@@ -48,6 +48,8 @@
 #include <tiny_obj_loader.h>
 #include <tinygltf/tiny_gltf.h>
 
+#include <meshoptimizer/src/meshoptimizer.h>
+
 #pragma warning(pop)
 
 

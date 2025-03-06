@@ -27,8 +27,9 @@ struct ShaderSetting : public Singleton<ShaderSetting> {
 #else
   uint32_t isDebugging = false;
 #endif  // _DEBUG
+  uint32_t isMeshletRender = false;
   uint32_t batchIdx = 0;
-  float pad[2];
+  float pad;
 
   glm::vec4 lightPos = glm::vec4(0.0f, 3.0f, 0.0f, 1.0f);
 };

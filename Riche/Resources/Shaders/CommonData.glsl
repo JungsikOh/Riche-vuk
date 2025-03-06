@@ -32,8 +32,9 @@ struct IndircetDrawIndexedCommand {
 layout(push_constant) uniform readonly U_ShaderSetting 
 {
 	uint isDebugging;
+    uint isMeshletRender;
 	uint batchIdx;
-    float padd[2];
+    float padd;
 
     vec4 lightPos;
 }u_ShaderSetting;

@@ -440,6 +440,10 @@ void CullingRenderPass::GetQueryResults() {
                         // If you don't want to wait, you can use VK_QUERY_RESULT_WITH_AVAILABILITY_BIT
                         // which also returns the state of the result (ready) in the result
                         VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+
+  for (int i = 0; i < m_passedSamples.size(); ++i) {
+    g_BatchManager.m_meshes[i].visible = m_passedSamples[i] > 0 ? true : false;
+  }
 }
 
 void CullingRenderPass::CreateBuffers() {

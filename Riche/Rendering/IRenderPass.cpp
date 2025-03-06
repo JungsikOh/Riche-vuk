@@ -40,6 +40,8 @@ IRenderPass::IRenderPass(VkDevice device, VkPhysicalDevice physicalDevice) {
   deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
   deviceFeatures2.pNext = &accelerationStructureFeatures;
   vkGetPhysicalDeviceFeatures2(physicalDevice, &deviceFeatures2);
+
+  vkCmdDrawMeshTasksEXT = reinterpret_cast<PFN_vkCmdDrawMeshTasksEXT>(vkGetDeviceProcAddr(device, "vkCmdDrawMeshTasksEXT"));
 }
 
 VkDeviceAddress IRenderPass::GetVkDeviceAddress(VkDevice device, VkBuffer buffer) {
@@ -53,8 +55,8 @@ VkDeviceAddress IRenderPass::GetVkDeviceAddress(VkDevice device, VkBuffer buffer
 
 VkStridedDeviceAddressRegionKHR IRenderPass::GetSbtEntryStridedDeviceAddressRegion(VkDevice device, VkBuffer buffer,
                                                                                    uint32_t handleCount) {
-  const uint32_t handleSizeAligned =
-      VkUtils::alignedSize(rayTracingPipelineProperties.shaderGroupHandleSize, rayTracingPipelineProperties.shaderGroupHandleAlignment);
+  const uint32_t handleSizeAligned = VkUtils::alignedSize(rayTracingPipelineProperties.shaderGroupHandleSize,
+                                                          rayTracingPipelineProperties.shaderGroupHandleAlignment);
   VkStridedDeviceAddressRegionKHR stridedDeviceAddressRegionKHR{};
   stridedDeviceAddressRegionKHR.deviceAddress = GetVkDeviceAddress(device, buffer);
   stridedDeviceAddressRegionKHR.stride = handleSizeAligned;

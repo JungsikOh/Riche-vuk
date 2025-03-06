@@ -47,6 +47,7 @@ class BasicLightingPass : public IRenderPass {
 
   virtual void CreatePipelineLayouts();
   void CreateRaytracingPipelineLayout();
+  void CreateMeshShaderPipelineLayout();
 
   virtual void CreatePipelines();
   void CreateGraphicsPipeline();
@@ -54,6 +55,7 @@ class BasicLightingPass : public IRenderPass {
   void CreateBoundingBoxPipeline();
   void CreateObjectIDPipeline();
   void CreateRaytracingPipeline();
+  void CreateMeshShaderPipeline();
 
   virtual void CreateBuffers();
   void CreateLightingPassBuffers();
@@ -69,6 +71,7 @@ class BasicLightingPass : public IRenderPass {
   virtual void CreateCommandBuffers();
 
   virtual void RecordCommands(uint32_t currentImage);
+  void RecordMeshletCommands(uint32_t currentImage);
   void RecordLightingPassCommands(uint32_t currentImage);
   void RecordRaytracingShadowCommands(uint32_t currentImage);
   void RecordBoundingBoxCommands(uint32_t currentImage);
@@ -142,6 +145,13 @@ class BasicLightingPass : public IRenderPass {
   VkDescriptorPool m_raytracingPool;
   std::vector<VkDescriptorSet> m_raytracingSets;
   std::vector<VkDescriptorSetLayout> m_raytracingSetLayouts;
+
+  /*
+  * Meshlet
+  */
+  VkPipeline m_meshPipeline;
+  VkPipelineLayout m_meshPipelineLayout;
+
 
   std::vector<VkFramebuffer> m_framebuffers;
   VkFramebuffer m_objectIdFramebuffer;

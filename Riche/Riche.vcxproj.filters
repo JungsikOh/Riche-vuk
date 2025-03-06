@@ -194,13 +194,16 @@
     <ClInclude Include="Rendering\PostprocessingPass.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="extern\tiny-stable-diffusion\TinyStableDiffusionhi.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="tiny-stable-diffusion\TinyStableDiffusionhi.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="tiny-stable-diffusion-main\TinyStableDiffusion.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="extern\tiny-stable-diffusion\TinyStableDiffusion.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Rendering\SharedCpuGpu.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
@@ -209,5 +212,8 @@
     <None Include="Resources\Shaders\compile_shaders.bat">
       <Filter>소스 파일</Filter>
     </None>
+    <None Include="Resources\Shaders\BasicMS.mesh" />
+    <None Include="Resources\Shaders\BasicPS.frag" />
+    <None Include="Resources\Shaders\BasicTS.task" />
   </ItemGroup>
 </Project>
