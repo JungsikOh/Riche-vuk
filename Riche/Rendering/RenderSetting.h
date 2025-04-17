@@ -10,7 +10,7 @@ class RenderSetting : public Singleton<RenderSetting> {
   bool isOcclusionCulling = true;
   bool isRenderBoundingBox = false;
   bool isMultiThreading = false;
-  bool UseMeshShader = true;
+  bool UseMeshShader = false;
 
   int beforeCullingRenderingNum = 0;
   int afterViewCullingRenderingNum = 0;

@@ -420,6 +420,7 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
   ImGui::Checkbox("Occlusion Culling", &(g_RenderSetting.isOcclusionCulling));
   ImGui::Checkbox("View BoundingBox", &(g_RenderSetting.isRenderBoundingBox));
   ImGui::SliderFloat4("Light Pos", glm::value_ptr(g_ShaderSetting.lightPos), -5.0f, 5.0f);
+  ImGui::SliderFloat4("Light Color", glm::value_ptr(g_ShaderSetting.lightColor), 0.0f, 1.0f);
   ImGui::Text("Selected File: %s", g_SelectedFilePath.c_str());
   ImGui::End();
 

@@ -249,6 +249,8 @@ void VulkanRenderer::Update(uint32_t imageIndex) {
     m_viewProjections[imageIndex].projection = m_camera->Proj();
     m_viewProjections[imageIndex].viewInverse = m_camera->InvView();
     m_viewProjections[imageIndex].projInverse = m_camera->InvProj();
+    m_viewProjections[imageIndex].camPos = glm::vec4(m_camera->Position(), 1.0f);
+
 
     vkMapMemory(mainDevice.logicalDevice, m_viewProjectionBuffers[imageIndex].memory, 0, sizeof(ViewProjection), 0, &pData);
     memcpy(pData, &m_viewProjections[imageIndex], sizeof(ViewProjection));

@@ -37,4 +37,5 @@ layout(push_constant) uniform readonly U_ShaderSetting
     float padd;
 
     vec4 lightPos;
+    vec4 lightColor;
 }u_ShaderSetting;

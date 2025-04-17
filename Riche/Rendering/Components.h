@@ -19,6 +19,8 @@ struct ViewProjection {
   glm::mat4 prevProjection;
   glm::mat4 prevViewInverse;
   glm::mat4 prevProjInverse;
+
+  glm::vec4 camPos;
 };
 
 struct ShaderSetting : public Singleton<ShaderSetting> {
@@ -32,6 +34,7 @@ struct ShaderSetting : public Singleton<ShaderSetting> {
   float pad;
 
   glm::vec4 lightPos = glm::vec4(0.0f, 3.0f, 0.0f, 1.0f);
+  glm::vec4 lightColor = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
 };
 
 #define g_ShaderSetting ShaderSetting::Get()
