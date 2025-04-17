@@ -100,7 +100,9 @@ void CullingRenderPass::Update(uint32_t imageIndex) {
     for (int i = 0; i < commandVector.size(); ++i) {
       instantCount += commandVector[i].instanceCount == 0 ? 0 : 1;
     }
-    g_RenderSetting.afterViewCullingRenderingNum = instantCount;
+    
+    if (g_RenderSetting.isOcclusionCulling) g_RenderSetting.afterViewCullingRenderingNum = instantCount;
+    
     vkUnmapMemory(m_pDevice, g_BatchManager.m_indirectDrawCommandBuffer.memory);
   }
 }
@@ -532,6 +534,8 @@ void CullingRenderPass::RecordCommands(uint32_t currentImage) {
   depthOnlyRenderPassBeginInfo.clearValueCount = static_cast<uint32_t>(depthOnlyClearValue.size());
   depthOnlyRenderPassBeginInfo.framebuffer = m_depthOnlyFramebuffer;
 
+  g_RenderSetting.afterViewCullingRenderingNum = (int)g_BatchManager.m_boundingBoxBufferList.size();
+
   if (g_RenderSetting.isOcclusionCulling) {
     // Must be done outside of render pass
     vkCmdResetQueryPool(m_commandBuffers[currentImage], m_occlusionQueryPool, 0,
@@ -549,9 +553,6 @@ void CullingRenderPass::RecordCommands(uint32_t currentImage) {
 }
 
 void CullingRenderPass::RecordOcclusionCullingCommands(uint32_t currentImage) {
-  /*
-   * BoundingBox Renderer
-   */
   std::vector<VkDrawIndexedIndirectCommand> commands{};
   for (auto& batch : g_BatchManager.m_miniBatchList) {
     commands.insert(commands.end(), batch.m_drawIndexedCommands.begin(), batch.m_drawIndexedCommands.end());
