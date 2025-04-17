@@ -2,8 +2,9 @@
 
 ## Features
 
-- View Frustum Culling using Compute Shader
-- Hi-Z Occlusion Culling using COmpute Shader
-- SPH Simulation(In progress)
-
+- View Frustum Culling
+- Occlusion Query Culling or Hi-Z Occlusion Culling using Compute Shader
 - Indirect Buffer using Batch System
+- Meshlet Rendering using Mesh Shader
+- Raytracing Shadow
+- Changing Texture Image to Generated Image using Tiny Stable Diffusion

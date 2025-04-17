@@ -38,4 +38,8 @@ layout(push_constant) uniform readonly U_ShaderSetting
 
     vec4 lightPos;
     vec4 lightColor;
+
+    float ambientStrength;
+    float specularStrength;
+    float shininess;
 }u_ShaderSetting;

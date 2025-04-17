@@ -421,6 +421,9 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
   ImGui::Checkbox("View BoundingBox", &(g_RenderSetting.isRenderBoundingBox));
   ImGui::SliderFloat4("Light Pos", glm::value_ptr(g_ShaderSetting.lightPos), -5.0f, 5.0f);
   ImGui::SliderFloat4("Light Color", glm::value_ptr(g_ShaderSetting.lightColor), 0.0f, 1.0f);
+  ImGui::SliderFloat("Ambient", &g_ShaderSetting.ambientStrength, 0.0f, 1.0f);
+  ImGui::SliderFloat("Specular", &g_ShaderSetting.specularStrength, 0.0f, 5.0f);
+  ImGui::SliderFloat("Shininess", &g_ShaderSetting.shininess, 1.0f, 128.0f);
   ImGui::Text("Selected File: %s", g_SelectedFilePath.c_str());
   ImGui::End();
 
