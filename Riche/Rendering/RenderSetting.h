@@ -11,6 +11,7 @@ class RenderSetting : public Singleton<RenderSetting> {
   bool isRenderBoundingBox = false;
   bool isMultiThreading = false;
   bool UseMeshShader = false;
+  bool UseBasicPass = false;
 
   int beforeCullingRenderingNum = 0;
   int afterViewCullingRenderingNum = 0;

@@ -534,8 +534,7 @@ void CullingRenderPass::RecordCommands(uint32_t currentImage) {
   depthOnlyRenderPassBeginInfo.clearValueCount = static_cast<uint32_t>(depthOnlyClearValue.size());
   depthOnlyRenderPassBeginInfo.framebuffer = m_depthOnlyFramebuffer;
 
-  g_RenderSetting.afterViewCullingRenderingNum = (int)g_BatchManager.m_boundingBoxBufferList.size();
-
+  
   if (g_RenderSetting.isOcclusionCulling) {
     // Must be done outside of render pass
     vkCmdResetQueryPool(m_commandBuffers[currentImage], m_occlusionQueryPool, 0,
@@ -548,6 +547,12 @@ void CullingRenderPass::RecordCommands(uint32_t currentImage) {
     RecordOcclusionCullingCommands(currentImage);
 
     vkCmdEndRenderPass(m_commandBuffers[currentImage]);
+  } else {
+    for (auto& batch : g_BatchManager.m_miniBatchList) {
+      for (auto& command : batch.m_drawIndexedCommands) {
+        command.instanceCount = 1;
+      }
+    }
   }
   VK_CHECK(vkEndCommandBuffer(m_commandBuffers[currentImage]));
 }

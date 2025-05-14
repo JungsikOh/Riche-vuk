@@ -78,8 +78,10 @@ static bool isAABBInsideFrustum(const std::array<FrustumPlane, 6>& frustum, cons
 
     // 바운딩 박스의 "가장 먼 쪽" 점 선택
     glm::vec3 positiveVertex =
-        glm::vec3((plane.normal.x < 0) ? aabb.min.x : aabb.max.x, (plane.normal.y < 0) ? aabb.min.y : aabb.max.y,
-                  (plane.normal.z < 0) ? aabb.min.z : aabb.max.z);
+        glm::vec3(
+            (plane.normal.x < 0) ? aabb.min.x : aabb.max.x, 
+            (plane.normal.y < 0) ? aabb.min.y : aabb.max.y,
+            (plane.normal.z < 0) ? aabb.min.z : aabb.max.z);
 
     // 평면과 점 사이의 거리 계산
     float distance = glm::dot(plane.normal, positiveVertex) + plane.distance;

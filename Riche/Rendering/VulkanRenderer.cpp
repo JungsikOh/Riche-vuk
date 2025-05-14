@@ -67,9 +67,11 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
         // 계산된 위치: x와 z는 격자에 따라, y는 고정
         glm::vec3 pos(col * spacingX, baseHeight, row * spacingZ);
         //loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f, pos);
+        //loadGltfModel(mainDevice.logicalDevice, "Resources/Models/DamagedHelmet/", "DamagedHelmet.gltf", outMeshes, 5.0f, pos);
       }
     }
     loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f);
+    // loadGltfModel(mainDevice.logicalDevice, "Resources/Models/DamagedHelmet/", "DamagedHelmet.gltf", outMeshes, 0.1f);
 
     // 이후 기존 코드에 따라 BatchManager의 데이터를 flush하거나 추가 작업 진행
     g_BatchManager.FlushMiniBatch(g_BatchManager.m_miniBatchList, g_ResourceManager);

@@ -38,14 +38,56 @@ float blurShadow9x9(texture2D shadowTex, vec2 uv)
     return sum / 36.0; // 9개 샘플의 평균
 }
 
+const float g5[5] = float[5](
+    0.06136, 0.24477, 0.38774, 0.24477, 0.06136                      // 정규화된 가중치
+);
+
+vec3 gaussianBlurLit(texture2D colTex, texture2D shTex, vec2 uv)
+{
+    vec2 d = 1.0 / vec2(textureSize(colTex, 0));
+    vec3 acc = vec3(0.0);
+    for (int i = -2; i <= 2; ++i) {
+        float wi = g5[i + 2];
+        for (int j = -2; j <= 2; ++j) {
+            float w = wi * g5[j + 2];
+            vec2  off = vec2(i, j) * d;
+            vec3  c   = textureLod(sampler2D(colTex, linearWrapSS), uv + off, 0).rgb;
+            float sh  = textureLod(sampler2D(shTex, linearWrapSS), uv + off, 0).r;
+            acc += c * sh * w;                     // 조명 결과에 필터 적용
+        }
+    }
+    return acc;                                    // 1.0 로 노멀라이즈됨
+}
+
+/*────────── ACES Filmic Tone-Mapping ──────────*/
+vec3 ACESFilm(vec3 x)
+{
+    const float a = 2.51;
+    const float b = 0.03;
+    const float c = 2.43;
+    const float d = 0.59;
+    const float e = 0.14;
+    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
 void main()
 {
     vec4 color = textureLod(sampler2D(inputColour, linearWrapSS), inFragTexcoord.xy, 0).rgba;
 
     float shadowFactor = blurShadow9x9(u_ShadowTexture, inFragTexcoord.xy);
+    // shadowFactor = textureLod(sampler2D(u_ShadowTexture, linearWrapSS), inFragTexcoord.xy, 0).r; // Test
 
-    color.rgb *= shadowFactor;
+    /* 3) 밝기(Luminance)로 마스크 생성 ─ ‘밝은 부분’만 blur */
+    float luminance  = dot(color.rgb * shadowFactor, vec3(0.2126, 0.7152, 0.0722));
+    float bloomMask  = smoothstep(0.8, 1.0, luminance);             // 임계값 0.8 ↔ 1.0
 
-    vec4 finalColor = vec4(color.rgb, 1.0);
-    outColour = finalColor;
+    vec3 blurred = gaussianBlurLit(inputColour, u_ShadowTexture, inFragTexcoord.xy);
+
+    vec3 lit = mix(color.rgb * shadowFactor, blurred, bloomMask);
+
+    vec3 mapped = ACESFilm(lit * 0.6);
+    mapped      = pow(mapped, vec3(1.0 / 2.2));   // sRGB γ
+
+    /* 6) 그림자 팩터 곱해서 최종 색 산출 */
+    outColour = vec4(mapped, 1.0);
 }

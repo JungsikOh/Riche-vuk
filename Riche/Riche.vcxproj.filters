@@ -215,5 +215,7 @@
     <None Include="Resources\Shaders\BasicMS.mesh" />
     <None Include="Resources\Shaders\BasicPS.frag" />
     <None Include="Resources\Shaders\BasicTS.task" />
+    <None Include="Resources\Shaders\BasicLightingVS.vert" />
+    <None Include="Resources\Shaders\BasicLightingPS.frag" />
   </ItemGroup>
 </Project>

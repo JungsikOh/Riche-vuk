@@ -417,6 +417,8 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
   } else {
     ImGui::Checkbox("Wire Frame", &(g_RenderSetting.isWireRendering));
   }
+  ImGui::Checkbox("Basic Rendering", &g_RenderSetting.UseBasicPass);
+
   ImGui::Checkbox("Occlusion Culling", &(g_RenderSetting.isOcclusionCulling));
   ImGui::Checkbox("View BoundingBox", &(g_RenderSetting.isRenderBoundingBox));
   ImGui::SliderFloat4("Light Pos", glm::value_ptr(g_ShaderSetting.lightPos), -5.0f, 5.0f);

@@ -1,6 +1,9 @@
 C:/VulkanSDK/1.3.290.0/Bin/glslangValidator.exe -o LightingVS.spv -V LightingVS.vert
 C:/VulkanSDK/1.3.290.0/Bin/glslangValidator.exe -o LightingPS.spv -V LightingPS.frag
 
+C:/VulkanSDK/1.3.290.0/Bin/glslangValidator.exe -o BasicLightingVS.spv -V BasicLightingVS.vert
+C:/VulkanSDK/1.3.290.0/Bin/glslangValidator.exe -o BasicLightingPS.spv -V BasicLightingPS.frag
+
 C:/VulkanSDK/1.3.290.0/Bin/glslangValidator.exe -o ObjectIdVS.spv -V ObjectIdVS.vert
 C:/VulkanSDK/1.3.290.0/Bin/glslangValidator.exe -o ObjectIdPS.spv -V ObjectIdPS.frag
 

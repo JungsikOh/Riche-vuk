@@ -34,7 +34,7 @@ struct ShaderSetting : public Singleton<ShaderSetting> {
   float pad;
 
   glm::vec4 lightPos = glm::vec4(0.0f, 3.0f, 0.0f, 1.0f);
-  glm::vec4 lightColor = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+  glm::vec4 lightColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
 
   float ambientStrength = 0.3f;
   float specularStrength = 0.5f;
