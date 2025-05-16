@@ -93,7 +93,7 @@ int main() {
   CameraParameters cameraParams = {};
   cameraParams.speed = 5.0f;
   cameraParams.sensitivity = 0.2f;
-  cameraParams.position = glm::vec3(0.0f, 0.0f, 2.0f);
+  cameraParams.position = glm::vec3(2.0f, 3.0f, 2.0f);
   cameraParams.lootAt = glm::vec3(0.0f, 0.0f, -1.0f);
   cameraParams.fov = 45.0f;
   cameraParams.aspectRatio = 1920.0f / 1080.0f;

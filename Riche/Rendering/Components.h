@@ -30,8 +30,9 @@ struct ShaderSetting : public Singleton<ShaderSetting> {
   uint32_t isDebugging = false;
 #endif  // _DEBUG
   uint32_t isMeshletRender = false;
+  //uint32_t isBloom = true;
+  uint32_t isTonemapping = true;
   uint32_t batchIdx = 0;
-  float pad;
 
   glm::vec4 lightPos = glm::vec4(0.0f, 3.0f, 0.0f, 1.0f);
   glm::vec4 lightColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);

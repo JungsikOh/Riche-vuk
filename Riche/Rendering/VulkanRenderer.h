@@ -95,6 +95,8 @@ class VulkanRenderer {
   VkPipeline m_offScreenPipeline;
   VkPipelineLayout m_offScreenPipelineLayout;
 
+  VkPushConstantRange m_debugPushConstant;
+
   // Camera Buffers
   std::vector<ViewProjection> m_viewProjections;
   std::vector<GpuBuffer> m_viewProjectionBuffers;

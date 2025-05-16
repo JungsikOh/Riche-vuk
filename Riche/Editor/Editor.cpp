@@ -417,7 +417,10 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
   } else {
     ImGui::Checkbox("Wire Frame", &(g_RenderSetting.isWireRendering));
   }
-  ImGui::Checkbox("Basic Rendering", &g_RenderSetting.UseBasicPass);
+  ImGui::Checkbox("Use Basic Rendering", &g_RenderSetting.UseBasicPass);
+
+  //ImGui::Checkbox("Use Bloom", reinterpret_cast<bool*>(&g_ShaderSetting.isBloom));
+  ImGui::Checkbox("Use ToneMapping", reinterpret_cast<bool*>(&g_ShaderSetting.isTonemapping));
 
   ImGui::Checkbox("Occlusion Culling", &(g_RenderSetting.isOcclusionCulling));
   ImGui::Checkbox("View BoundingBox", &(g_RenderSetting.isRenderBoundingBox));

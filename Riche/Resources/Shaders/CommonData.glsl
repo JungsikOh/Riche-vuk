@@ -33,8 +33,8 @@ layout(push_constant) uniform readonly U_ShaderSetting
 {
 	uint isDebugging;
     uint isMeshletRender;
+    uint isTonemapping;
 	uint batchIdx;
-    float padd;
 
     vec4 lightPos;
     vec4 lightColor;

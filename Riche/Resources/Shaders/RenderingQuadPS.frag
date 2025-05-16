@@ -5,6 +5,8 @@
 #extension GL_EXT_debug_printf : enable
 #extension GL_EXT_samplerless_texture_functions : enable
 
+#include "CommonData.glsl"
+
 layout(set = 0, binding = 0) uniform sampler linearWrapSS;
 layout(set = 0, binding = 1) uniform sampler linearClampSS;
 layout(set = 0, binding = 2) uniform sampler linearBorderSS;
@@ -59,6 +61,32 @@ vec3 gaussianBlurLit(texture2D colTex, texture2D shTex, vec2 uv)
     return acc;                                    // 1.0 로 노멀라이즈됨
 }
 
+float brightness(vec3 color) {
+    return dot(color, vec3(0.2126, 0.7152, 0.0722));
+}
+
+vec3 blurLit(texture2D colTex, texture2D shTex, vec2 uv)
+{
+    vec2 d = 1.0 / vec2(textureSize(colTex, 0));
+    vec3 bloom = vec3(0.0);
+    for (int y = -3; y <= 3; ++y) {
+           for (int x = -3; x <= 3; ++x) {
+                vec2 offset = vec2(x, y) * d;
+
+                vec3 bloomSample = textureLod(sampler2D(colTex, linearWrapSS), uv + offset, 0).rgb;
+                float b = brightness(bloomSample);
+                float visibility = textureLod(sampler2D(shTex, linearWrapSS), uv + offset, 0).r;
+
+                if (b > 0.9999 && visibility > 0.9) { // Shadow condition plus
+                    bloom += bloomSample;
+                }
+            }
+    }
+    bloom /= 49.0;
+    bloom *= 0.2;
+    return bloom;
+}
+
 /*────────── ACES Filmic Tone-Mapping ──────────*/
 vec3 ACESFilm(vec3 x)
 {
@@ -77,16 +105,21 @@ void main()
     float shadowFactor = blurShadow9x9(u_ShadowTexture, inFragTexcoord.xy);
     // shadowFactor = textureLod(sampler2D(u_ShadowTexture, linearWrapSS), inFragTexcoord.xy, 0).r; // Test
 
-    /* 3) 밝기(Luminance)로 마스크 생성 ─ ‘밝은 부분’만 blur */
+    vec3 lit = color.rgb;
     float luminance  = dot(color.rgb * shadowFactor, vec3(0.2126, 0.7152, 0.0722));
     float bloomMask  = smoothstep(0.8, 1.0, luminance);             // 임계값 0.8 ↔ 1.0
 
     vec3 blurred = gaussianBlurLit(inputColour, u_ShadowTexture, inFragTexcoord.xy);
 
-    vec3 lit = mix(color.rgb * shadowFactor, blurred, bloomMask);
+    lit = mix(color.rgb * shadowFactor, blurred, bloomMask);
 
-    vec3 mapped = ACESFilm(lit * 0.6);
-    mapped      = pow(mapped, vec3(1.0 / 2.2));   // sRGB γ
+    vec3 mapped = lit;
+    if(u_ShaderSetting.isTonemapping != 0) {
+        mapped = ACESFilm(lit * 0.6);
+        mapped = pow(mapped, vec3(1.0 / 2.2));   // sRGB γ
+    } else {
+        mapped = lit;
+    }
 
     /* 6) 그림자 팩터 곱해서 최종 색 산출 */
     outColour = vec4(mapped, 1.0);

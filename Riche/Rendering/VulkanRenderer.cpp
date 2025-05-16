@@ -66,8 +66,8 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
       for (int col = 0; col < numColumns; ++col) {
         // 계산된 위치: x와 z는 격자에 따라, y는 고정
         glm::vec3 pos(col * spacingX, baseHeight, row * spacingZ);
-        //loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f, pos);
-        //loadGltfModel(mainDevice.logicalDevice, "Resources/Models/DamagedHelmet/", "DamagedHelmet.gltf", outMeshes, 5.0f, pos);
+        // loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f, pos);
+        // loadGltfModel(mainDevice.logicalDevice, "Resources/Models/DamagedHelmet/", "DamagedHelmet.gltf", outMeshes, 5.0f, pos);
       }
     }
     loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f);
@@ -153,7 +153,7 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
       GpuBuffer meshletVerticesBuffer;
       GpuBuffer meshletTrianglesBuffer;
 
-      //positionBuffer.size = (uint64_t)(sizeof(mesh.m_positions[0]) * mesh.m_positions.size());
+      // positionBuffer.size = (uint64_t)(sizeof(mesh.m_positions[0]) * mesh.m_positions.size());
       positionBuffer.size = (uint64_t)(sizeof(RayTracingVertex) * mesh.ray_vertices.size());
       meshletBuffer.size = (uint64_t)(sizeof(mesh.m_meshlets[0]) * mesh.m_meshlets.size());
       meshletVerticesBuffer.size = (uint64_t)(sizeof(mesh.m_meshletVertices[0]) * mesh.m_meshletVertices.size());
@@ -221,6 +221,7 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
     m_pEditor->m_pLightingPass = m_pLightingRenderPass.get();
 
     /// OffScreen Pipeline
+    CreatePushConstantRange();
     CreateRenderPass();
     CreateSwapchainFrameBuffers();
     CreateOffScrrenDescriptorSet();
@@ -252,7 +253,6 @@ void VulkanRenderer::Update(uint32_t imageIndex) {
     m_viewProjections[imageIndex].viewInverse = m_camera->InvView();
     m_viewProjections[imageIndex].projInverse = m_camera->InvProj();
     m_viewProjections[imageIndex].camPos = glm::vec4(m_camera->Position(), 1.0f);
-
 
     vkMapMemory(mainDevice.logicalDevice, m_viewProjectionBuffers[imageIndex].memory, 0, sizeof(ViewProjection), 0, &pData);
     memcpy(pData, &m_viewProjections[imageIndex], sizeof(ViewProjection));
@@ -831,9 +831,9 @@ void VulkanRenderer::CreateOffScrrenDescriptorSet() {
 
 void VulkanRenderer::CreatePushConstantRange() {
   // Define Push constant values(no 'create' needed)
-  pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;  // Shader stage push constant will go to
-  pushConstantRange.offset = 0;                               // Offset into given data to pass to push constant
-  pushConstantRange.size = sizeof(Model);                     // Size of Data Being Passed
+  m_debugPushConstant.stageFlags = VK_SHADER_STAGE_ALL;  // Shader stage push constant will go to
+  m_debugPushConstant.offset = 0;                        // Offset into given data to pass to push constant
+  m_debugPushConstant.size = sizeof(ShaderSetting);      // Size of Data Being Passed
 }
 
 void VulkanRenderer::CreateBuffers() {
@@ -1002,8 +1002,8 @@ void VulkanRenderer::CreatePipelines() {
   pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   pipelineLayoutCreateInfo.setLayoutCount = setLayouts.size();
   pipelineLayoutCreateInfo.pSetLayouts = setLayouts.data();
-  pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
-  pipelineLayoutCreateInfo.pPushConstantRanges = VK_NULL_HANDLE;
+  pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+  pipelineLayoutCreateInfo.pPushConstantRanges = &m_debugPushConstant;
 
   VK_CHECK(vkCreatePipelineLayout(mainDevice.logicalDevice, &pipelineLayoutCreateInfo, nullptr, &m_offScreenPipelineLayout));
 
@@ -1139,6 +1139,8 @@ void VulkanRenderer::FillOffScreenCommands(uint32_t currentImage) {
                           &g_DescriptorManager.GetVkDescriptorSet("OffScreenInput" + std::to_string(currentImage)), 0, nullptr);
   vkCmdBindDescriptorSets(m_swapchainCommandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_offScreenPipelineLayout, 2, 1,
                           &g_DescriptorManager.GetVkDescriptorSet("ShadowTexture_ALL" + std::to_string(currentImage)), 0, nullptr);
+  vkCmdPushConstants(m_swapchainCommandBuffers[currentImage], m_offScreenPipelineLayout, VK_SHADER_STAGE_ALL, 0,
+                     sizeof(ShaderSetting), &g_ShaderSetting);
 
   vkCmdDraw(m_swapchainCommandBuffers[currentImage], 3, 1, 0, 0);
 
