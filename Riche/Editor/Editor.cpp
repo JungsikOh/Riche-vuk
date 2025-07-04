@@ -3,6 +3,8 @@
 #include "Rendering/BasicLightingPass.h"
 #include "Rendering/Camera.h"
 #include "extern/tiny-stable-diffusion/TinyStableDiffusion.h"
+#include <fstream>
+#include <iomanip>
 
 static bool g_ShowFileBrowser = false;
 static std::string g_SelectedFilePath = "";
@@ -353,23 +355,92 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
   static float totalFps = 0.0f;
   static int frameCount = 0;
 
+  static float timeSinceStart = 0.0f;  // 실행 후 누적 시간
+  static float secondAcc = 0.0f;       // 1초 누적용 타이머
+  static int framesInSec = 0;          // 1초 동안 렌더링된 프레임 수
+
+  constexpr int MAX_SAVED = 5000;                    // 최대 1000개 저장 (필요에 따라 조정)
+  static std::array<float, MAX_SAVED> fpsHistory{};  // 1 초 단위 FPS 저장
+  static int savedIdx = 0;                           // fpsHistory 에 저장된 개수
+
+  static float timeSinceLastUpdate = 0.0f;   // 마지막 FPS 갱신 시점
+  static const float updateInterval = 0.08f;  // FPS 갱신 간격 (0.5초마다 갱신)
+
   auto currentTime = std::chrono::high_resolution_clock::now();
   std::chrono::duration<float> elapsedTime = currentTime - lastTime;
   lastTime = currentTime;
   float deltaTime = elapsedTime.count();
+
+  timeSinceStart += deltaTime;  // 전체 경과 시간
+  secondAcc += deltaTime;       // 1초 누적용
+
+  timeSinceLastUpdate += deltaTime;  // 시간 누적
 
   // FPS 계산
   if (deltaTime > 0.0f) {
     fps = 1.0f / deltaTime;
     frameCount++;
     totalFps += fps;
+    maxFps = std::max(maxFps, fps);
+    minFps = std::min(minFps, fps);
+  }
 
-    // 최고 FPS 갱신
-    if (fps > maxFps) {
-      maxFps = fps;
+  //// 1초 단위 FPS 기록
+  //if (secondAcc >= 1.0f) {
+  //  float fpsThisSecond = framesInSec / secondAcc;  // 더 정확한 1초 평균 FPS
+  //  secondAcc -= 1.0f;                              // 남은 시간(1초 초과분) 유지
+  //  framesInSec = 0;                                // 1초 동안 렌더링된 프레임 수 초기화
+
+  //  // fpsHistory에 기록
+  //  if (savedIdx < MAX_SAVED) {
+  //    fpsHistory[savedIdx++] = fps;
+
+  //    // 1초마다 기록을 텍스트 파일로 내보내기 (CSV 형식으로 저장)
+  //    std::ofstream out("fps_log.csv", std::ios::app);  // append 모드로 열기
+  //    if (out.is_open()) {
+  //      // 헤더가 없으면 첫 번째 기록 시 헤더를 추가
+  //      if (savedIdx == 1) {
+  //        out << "Frame, FPS\n";  // CSV 파일에 헤더 추가
+  //      }
+
+  //      // CSV 형식으로 FPS 기록 (콤마로 구분)
+  //      out << savedIdx << "," << std::fixed << std::setprecision(2) << fps << '\n';
+  //      out.close();
+  //    }
+  //  }
+  //}
+
+  // 1초 단위 FPS 기록
+  if (secondAcc >= 1.0f) {
+    float fpsThisSecond = framesInSec / secondAcc;  // 더 정확한 1초 평균 FPS
+    secondAcc -= 1.0f;                              // 남은 시간(1초 초과분) 유지
+    framesInSec = 0;                                // 1초 동안 렌더링된 프레임 수 초기화
+
+    // fpsHistory에 기록
+    if (savedIdx < MAX_SAVED && timeSinceLastUpdate >= updateInterval) {  // updateInterval 시간마다 갱신
+      fpsHistory[savedIdx++] = fps;
+
+      // 1초마다 기록을 텍스트 파일로 내보내기 (CSV 형식으로 저장)
+      std::ofstream out("fps_log.csv", std::ios::app);  // append 모드로 열기
+      if (out.is_open()) {
+        // 헤더가 없으면 첫 번째 기록 시 헤더를 추가
+        if (savedIdx == 1) {
+          out << "Frame, FPS\n";  // CSV 파일에 헤더 추가
+        }
+
+        // CSV 형식으로 FPS 기록 (콤마로 구분)
+        out << savedIdx << "," << std::fixed << std::setprecision(2) << fps << '\n';
+        out.close();
+      }
+
+      timeSinceLastUpdate = 0.0f;  // 갱신 후 타이머 리셋
     }
   }
 
+  // 매 프레임마다 framesInSec를 증가시킴 (1초마다 증가)
+  framesInSec++;
+
+  // 평균 FPS 계산
   float averageFps = (frameCount > 0) ? totalFps / frameCount : 0.0f;
 
   // 새로운 ImGui 프레임 시작
@@ -400,6 +471,18 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
   ImGui::Begin("Performance");
   ImGui::Text("Current FPS: %.1f", fps);
   ImGui::Text("Max FPS: %.1f | Average FPS: %.1f", maxFps, averageFps);
+
+  // 실행된 시간 표시 (초단위)
+  int minutes = static_cast<int>(timeSinceStart) / 60;
+  int seconds = static_cast<int>(timeSinceStart) % 60;
+  ImGui::Text("Elapsed Time: %02d:%02d", minutes, seconds);
+
+  if (savedIdx > 0) {
+    ImGui::PlotLines("FPS / sec", fpsHistory.data(), savedIdx, 0, /*overlay*/ nullptr, 0.0f, maxFps, ImVec2(0, 120));
+  }
+
+
+
   ImGui::Text("Number Of Rendering Object (Before Culling) : %d", g_RenderSetting.beforeCullingRenderingNum);
   ImGui::Text("Number Of Rendering Object (After View Culling) : %d", g_RenderSetting.afterViewCullingRenderingNum);
   ImGui::End();

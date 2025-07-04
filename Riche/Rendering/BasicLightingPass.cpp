@@ -1611,6 +1611,7 @@ void BasicLightingPass::CreateMeshShaderPipeline() {
   VK_CHECK(vkCreateGraphicsPipelines(m_pDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_meshPipeline));
 
   // Destroy second shader modules
+  vkDestroyShaderModule(m_pDevice, taskShaderModule, nullptr);
   vkDestroyShaderModule(m_pDevice, meshShaderModule, nullptr);
   vkDestroyShaderModule(m_pDevice, fragmentShaderModule, nullptr);
 }
@@ -2265,7 +2266,7 @@ void BasicLightingPass::RecordBasicLightingCommands(uint32_t currentImage) {
 
   g_ShaderSetting.batchIdx = 0;
   for (int i = 0; i < g_BatchManager.m_meshes.size(); ++i) {
-    {
+    if (g_BatchManager.m_meshes[i].visible) {
       VkDeviceSize vertexOffset = 0;  // Always bind at offset 0 since indirect commands handle offsets
       vkCmdBindVertexBuffers(m_commandBuffers[currentImage], 0, 1, &g_BatchManager.m_bbVertexBuffers[i].buffer, &vertexOffset);
 

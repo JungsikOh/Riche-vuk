@@ -108,6 +108,7 @@ class BatchManager : public Singleton<BatchManager> {
   std::vector<GpuBuffer> m_meshletBuffers;
   std::vector<GpuBuffer> m_meshletVerticesBuffers;
   std::vector<GpuBuffer> m_meshletTrianglesBuffers;
+  std::vector<GpuBuffer> m_meshletBoundsBuffers;
 
   VkDescriptorSetLayout m_meshletSetLayout;
   std::vector<VkDescriptorSet> m_meshletSets;

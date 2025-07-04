@@ -1,0 +1,73 @@
+#version 460
+#extension GL_EXT_mesh_shader : require
+#extension GL_ARB_shading_language_include : enable
+#extension GL_ARB_shader_draw_parameters : enable
+#extension GL_EXT_nonuniform_qualifier : require
+#extension GL_EXT_debug_printf : enable
+#extension GL_EXT_samplerless_texture_functions : require
+
+#include "CommonData.glsl"
+
+#define TASK_WORKGROUP_SIZE 32
+#define MESH_WORKGROUP_SIZE 128
+
+layout(local_size_x = TASK_WORKGROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform U_Camera
+{
+	mat4 view;
+	mat4 projection;
+    mat4 viewInverse;
+    mat4 projInverse;
+
+	mat4 prevView;
+	mat4 prevProjection;
+	mat4 prevViewInverse;
+	mat4 prevProjInverse;
+} u_Camera;
+
+struct MeshletBoundSphere
+{
+    vec3  center;   // object-space
+    float radius;
+};
+
+layout(set = 1, binding = 4) readonly buffer MeshletBoundsBuffer
+{
+	vec4 meshletBounds[]; // (xyz = center, w = radius)
+};
+
+/* ---------- 프러스텀 컬링 함수 ---------- */
+bool SphereInFrustum(vec3 c, float r)
+{
+    // view-공간으로 변환
+    vec4 cv = uCam.view * vec4(c, 1.0);
+    // 간단한 6-평면 테스트 (좌·우·상·하·근·원)
+    vec4 cp = uCam.projection * cv;      // clip-space
+    // 동차 좌표 -> 평면식: ±x ≤ w-r, ±y ≤ w-r,   z ≥ -w + r, z ≤ w-r
+    float w = cp.w;
+    if ( cp.x >  w + r) return false;    // left
+    if (-cp.x >  w + r) return false;    // right
+    if ( cp.y >  w + r) return false;    // bottom
+    if (-cp.y >  w + r) return false;    // top
+    if ( cp.z < -w - r) return false;    // near
+    if ( cp.z >  w + r) return false;    // far
+    return true;
+}
+
+struct Payload {
+	uint meshletIndices[TASK_WORKGROUP_SIZE];
+};
+
+taskPayloadSharedEXT Payload s_Payload;
+
+void main()
+{
+	uint gtid = gl_LocalInvocationID.x;
+	uint gid = gl_WorkGroupID.x;
+	uint dtid = gl_WorkGroupID.x * gl_WorkGroupSize.x + gtid;
+
+	s_Payload.meshletIndices[gtid] = dtid;
+
+	EmitMeshTasksEXT(TASK_WORKGROUP_SIZE, 1, 1);
+}

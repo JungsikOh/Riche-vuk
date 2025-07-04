@@ -104,3 +104,8 @@ struct COMPONENTS BoundingBox {
   AABB originalBox;
   AABB currentBoxBox;
 };
+
+struct MeshletBoundSphere {
+  glm::vec3 center;  // world-space or object-space
+  float radius;
+};

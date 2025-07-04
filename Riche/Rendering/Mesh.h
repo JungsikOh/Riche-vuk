@@ -19,6 +19,7 @@ class Mesh {
   std::vector<meshopt_Meshlet> m_meshlets;
   std::vector<uint32_t> m_meshletVertices;
   std::vector<uint8_t> m_meshletTriangles;
+  std::vector<MeshletBoundSphere> m_meshletBounds;
 
   uint64_t vertexOffset;
   uint64_t indexOffset;

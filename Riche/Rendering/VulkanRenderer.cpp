@@ -52,8 +52,8 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
                           m_camera);
 
     // 물체 배치를 위한 파라미터 설정
-    const int numColumns = 5;
-    const int numRows = 1;          // 5 * 4 = 20 개의 물체
+    const int numColumns = 1;
+    const int numRows = 15;          // 5 * 4 = 20 개의 물체
     const float spacingX = 200.0f;  // X축 간격
     const float spacingZ = 200.0f;  // Z축 간격
     const float baseHeight = 0.0f;  // 모든 물체의 높이
@@ -66,11 +66,11 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
       for (int col = 0; col < numColumns; ++col) {
         // 계산된 위치: x와 z는 격자에 따라, y는 고정
         glm::vec3 pos(col * spacingX, baseHeight, row * spacingZ);
-        // loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f, pos);
+        loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f, pos);
         // loadGltfModel(mainDevice.logicalDevice, "Resources/Models/DamagedHelmet/", "DamagedHelmet.gltf", outMeshes, 5.0f, pos);
       }
     }
-    loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f);
+    //loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f);
     // loadGltfModel(mainDevice.logicalDevice, "Resources/Models/DamagedHelmet/", "DamagedHelmet.gltf", outMeshes, 0.1f);
 
     // 이후 기존 코드에 따라 BatchManager의 데이터를 flush하거나 추가 작업 진행
@@ -104,11 +104,7 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
       for (BasicVertex& v : mesh.vertices) {
         mesh.m_positions.push_back(v.pos);
       }
-      /*size_t meshletCount =
-          meshopt_buildMeshlets(mesh.m_meshlets.data(), mesh.m_meshletVertices.data(), mesh.m_meshletTriangles.data(),
-                                reinterpret_cast<const uint32_t*>(mesh.indices.data()), mesh.indices.size(),
-                                reinterpret_cast<const float*>(mesh.m_positions.data()), mesh.m_positions.size(), sizeof(glm::vec3),
-                                kMaxVertices, kMaxTriangles, kConeWeight);*/
+
       size_t meshletCount = meshopt_buildMeshlets(
           mesh.m_meshlets.data(), mesh.m_meshletVertices.data(), mesh.m_meshletTriangles.data(),
           reinterpret_cast<const uint32_t*>(mesh.indices.data()), mesh.indices.size(), &mesh.ray_vertices.data()->pos.x,
@@ -152,12 +148,14 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
       GpuBuffer meshletBuffer;
       GpuBuffer meshletVerticesBuffer;
       GpuBuffer meshletTrianglesBuffer;
+      GpuBuffer meshletBoundBuffer;
 
       // positionBuffer.size = (uint64_t)(sizeof(mesh.m_positions[0]) * mesh.m_positions.size());
       positionBuffer.size = (uint64_t)(sizeof(RayTracingVertex) * mesh.ray_vertices.size());
       meshletBuffer.size = (uint64_t)(sizeof(mesh.m_meshlets[0]) * mesh.m_meshlets.size());
       meshletVerticesBuffer.size = (uint64_t)(sizeof(mesh.m_meshletVertices[0]) * mesh.m_meshletVertices.size());
       meshletTrianglesBuffer.size = (uint64_t)(sizeof(meshletTrianglesU32[0]) * meshletTrianglesU32.size());
+      meshletBoundBuffer.size = (uint64_t)(sizeof(MeshletBoundSphere) * mesh.m_meshletBounds.size());
 
       VkUtils::CreateBuffer(
           mainDevice.logicalDevice, mainDevice.physicalDevice, positionBuffer.size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -173,6 +171,7 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
                             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &meshletTrianglesBuffer.buffer,
                             &meshletTrianglesBuffer.memory);
+
 
       void* pData = nullptr;
       vkMapMemory(mainDevice.logicalDevice, positionBuffer.memory, 0, positionBuffer.size, 0, &pData);

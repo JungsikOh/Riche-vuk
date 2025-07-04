@@ -7,11 +7,11 @@ class RenderSetting : public Singleton<RenderSetting> {
 
  public:
   bool isWireRendering = false;
-  bool isOcclusionCulling = true;
+  bool isOcclusionCulling = false;
   bool isRenderBoundingBox = false;
   bool isMultiThreading = false;
   bool UseMeshShader = false;
-  bool UseBasicPass = false;
+  bool UseBasicPass = true;
 
   int beforeCullingRenderingNum = 0;
   int afterViewCullingRenderingNum = 0;
