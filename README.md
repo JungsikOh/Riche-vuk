@@ -14,13 +14,7 @@ pipeline. In the captured scene, batching improves the frame rate from roughly
 
 ## Demo on YouTube
 
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=x90SoRK9CGA">
-    <img src="https://img.youtube.com/vi/x90SoRK9CGA/maxresdefault.jpg"
-         alt="Watch on YouTube"
-         width="640">
-  </a>
-</p>
+[YouTube](https://www.youtube.com/watch?v=x90SoRK9CGA)
 
 ## Features
 
