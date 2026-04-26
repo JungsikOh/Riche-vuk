@@ -21,7 +21,6 @@ IRenderPass::IRenderPass(VkDevice device, VkPhysicalDevice physicalDevice) {
   vkCreateRayTracingPipelinesKHR =
       reinterpret_cast<PFN_vkCreateRayTracingPipelinesKHR>(vkGetDeviceProcAddr(device, "vkCreateRayTracingPipelinesKHR"));
 
-  // 함수 로딩 확인
   if (!vkGetBufferDeviceAddressKHR || !vkCreateAccelerationStructureKHR || !vkDestroyAccelerationStructureKHR ||
       !vkGetAccelerationStructureBuildSizesKHR || !vkGetAccelerationStructureDeviceAddressKHR ||
       !vkCmdBuildAccelerationStructuresKHR || !vkBuildAccelerationStructuresKHR || !vkCmdTraceRaysKHR ||

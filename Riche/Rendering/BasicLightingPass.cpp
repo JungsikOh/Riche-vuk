@@ -131,18 +131,16 @@ void BasicLightingPass::UpdateTLAS(uint32_t imageIndex) {
 
   {
     for (uint32_t i = 0; i < numInstances; ++i) {
-      // 각 인스턴스별 변환행렬, customIndex, mask 등 세팅
       VkAccelerationStructureInstanceKHR& instance = instances[imageIndex][i];
 
       glm::mat4 curr = (g_BatchManager.m_transforms[imageIndex][i].currentTransform);
       VkTransformMatrixKHR transformMatrix = mat4ToVkTransform(curr);
       instance.transform = transformMatrix;
 
-      // 예: 하위 구조(= BLAS) 주소
       instance.accelerationStructureReference = m_bottomLevelASList[i].deviceAddress;
 
-      // 그 외 속성
-      instance.instanceCustomIndex = i;  // 임의의 식별자
+      // The custom index maps ray hits back to the mesh/object ID buffers.
+      instance.instanceCustomIndex = i;
       instance.mask = 0xFF;
       instance.instanceShaderBindingTableRecordOffset = 0;
       instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
@@ -299,7 +297,6 @@ void BasicLightingPass::Draw(uint32_t imageIndex, VkFence fence, VkSemaphore ren
   basicSubmitInfo.pCommandBuffers = &m_commandBuffers[imageIndex];     // Command buffer to submit
   basicSubmitInfo.signalSemaphoreCount = 1;                            // Number of semaphores to signal
   basicSubmitInfo.pSignalSemaphores = &m_renderAvailable[imageIndex];  // Semaphores to signal when command buffer finishes
-  // Command buffer가 실행을 완료하면, Signaled 상태가 될 semaphore 배열.
 
   VK_CHECK(vkQueueSubmit(m_pGraphicsQueue, 1, &basicSubmitInfo, nullptr));
 }
@@ -314,7 +311,7 @@ void BasicLightingPass::CreateLightingRenderPass() {
   std::array<VkSubpassDescription, 1> subpasses{};
 
   // ATTACHMENTS
-  // SUBPASS 1 ATTACHMENTS (INPUT ATTACHMEMNTS)
+  // SUBPASS 1 ATTACHMENTS (INPUT ATTACHMENTS)
   // Colour Attachment
   VkAttachmentDescription colourAttachment = {};
   colourAttachment.format = VkUtils::ChooseSupportedFormat(m_pPhyscialDevice, {VK_FORMAT_R8G8B8A8_UNORM}, VK_IMAGE_TILING_OPTIMAL,
@@ -359,7 +356,7 @@ void BasicLightingPass::CreateLightingRenderPass() {
   // Conversion from VK_IMAGE_LAYER-UNDEFINED to VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
   // Transition must happen after ..
   subpassDependencies[0].srcSubpass =
-      VK_SUBPASS_EXTERNAL;  // 외부에서 들어오므로, Subpass index(VK_SUBPASS_EXTERNAL = Special value meaning outside of renderpass)
+      VK_SUBPASS_EXTERNAL;
   subpassDependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;  // Pipeline stage
   subpassDependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;            // Stage access mask (memory access)
   // But most happen before ..
@@ -397,7 +394,7 @@ void BasicLightingPass::CreateObjectIdRenderPass() {
   std::array<VkSubpassDescription, 1> subpasses{};
 
   // ATTACHMENTS
-  // SUBPASS 1 ATTACHMENTS (INPUT ATTACHMEMNTS)
+  // SUBPASS 1 ATTACHMENTS (INPUT ATTACHMENTS)
   // Colour Attachment
   VkAttachmentDescription colourAttachment = {};
   colourAttachment.format = VkUtils::ChooseSupportedFormat(m_pPhyscialDevice, {VK_FORMAT_R32G32B32A32_SFLOAT}, VK_IMAGE_TILING_OPTIMAL,
@@ -442,7 +439,7 @@ void BasicLightingPass::CreateObjectIdRenderPass() {
   // Conversion from VK_IMAGE_LAYER-UNDEFINED to VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
   // Transition must happen after ..
   subpassDependencies[0].srcSubpass =
-      VK_SUBPASS_EXTERNAL;  // 외부에서 들어오므로, Subpass index(VK_SUBPASS_EXTERNAL = Special value meaning outside of renderpass)
+      VK_SUBPASS_EXTERNAL;
   subpassDependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;  // Pipeline stage
   subpassDependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;            // Stage access mask (memory access)
   // But most happen before ..
@@ -577,7 +574,7 @@ void BasicLightingPass::CreateRaytracingFramebuffer() {
       imageCreateInfo.arrayLayers = 1;                            // Number of levels in image array
       imageCreateInfo.format = colourImageFormat;                 // Format type of image
       imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;           // How image data should be "tiled" (arranged for optimal reading)
-      imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;  // Layout of image data on creation (프레임버퍼에 맞게 변형됨)
+      imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
       imageCreateInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
                               VK_IMAGE_USAGE_STORAGE_BIT;       // Bit flags defining what image will be used for
       imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;          // Number of samples for multi-sampling
@@ -684,13 +681,13 @@ void BasicLightingPass::CreateGraphicsPipeline() {
   VkPipelineShaderStageCreateInfo vertexShaderCreateInfo = {};
   vertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   vertexShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;  // Shader stage name
-  vertexShaderCreateInfo.module = vertexShaderModule;         // Shader moudle to be used by stage
+  vertexShaderCreateInfo.module = vertexShaderModule;         // Shader module to be used by stage
   vertexShaderCreateInfo.pName = "main";                      // Entry point in to shader
   // Fragment Stage Creation information
   VkPipelineShaderStageCreateInfo fragmentShaderCreateInfo = {};
   fragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   fragmentShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;  // Shader stage name
-  fragmentShaderCreateInfo.module = fragmentShaderModule;         // Shader moudle to be used by stage
+  fragmentShaderCreateInfo.module = fragmentShaderModule;         // Shader module to be used by stage
   fragmentShaderCreateInfo.pName = "main";                        // Entry point in to shader
 
   VkPipelineShaderStageCreateInfo shaderStages[] = {vertexShaderCreateInfo, fragmentShaderCreateInfo};
@@ -735,7 +732,6 @@ void BasicLightingPass::CreateGraphicsPipeline() {
   // -- INPUT ASSEMBLY --
   VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
   inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-  // List versus Strip: 연속된 점(Strip), 딱 딱 끊어서 (List)
   inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;  // Primitive type to assemble vertices
   inputAssembly.primitiveRestartEnable = VK_FALSE;               // Allow overriding of "strip" topology to start new primitives
 
@@ -768,7 +764,7 @@ void BasicLightingPass::CreateGraphicsPipeline() {
       VK_FALSE;  // Change if fragments beyond near/far planes are clipped (default) or clamped to
                  // plane, you can only use this to accept depthBiasClamp of physical device VK_TRUE
   rasterizerCreateInfo.rasterizerDiscardEnable = VK_FALSE;  // Whether tp discard data and skip rasterizer. Never creates fragments
-                                                            // only suitable for pipline without framebuffer output.
+                                                            // only suitable for pipeline without framebuffer output.
   rasterizerCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;  // How to handle filling points between vertices.
   rasterizerCreateInfo.lineWidth = 1.0f;                    // How thick lines should be when drawn
   rasterizerCreateInfo.cullMode = VK_CULL_MODE_NONE;        // Which face of a tri to cull
@@ -784,7 +780,7 @@ void BasicLightingPass::CreateGraphicsPipeline() {
 
   // -- BLENDING --
   // Blending decides how to blend a new colour being written to a fragment, with the old value
-  // Blend Attacment State (how blending is handled)
+  // Blend Attachment State (how blending is handled)
   VkPipelineColorBlendAttachmentState colourState = {};
   colourState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
                                VK_COLOR_COMPONENT_A_BIT;  // Colours to apply blending to
@@ -827,11 +823,10 @@ void BasicLightingPass::CreateGraphicsPipeline() {
   // -- DEPTH STENCIL TESTING --
   VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo = {};
   depthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-  depthStencilCreateInfo.depthTestEnable = VK_TRUE;            // Enable checking depth to determine fragment wrtie
+  depthStencilCreateInfo.depthTestEnable = VK_TRUE;            // Enable checking depth to determine fragment write
   depthStencilCreateInfo.depthWriteEnable = VK_TRUE;           // Enable writing to depth buffer (to replace old values)
   depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;  // Comparison operation that allows an overwrite (is in front)
-  depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;     // Depth Bounds Test: Does the depth value exist between two bounds, 즉
-                                                            // 픽셀의 깊이 값이 특정 범위 안에 있는지를 체크하는 검사
+  depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;
   depthStencilCreateInfo.stencilTestEnable = VK_FALSE;  // Enable Stencil Test
 
   // -- GRAPHICS PIPELINE CREATION --
@@ -847,13 +842,13 @@ void BasicLightingPass::CreateGraphicsPipeline() {
   pipelineCreateInfo.pMultisampleState = &multisamplingCreateInfo;
   pipelineCreateInfo.pColorBlendState = &colourBlendingCreateInfo;
   pipelineCreateInfo.pDepthStencilState = &depthStencilCreateInfo;
-  pipelineCreateInfo.layout = m_graphicsPipelineLayout;  // Pipeline Laytout pipeline should use
+  pipelineCreateInfo.layout = m_graphicsPipelineLayout;  // Pipeline layout pipeline should use
   pipelineCreateInfo.renderPass = m_renderPass;          // Render pass description the pipeline is compatible with
   pipelineCreateInfo.subpass = 0;                        // Subpass of render pass to use with pipeline
 
   // Pipeline Derivatives : can create multiple pipeline that derive from one another for optimization
-  pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;  // Existing pipline to derive from
-  pipelineCreateInfo.basePipelineIndex = -1;  // or index of pipeline being created to derive from (in case createing multiple at once)
+  pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;  // Existing pipeline to derive from
+  pipelineCreateInfo.basePipelineIndex = -1;  // or index of pipeline being created to derive from (in case creating multiple at once)
 
   VK_CHECK(vkCreateGraphicsPipelines(m_pDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_graphicsPipeline));
 
@@ -875,13 +870,13 @@ void BasicLightingPass::CreateWireGraphicsPipeline() {
   VkPipelineShaderStageCreateInfo vertexShaderCreateInfo = {};
   vertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   vertexShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;  // Shader stage name
-  vertexShaderCreateInfo.module = vertexShaderModule;         // Shader moudle to be used by stage
+  vertexShaderCreateInfo.module = vertexShaderModule;         // Shader module to be used by stage
   vertexShaderCreateInfo.pName = "main";                      // Entry point in to shader
   // Fragment Stage Creation information
   VkPipelineShaderStageCreateInfo fragmentShaderCreateInfo = {};
   fragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   fragmentShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;  // Shader stage name
-  fragmentShaderCreateInfo.module = fragmentShaderModule;         // Shader moudle to be used by stage
+  fragmentShaderCreateInfo.module = fragmentShaderModule;         // Shader module to be used by stage
   fragmentShaderCreateInfo.pName = "main";                        // Entry point in to shader
 
   VkPipelineShaderStageCreateInfo shaderStages[] = {vertexShaderCreateInfo, fragmentShaderCreateInfo};
@@ -926,7 +921,6 @@ void BasicLightingPass::CreateWireGraphicsPipeline() {
   // -- INPUT ASSEMBLY --
   VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
   inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-  // List versus Strip: 연속된 점(Strip), 딱 딱 끊어서 (List)
   inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;  // Primitive type to assemble vertices
   inputAssembly.primitiveRestartEnable = VK_FALSE;               // Allow overriding of "strip" topology to start new primitives
 
@@ -959,7 +953,7 @@ void BasicLightingPass::CreateWireGraphicsPipeline() {
       VK_FALSE;  // Change if fragments beyond near/far planes are clipped (default) or clamped to
                  // plane, you can only use this to accept depthBiasClamp of physical device VK_TRUE
   rasterizerCreateInfo.rasterizerDiscardEnable = VK_FALSE;  // Whether tp discard data and skip rasterizer. Never creates fragments
-                                                            // only suitable for pipline without framebuffer output.
+                                                            // only suitable for pipeline without framebuffer output.
   rasterizerCreateInfo.polygonMode = VK_POLYGON_MODE_LINE;  // How to handle filling points between vertices.
   rasterizerCreateInfo.lineWidth = 1.0f;                    // How thick lines should be when drawn
   rasterizerCreateInfo.cullMode = VK_CULL_MODE_NONE;        // Which face of a tri to cull
@@ -975,7 +969,7 @@ void BasicLightingPass::CreateWireGraphicsPipeline() {
 
   // -- BLENDING --
   // Blending decides how to blend a new colour being written to a fragment, with the old value
-  // Blend Attacment State (how blending is handled)
+  // Blend Attachment State (how blending is handled)
   VkPipelineColorBlendAttachmentState colourState = {};
   colourState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
                                VK_COLOR_COMPONENT_A_BIT;  // Colours to apply blending to
@@ -1002,11 +996,10 @@ void BasicLightingPass::CreateWireGraphicsPipeline() {
   // -- DEPTH STENCIL TESTING --
   VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo = {};
   depthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-  depthStencilCreateInfo.depthTestEnable = VK_TRUE;            // Enable checking depth to determine fragment wrtie
+  depthStencilCreateInfo.depthTestEnable = VK_TRUE;            // Enable checking depth to determine fragment write
   depthStencilCreateInfo.depthWriteEnable = VK_TRUE;           // Enable writing to depth buffer (to replace old values)
   depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;  // Comparison operation that allows an overwrite (is in front)
-  depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;     // Depth Bounds Test: Does the depth value exist between two bounds, 즉
-                                                            // 픽셀의 깊이 값이 특정 범위 안에 있는지를 체크하는 검사
+  depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;
   depthStencilCreateInfo.stencilTestEnable = VK_FALSE;  // Enable Stencil Test
 
   // -- GRAPHICS PIPELINE CREATION --
@@ -1022,13 +1015,13 @@ void BasicLightingPass::CreateWireGraphicsPipeline() {
   pipelineCreateInfo.pMultisampleState = &multisamplingCreateInfo;
   pipelineCreateInfo.pColorBlendState = &colourBlendingCreateInfo;
   pipelineCreateInfo.pDepthStencilState = &depthStencilCreateInfo;
-  pipelineCreateInfo.layout = m_graphicsPipelineLayout;  // Pipeline Laytout pipeline should use
+  pipelineCreateInfo.layout = m_graphicsPipelineLayout;  // Pipeline layout pipeline should use
   pipelineCreateInfo.renderPass = m_renderPass;          // Render pass description the pipeline is compatible with
   pipelineCreateInfo.subpass = 0;                        // Subpass of render pass to use with pipeline
 
   // Pipeline Derivatives : can create multiple pipeline that derive from one another for optimization
-  pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;  // Existing pipline to derive from
-  pipelineCreateInfo.basePipelineIndex = -1;  // or index of pipeline being created to derive from (in case createing multiple at once)
+  pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;  // Existing pipeline to derive from
+  pipelineCreateInfo.basePipelineIndex = -1;  // or index of pipeline being created to derive from (in case creating multiple at once)
 
   VK_CHECK(vkCreateGraphicsPipelines(m_pDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_wireGraphicsPipeline));
 
@@ -1050,13 +1043,13 @@ void BasicLightingPass::CreateBoundingBoxPipeline() {
   VkPipelineShaderStageCreateInfo vertexShaderCreateInfo = {};
   vertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   vertexShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;  // Shader stage name
-  vertexShaderCreateInfo.module = vertexShaderModule;         // Shader moudle to be used by stage
+  vertexShaderCreateInfo.module = vertexShaderModule;         // Shader module to be used by stage
   vertexShaderCreateInfo.pName = "main";                      // Entry point in to shader
   // Fragment Stage Creation information
   VkPipelineShaderStageCreateInfo fragmentShaderCreateInfo = {};
   fragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   fragmentShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;  // Shader stage name
-  fragmentShaderCreateInfo.module = fragmentShaderModule;         // Shader moudle to be used by stage
+  fragmentShaderCreateInfo.module = fragmentShaderModule;         // Shader module to be used by stage
   fragmentShaderCreateInfo.pName = "main";                        // Entry point in to shader
 
   VkPipelineShaderStageCreateInfo shaderStages[] = {vertexShaderCreateInfo, fragmentShaderCreateInfo};
@@ -1092,7 +1085,6 @@ void BasicLightingPass::CreateBoundingBoxPipeline() {
   // -- INPUT ASSEMBLY --
   VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
   inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-  // List versus Strip: 연속된 점(Strip), 딱 딱 끊어서 (List)
   inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;  // Primitive type to assemble vertices
   inputAssembly.primitiveRestartEnable = VK_FALSE;               // Allow overriding of "strip" topology to start new primitives
 
@@ -1125,7 +1117,7 @@ void BasicLightingPass::CreateBoundingBoxPipeline() {
       VK_FALSE;  // Change if fragments beyond near/far planes are clipped (default) or clamped to
                  // plane, you can only use this to accept depthBiasClamp of physical device VK_TRUE
   rasterizerCreateInfo.rasterizerDiscardEnable = VK_FALSE;  // Whether tp discard data and skip rasterizer. Never creates fragments
-                                                            // only suitable for pipline without framebuffer output.
+                                                            // only suitable for pipeline without framebuffer output.
   rasterizerCreateInfo.polygonMode = VK_POLYGON_MODE_LINE;  // How to handle filling points between vertices.
   rasterizerCreateInfo.lineWidth = 2.0f;                    // How thick lines should be when drawn
   rasterizerCreateInfo.cullMode = VK_CULL_MODE_NONE;        // Which face of a tri to cull
@@ -1141,7 +1133,7 @@ void BasicLightingPass::CreateBoundingBoxPipeline() {
 
   // -- BLENDING --
   // Blending decides how to blend a new colour being written to a fragment, with the old value
-  // Blend Attacment State (how blending is handled)
+  // Blend Attachment State (how blending is handled)
   VkPipelineColorBlendAttachmentState colourState = {};
   colourState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
                                VK_COLOR_COMPONENT_A_BIT;  // Colours to apply blending to
@@ -1168,11 +1160,10 @@ void BasicLightingPass::CreateBoundingBoxPipeline() {
   // -- DEPTH STENCIL TESTING --
   VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo = {};
   depthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-  depthStencilCreateInfo.depthTestEnable = VK_TRUE;            // Enable checking depth to determine fragment wrtie
+  depthStencilCreateInfo.depthTestEnable = VK_TRUE;            // Enable checking depth to determine fragment write
   depthStencilCreateInfo.depthWriteEnable = VK_TRUE;           // Enable writing to depth buffer (to replace old values)
   depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;  // Comparison operation that allows an overwrite (is in front)
-  depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;     // Depth Bounds Test: Does the depth value exist between two bounds, 즉
-                                                            // 픽셀의 깊이 값이 특정 범위 안에 있는지를 체크하는 검사
+  depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;
   depthStencilCreateInfo.stencilTestEnable = VK_FALSE;  // Enable Stencil Test
 
   // -- GRAPHICS PIPELINE CREATION --
@@ -1188,13 +1179,13 @@ void BasicLightingPass::CreateBoundingBoxPipeline() {
   pipelineCreateInfo.pMultisampleState = &multisamplingCreateInfo;
   pipelineCreateInfo.pColorBlendState = &colourBlendingCreateInfo;
   pipelineCreateInfo.pDepthStencilState = &depthStencilCreateInfo;
-  pipelineCreateInfo.layout = m_graphicsPipelineLayout;  // Pipeline Laytout pipeline should use
+  pipelineCreateInfo.layout = m_graphicsPipelineLayout;  // Pipeline layout pipeline should use
   pipelineCreateInfo.renderPass = m_renderPass;          // Render pass description the pipeline is compatible with
   pipelineCreateInfo.subpass = 0;                        // Subpass of render pass to use with pipeline
 
   // Pipeline Derivatives : can create multiple pipeline that derive from one another for optimization
-  pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;  // Existing pipline to derive from
-  pipelineCreateInfo.basePipelineIndex = -1;  // or index of pipeline being created to derive from (in case createing multiple at once)
+  pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;  // Existing pipeline to derive from
+  pipelineCreateInfo.basePipelineIndex = -1;  // or index of pipeline being created to derive from (in case creating multiple at once)
 
   VK_CHECK(vkCreateGraphicsPipelines(m_pDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_boundingBoxPipeline));
 
@@ -1216,13 +1207,13 @@ void BasicLightingPass::CreateObjectIDPipeline() {
   VkPipelineShaderStageCreateInfo vertexShaderCreateInfo = {};
   vertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   vertexShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;  // Shader stage name
-  vertexShaderCreateInfo.module = vertexShaderModule;         // Shader moudle to be used by stage
+  vertexShaderCreateInfo.module = vertexShaderModule;         // Shader module to be used by stage
   vertexShaderCreateInfo.pName = "main";                      // Entry point in to shader
   // Fragment Stage Creation information
   VkPipelineShaderStageCreateInfo fragmentShaderCreateInfo = {};
   fragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   fragmentShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;  // Shader stage name
-  fragmentShaderCreateInfo.module = fragmentShaderModule;         // Shader moudle to be used by stage
+  fragmentShaderCreateInfo.module = fragmentShaderModule;         // Shader module to be used by stage
   fragmentShaderCreateInfo.pName = "main";                        // Entry point in to shader
 
   VkPipelineShaderStageCreateInfo shaderStages[] = {vertexShaderCreateInfo, fragmentShaderCreateInfo};
@@ -1267,7 +1258,6 @@ void BasicLightingPass::CreateObjectIDPipeline() {
   // -- INPUT ASSEMBLY --
   VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
   inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-  // List versus Strip: 연속된 점(Strip), 딱 딱 끊어서 (List)
   inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;  // Primitive type to assemble vertices
   inputAssembly.primitiveRestartEnable = VK_FALSE;               // Allow overriding of "strip" topology to start new primitives
 
@@ -1300,7 +1290,7 @@ void BasicLightingPass::CreateObjectIDPipeline() {
       VK_FALSE;  // Change if fragments beyond near/far planes are clipped (default) or clamped to
                  // plane, you can only use this to accept depthBiasClamp of physical device VK_TRUE
   rasterizerCreateInfo.rasterizerDiscardEnable = VK_FALSE;  // Whether tp discard data and skip rasterizer. Never creates fragments
-                                                            // only suitable for pipline without framebuffer output.
+                                                            // only suitable for pipeline without framebuffer output.
   rasterizerCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;  // How to handle filling points between vertices.
   rasterizerCreateInfo.lineWidth = 1.0f;                    // How thick lines should be when drawn
   rasterizerCreateInfo.cullMode = VK_CULL_MODE_NONE;        // Which face of a tri to cull
@@ -1316,7 +1306,7 @@ void BasicLightingPass::CreateObjectIDPipeline() {
 
   // -- BLENDING --
   // Blending decides how to blend a new colour being written to a fragment, with the old value
-  // Blend Attacment State (how blending is handled)
+  // Blend Attachment State (how blending is handled)
   VkPipelineColorBlendAttachmentState colourState = {};
   colourState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
                                VK_COLOR_COMPONENT_A_BIT;  // Colours to apply blending to
@@ -1343,11 +1333,10 @@ void BasicLightingPass::CreateObjectIDPipeline() {
   // -- DEPTH STENCIL TESTING --
   VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo = {};
   depthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-  depthStencilCreateInfo.depthTestEnable = VK_TRUE;            // Enable checking depth to determine fragment wrtie
+  depthStencilCreateInfo.depthTestEnable = VK_TRUE;            // Enable checking depth to determine fragment write
   depthStencilCreateInfo.depthWriteEnable = VK_TRUE;           // Enable writing to depth buffer (to replace old values)
   depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;  // Comparison operation that allows an overwrite (is in front)
-  depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;     // Depth Bounds Test: Does the depth value exist between two bounds, 즉
-                                                            // 픽셀의 깊이 값이 특정 범위 안에 있는지를 체크하는 검사
+  depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;
   depthStencilCreateInfo.stencilTestEnable = VK_FALSE;  // Enable Stencil Test
 
   // -- GRAPHICS PIPELINE CREATION --
@@ -1363,13 +1352,13 @@ void BasicLightingPass::CreateObjectIDPipeline() {
   pipelineCreateInfo.pMultisampleState = &multisamplingCreateInfo;
   pipelineCreateInfo.pColorBlendState = &colourBlendingCreateInfo;
   pipelineCreateInfo.pDepthStencilState = &depthStencilCreateInfo;
-  pipelineCreateInfo.layout = m_graphicsPipelineLayout;  // Pipeline Laytout pipeline should use
+  pipelineCreateInfo.layout = m_graphicsPipelineLayout;  // Pipeline layout pipeline should use
   pipelineCreateInfo.renderPass = m_objectIdRenderPass;  // Render pass description the pipeline is compatible with
   pipelineCreateInfo.subpass = 0;                        // Subpass of render pass to use with pipeline
 
   // Pipeline Derivatives : can create multiple pipeline that derive from one another for optimization
-  pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;  // Existing pipline to derive from
-  pipelineCreateInfo.basePipelineIndex = -1;  // or index of pipeline being created to derive from (in case createing multiple at once)
+  pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;  // Existing pipeline to derive from
+  pipelineCreateInfo.basePipelineIndex = -1;  // or index of pipeline being created to derive from (in case creating multiple at once)
 
   VK_CHECK(vkCreateGraphicsPipelines(m_pDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_objectIDPipeline));
 
@@ -1388,7 +1377,7 @@ void BasicLightingPass::CreateRaytracingPipeline() {
     VkPipelineShaderStageCreateInfo stageCreateInfo = {};
     stageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stageCreateInfo.stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;  // Shader stage name
-    stageCreateInfo.module = shaderModule;                   // Shader moudle to be used by stage
+    stageCreateInfo.module = shaderModule;                   // Shader module to be used by stage
     stageCreateInfo.pName = "main";
     shaderStages.push_back(stageCreateInfo);
 
@@ -1409,7 +1398,7 @@ void BasicLightingPass::CreateRaytracingPipeline() {
     VkPipelineShaderStageCreateInfo stageCreateInfo = {};
     stageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stageCreateInfo.stage = VK_SHADER_STAGE_MISS_BIT_KHR;  // Shader stage name
-    stageCreateInfo.module = shaderModule;                 // Shader moudle to be used by stage
+    stageCreateInfo.module = shaderModule;                 // Shader module to be used by stage
     stageCreateInfo.pName = "main";
     shaderStages.push_back(stageCreateInfo);
 
@@ -1428,7 +1417,7 @@ void BasicLightingPass::CreateRaytracingPipeline() {
     VkPipelineShaderStageCreateInfo secondStageCreateInfo = {};
     secondStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     secondStageCreateInfo.stage = VK_SHADER_STAGE_MISS_BIT_KHR;  // Shader stage name
-    secondStageCreateInfo.module = secondShaderModule;           // Shader moudle to be used by stage
+    secondStageCreateInfo.module = secondShaderModule;           // Shader module to be used by stage
     secondStageCreateInfo.pName = "main";
     shaderStages.push_back(secondStageCreateInfo);
     shaderGroup.generalShader = static_cast<uint32_t>(shaderStages.size()) - 1;
@@ -1442,7 +1431,7 @@ void BasicLightingPass::CreateRaytracingPipeline() {
     VkPipelineShaderStageCreateInfo stageCreateInfo = {};
     stageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stageCreateInfo.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;  // Shader stage name
-    stageCreateInfo.module = shaderModule;                        // Shader moudle to be used by stage
+    stageCreateInfo.module = shaderModule;                        // Shader module to be used by stage
     stageCreateInfo.pName = "main";
     shaderStages.push_back(stageCreateInfo);
 
@@ -1487,19 +1476,19 @@ void BasicLightingPass::CreateMeshShaderPipeline() {
   VkPipelineShaderStageCreateInfo taskShaderCreateInfo = {};
   taskShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   taskShaderCreateInfo.stage = VK_SHADER_STAGE_TASK_BIT_EXT;  // Shader stage name
-  taskShaderCreateInfo.module = taskShaderModule;             // Shader moudle to be used by stage
+  taskShaderCreateInfo.module = taskShaderModule;             // Shader module to be used by stage
   taskShaderCreateInfo.pName = "main";                        // Entry point in to shader
   // Vertex Stage Creation information
   VkPipelineShaderStageCreateInfo vertexShaderCreateInfo = {};
   vertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   vertexShaderCreateInfo.stage = VK_SHADER_STAGE_MESH_BIT_EXT;  // Shader stage name
-  vertexShaderCreateInfo.module = meshShaderModule;             // Shader moudle to be used by stage
+  vertexShaderCreateInfo.module = meshShaderModule;             // Shader module to be used by stage
   vertexShaderCreateInfo.pName = "main";                        // Entry point in to shader
   // Fragment Stage Creation information
   VkPipelineShaderStageCreateInfo fragmentShaderCreateInfo = {};
   fragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   fragmentShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;  // Shader stage name
-  fragmentShaderCreateInfo.module = fragmentShaderModule;         // Shader moudle to be used by stage
+  fragmentShaderCreateInfo.module = fragmentShaderModule;         // Shader module to be used by stage
   fragmentShaderCreateInfo.pName = "main";                        // Entry point in to shader
 
   VkPipelineShaderStageCreateInfo shaderStages[] = {taskShaderCreateInfo, vertexShaderCreateInfo, fragmentShaderCreateInfo};
@@ -1537,7 +1526,7 @@ void BasicLightingPass::CreateMeshShaderPipeline() {
       VK_FALSE;  // Change if fragments beyond near/far planes are clipped (default) or clamped to
                  // plane, you can only use this to accept depthBiasClamp of physical device VK_TRUE
   rasterizerCreateInfo.rasterizerDiscardEnable = VK_FALSE;  // Whether tp discard data and skip rasterizer. Never creates fragments
-                                                            // only suitable for pipline without framebuffer output.
+                                                            // only suitable for pipeline without framebuffer output.
   rasterizerCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;  // How to handle filling points between vertices.
   rasterizerCreateInfo.lineWidth = 1.0f;                    // How thick lines should be when drawn
   rasterizerCreateInfo.cullMode = VK_CULL_MODE_NONE;        // Which face of a tri to cull
@@ -1553,7 +1542,7 @@ void BasicLightingPass::CreateMeshShaderPipeline() {
 
   // -- BLENDING --
   // Blending decides how to blend a new colour being written to a fragment, with the old value
-  // Blend Attacment State (how blending is handled)
+  // Blend Attachment State (how blending is handled)
   VkPipelineColorBlendAttachmentState colourState = {};
   colourState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
                                VK_COLOR_COMPONENT_A_BIT;  // Colours to apply blending to
@@ -1580,11 +1569,10 @@ void BasicLightingPass::CreateMeshShaderPipeline() {
   // -- DEPTH STENCIL TESTING --
   VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo = {};
   depthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-  depthStencilCreateInfo.depthTestEnable = VK_TRUE;            // Enable checking depth to determine fragment wrtie
+  depthStencilCreateInfo.depthTestEnable = VK_TRUE;            // Enable checking depth to determine fragment write
   depthStencilCreateInfo.depthWriteEnable = VK_TRUE;           // Enable writing to depth buffer (to replace old values)
   depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;  // Comparison operation that allows an overwrite (is in front)
-  depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;     // Depth Bounds Test: Does the depth value exist between two bounds, 즉
-                                                            // 픽셀의 깊이 값이 특정 범위 안에 있는지를 체크하는 검사
+  depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;
   depthStencilCreateInfo.stencilTestEnable = VK_FALSE;  // Enable Stencil Test
 
   // -- GRAPHICS PIPELINE CREATION --
@@ -1600,13 +1588,13 @@ void BasicLightingPass::CreateMeshShaderPipeline() {
   pipelineCreateInfo.pMultisampleState = &multisamplingCreateInfo;
   pipelineCreateInfo.pColorBlendState = &colourBlendingCreateInfo;
   pipelineCreateInfo.pDepthStencilState = &depthStencilCreateInfo;
-  pipelineCreateInfo.layout = m_meshPipelineLayout;  // Pipeline Laytout pipeline should use
+  pipelineCreateInfo.layout = m_meshPipelineLayout;  // Pipeline layout pipeline should use
   pipelineCreateInfo.renderPass = m_renderPass;      // Render pass description the pipeline is compatible with
   pipelineCreateInfo.subpass = 0;                    // Subpass of render pass to use with pipeline
 
   // Pipeline Derivatives : can create multiple pipeline that derive from one another for optimization
-  pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;  // Existing pipline to derive from
-  pipelineCreateInfo.basePipelineIndex = -1;  // or index of pipeline being created to derive from (in case createing multiple at once)
+  pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;  // Existing pipeline to derive from
+  pipelineCreateInfo.basePipelineIndex = -1;  // or index of pipeline being created to derive from (in case creating multiple at once)
 
   VK_CHECK(vkCreateGraphicsPipelines(m_pDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_meshPipeline));
 
@@ -1629,13 +1617,13 @@ void BasicLightingPass::CreateBasicLightingPipeline() {
   VkPipelineShaderStageCreateInfo vertexShaderCreateInfo = {};
   vertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   vertexShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;  // Shader stage name
-  vertexShaderCreateInfo.module = vertexShaderModule;         // Shader moudle to be used by stage
+  vertexShaderCreateInfo.module = vertexShaderModule;         // Shader module to be used by stage
   vertexShaderCreateInfo.pName = "main";                      // Entry point in to shader
   // Fragment Stage Creation information
   VkPipelineShaderStageCreateInfo fragmentShaderCreateInfo = {};
   fragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   fragmentShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;  // Shader stage name
-  fragmentShaderCreateInfo.module = fragmentShaderModule;         // Shader moudle to be used by stage
+  fragmentShaderCreateInfo.module = fragmentShaderModule;         // Shader module to be used by stage
   fragmentShaderCreateInfo.pName = "main";                        // Entry point in to shader
 
   VkPipelineShaderStageCreateInfo shaderStages[] = {vertexShaderCreateInfo, fragmentShaderCreateInfo};
@@ -1680,7 +1668,6 @@ void BasicLightingPass::CreateBasicLightingPipeline() {
   // -- INPUT ASSEMBLY --
   VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
   inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-  // List versus Strip: 연속된 점(Strip), 딱 딱 끊어서 (List)
   inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;  // Primitive type to assemble vertices
   inputAssembly.primitiveRestartEnable = VK_FALSE;               // Allow overriding of "strip" topology to start new primitives
 
@@ -1713,7 +1700,7 @@ void BasicLightingPass::CreateBasicLightingPipeline() {
       VK_FALSE;  // Change if fragments beyond near/far planes are clipped (default) or clamped to
                  // plane, you can only use this to accept depthBiasClamp of physical device VK_TRUE
   rasterizerCreateInfo.rasterizerDiscardEnable = VK_FALSE;  // Whether tp discard data and skip rasterizer. Never creates fragments
-                                                            // only suitable for pipline without framebuffer output.
+                                                            // only suitable for pipeline without framebuffer output.
   rasterizerCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;  // How to handle filling points between vertices.
   rasterizerCreateInfo.lineWidth = 1.0f;                    // How thick lines should be when drawn
   rasterizerCreateInfo.cullMode = VK_CULL_MODE_NONE;        // Which face of a tri to cull
@@ -1729,7 +1716,7 @@ void BasicLightingPass::CreateBasicLightingPipeline() {
 
   // -- BLENDING --
   // Blending decides how to blend a new colour being written to a fragment, with the old value
-  // Blend Attacment State (how blending is handled)
+  // Blend Attachment State (how blending is handled)
   VkPipelineColorBlendAttachmentState colourState = {};
   colourState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
                                VK_COLOR_COMPONENT_A_BIT;  // Colours to apply blending to
@@ -1756,11 +1743,10 @@ void BasicLightingPass::CreateBasicLightingPipeline() {
   // -- DEPTH STENCIL TESTING --
   VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo = {};
   depthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-  depthStencilCreateInfo.depthTestEnable = VK_TRUE;            // Enable checking depth to determine fragment wrtie
+  depthStencilCreateInfo.depthTestEnable = VK_TRUE;            // Enable checking depth to determine fragment write
   depthStencilCreateInfo.depthWriteEnable = VK_TRUE;           // Enable writing to depth buffer (to replace old values)
   depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;  // Comparison operation that allows an overwrite (is in front)
-  depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;     // Depth Bounds Test: Does the depth value exist between two bounds, 즉
-                                                            // 픽셀의 깊이 값이 특정 범위 안에 있는지를 체크하는 검사
+  depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;
   depthStencilCreateInfo.stencilTestEnable = VK_FALSE;  // Enable Stencil Test
 
   // -- GRAPHICS PIPELINE CREATION --
@@ -1776,13 +1762,13 @@ void BasicLightingPass::CreateBasicLightingPipeline() {
   pipelineCreateInfo.pMultisampleState = &multisamplingCreateInfo;
   pipelineCreateInfo.pColorBlendState = &colourBlendingCreateInfo;
   pipelineCreateInfo.pDepthStencilState = &depthStencilCreateInfo;
-  pipelineCreateInfo.layout = m_graphicsPipelineLayout;  // Pipeline Laytout pipeline should use
+  pipelineCreateInfo.layout = m_graphicsPipelineLayout;  // Pipeline layout pipeline should use
   pipelineCreateInfo.renderPass = m_renderPass;          // Render pass description the pipeline is compatible with
   pipelineCreateInfo.subpass = 0;                        // Subpass of render pass to use with pipeline
 
   // Pipeline Derivatives : can create multiple pipeline that derive from one another for optimization
-  pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;  // Existing pipline to derive from
-  pipelineCreateInfo.basePipelineIndex = -1;  // or index of pipeline being created to derive from (in case createing multiple at once)
+  pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;  // Existing pipeline to derive from
+  pipelineCreateInfo.basePipelineIndex = -1;  // or index of pipeline being created to derive from (in case creating multiple at once)
   VK_CHECK(vkCreateGraphicsPipelines(m_pDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_basicPipeline));
 
   // Destroy second shader modules
@@ -1881,9 +1867,6 @@ void BasicLightingPass::CreateRaytracingDescriptorSets() {
     Create the bottom level acceleration structure contains the scene's actual geometry (vertices, triangles)
 */
 void BasicLightingPass::CreateBLAS() {
-  /*
-      여러 BLAS 생성
-  */
   m_bottomLevelASList.reserve(g_BatchManager.m_meshes.size());
   scratchBuffers.reserve(g_BatchManager.m_meshes.size());
 
@@ -1996,18 +1979,16 @@ void BasicLightingPass::CreateTLAS() {
   for (int cur = 0; cur < MAX_FRAME_DRAWS; ++cur) {
     instances[cur].resize(numInstances);
     for (uint32_t i = 0; i < numInstances; ++i) {
-      // 각 인스턴스별 변환행렬, customIndex, mask 등 세팅
       VkAccelerationStructureInstanceKHR& instance = instances[cur][i];
 
       glm::mat4 curr = (g_BatchManager.m_transforms[cur][i].currentTransform);
       VkTransformMatrixKHR transformMatrix = mat4ToVkTransform(curr);
       instance.transform = transformMatrix;
 
-      // 예: 하위 구조(= BLAS) 주소
       instance.accelerationStructureReference = m_bottomLevelASList[i].deviceAddress;
 
-      // 그 외 속성
-      instance.instanceCustomIndex = i;  // 임의의 식별자
+      // The custom index maps ray hits back to the mesh/object ID buffers.
+      instance.instanceCustomIndex = i;
       instance.mask = 0xFF;
       instance.instanceShaderBindingTableRecordOffset = 0;
       instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
@@ -2127,7 +2108,7 @@ void BasicLightingPass::CreateSemaphores() {
   m_fence.resize(MAX_FRAME_DRAWS);
   m_renderAvailable.resize(MAX_FRAME_DRAWS);
 
-  // Semaphore creataion information
+  // Semaphore creation information
   VkSemaphoreCreateInfo semaphoreCreateInfo = {};
   semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
   VkFenceCreateInfo fenceCreateInfo = {};
@@ -2146,7 +2127,7 @@ void BasicLightingPass::CreateCommandBuffers() {
   VkCommandBufferAllocateInfo cbAllocInfo = {};
   cbAllocInfo = {};
   cbAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  cbAllocInfo.commandPool = m_pGraphicsCommandPool;  // 해당 큐 패밀리의 큐에서만 커맨드 큐 동작이 실행가능하다.
+  cbAllocInfo.commandPool = m_pGraphicsCommandPool;
   cbAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;  // VK_COMMAND_BUFFER_LEVEL_PRIMARY		: buffer you submit directly to
                                                         // queue. cant be called by other buffers
   // VK_COMMAND_BUFFER_LEVEL_SECONDARY	: buffer can't be called directly. Can be called from other buffers via
@@ -2187,9 +2168,12 @@ void BasicLightingPass::RecordCommands(uint32_t currentImage) {
   // Begin Render Pass
   vkCmdBeginRenderPass(m_commandBuffers[currentImage], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-  if (g_RenderSetting.UseMeshShader)
+  const bool useMeshShader = !g_RenderSetting.ForceGpuBatchRendering && g_RenderSetting.UseMeshShader;
+  const bool useBasicPass = !g_RenderSetting.ForceGpuBatchRendering && g_RenderSetting.UseBasicPass;
+
+  if (useMeshShader)
     RecordMeshletCommands(currentImage);
-  else if (g_RenderSetting.UseBasicPass)
+  else if (useBasicPass)
     RecordBasicLightingCommands(currentImage);
   else
     RecordLightingPassCommands(currentImage);

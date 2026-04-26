@@ -74,7 +74,7 @@ void main()
     float tMin = 0.001;
     float tMax = 10000.0;
     vec3 origin = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
-    vec3 biasedOrigin = origin + normal * 0.005; // 자기 교차 방지용 offset
+    vec3 biasedOrigin = origin + normal * 0.005;
     
     shadowed = true;
 

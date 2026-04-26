@@ -87,7 +87,7 @@ class CullingRenderPass : public IRenderPass {
   VkPipelineLayout m_graphicsPipelineLayout;
 
   GpuImage m_depthOnlyBufferImage;
-  VkFramebuffer m_depthOnlyFramebuffer;  // mipmap 별로 생성.
+  VkFramebuffer m_depthOnlyFramebuffer;
 
   VkQueryPool m_occlusionQueryPool;
   std::vector<uint64_t> m_passedSamples;

@@ -73,7 +73,6 @@ void CullingRenderPass::Update(uint32_t imageIndex) {
         } else {
           batch.m_drawIndexedCommands[i].instanceCount = 0;
         }
-        // if(accumulatedIndex != m_passedSamples.size()) std::cout << m_passedSamples[accumulatedIndex] << ", ";
       }
       commands.insert(commands.end(), batch.m_drawIndexedCommands.begin(), batch.m_drawIndexedCommands.end());
     }
@@ -123,7 +122,6 @@ void CullingRenderPass::Draw(uint32_t imageIndex, VkFence fence, VkSemaphore ren
   basicSubmitInfo.pCommandBuffers = &m_commandBuffers[imageIndex];     // Command buffer to submit
   basicSubmitInfo.signalSemaphoreCount = 1;                            // Number of semaphores to signal
   basicSubmitInfo.pSignalSemaphores = &m_renderAvailable[imageIndex];  // Semaphores to signal when command buffer finishes
-  // Command buffer가 실행을 완료하면, Signaled 상태가 될 semaphore 배열.
 
   VK_CHECK(vkQueueSubmit(m_pGraphicsQueue, 1, &basicSubmitInfo, nullptr));
 
@@ -139,7 +137,7 @@ void CullingRenderPass::CreateDepthRenderPass() {
   std::array<VkSubpassDescription, 1> subpasses{};
 
   // ATTACHMENTS
-  // SUBPASS 1 ATTACHMENTS (INPUT ATTACHMEMNTS)
+  // SUBPASS 1 ATTACHMENTS (INPUT ATTACHMENTS)
   VkAttachmentDescription depthStencilAttachment = {};
   depthStencilAttachment.format = VkUtils::ChooseSupportedFormat(m_pPhyscialDevice, {VK_FORMAT_D32_SFLOAT}, VK_IMAGE_TILING_OPTIMAL,
                                                                  VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
@@ -167,7 +165,7 @@ void CullingRenderPass::CreateDepthRenderPass() {
   // Conversion from VK_IMAGE_LAYER-UNDEFINED to VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
   // Transition must happen after ..
   subpassDependencies[0].srcSubpass =
-      VK_SUBPASS_EXTERNAL;  // 외부에서 들어오므로, Subpass index(VK_SUBPASS_EXTERNAL = Special value meaning outside of renderpass)
+      VK_SUBPASS_EXTERNAL;
   subpassDependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;  // Pipeline stage
   subpassDependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;            // Stage access mask (memory access)
   // But most happen before ..
@@ -265,7 +263,7 @@ void CullingRenderPass::CreateDepthGraphicsPipeline() {
   VkPipelineShaderStageCreateInfo vertexShaderCreateInfo = {};
   vertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   vertexShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;  // Shader stage name
-  vertexShaderCreateInfo.module = vertexShaderModule;         // Shader moudle to be used by stage
+  vertexShaderCreateInfo.module = vertexShaderModule;         // Shader module to be used by stage
   vertexShaderCreateInfo.pName = "main";                      // Entry point in to shader
 
   VkPipelineShaderStageCreateInfo shaderStages[] = {vertexShaderCreateInfo};
@@ -310,7 +308,6 @@ void CullingRenderPass::CreateDepthGraphicsPipeline() {
   // -- INPUT ASSEMBLY --
   VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
   inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-  // List versus Strip: 연속된 점(Strip), 딱 딱 끊어서 (List)
   inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;  // Primitive type to assemble vertices
   inputAssembly.primitiveRestartEnable = VK_FALSE;               // Allow overriding of "strip" topology to start new primitives
 
@@ -343,7 +340,7 @@ void CullingRenderPass::CreateDepthGraphicsPipeline() {
       VK_FALSE;  // Change if fragments beyond near/far planes are clipped (default) or clamped to
                  // plane, you can only use this to accept depthBiasClamp of physical device VK_TRUE
   rasterizerCreateInfo.rasterizerDiscardEnable = VK_FALSE;  // Whether tp discard data and skip rasterizer. Never creates fragments
-                                                            // only suitable for pipline without framebuffer output.
+                                                            // only suitable for pipeline without framebuffer output.
   rasterizerCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;  // How to handle filling points between vertices.
   rasterizerCreateInfo.lineWidth = 1.0f;                    // How thick lines should be when drawn
   rasterizerCreateInfo.cullMode = VK_CULL_MODE_NONE;        // Which face of a tri to cull
@@ -359,7 +356,7 @@ void CullingRenderPass::CreateDepthGraphicsPipeline() {
 
   // -- BLENDING --
   // Blending decides how to blend a new colour being written to a fragment, with the old value
-  // Blend Attacment State (how blending is handled)
+  // Blend Attachment State (how blending is handled)
   VkPipelineColorBlendAttachmentState colourState = {};
   colourState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
                                VK_COLOR_COMPONENT_A_BIT;  // Colours to apply blending to
@@ -390,11 +387,10 @@ void CullingRenderPass::CreateDepthGraphicsPipeline() {
   // -- DEPTH STENCIL TESTING --
   VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo = {};
   depthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-  depthStencilCreateInfo.depthTestEnable = VK_TRUE;            // Enable checking depth to determine fragment wrtie
+  depthStencilCreateInfo.depthTestEnable = VK_TRUE;            // Enable checking depth to determine fragment write
   depthStencilCreateInfo.depthWriteEnable = VK_TRUE;           // Enable writing to depth buffer (to replace old values)
   depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;  // Comparison operation that allows an overwrite (is in front)
-  depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;     // Depth Bounds Test: Does the depth value exist between two bounds, 즉
-                                                            // 픽셀의 깊이 값이 특정 범위 안에 있는지를 체크하는 검사
+  depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;
   depthStencilCreateInfo.stencilTestEnable = VK_FALSE;  // Enable Stencil Test
 
   // -- GRAPHICS PIPELINE CREATION --
@@ -410,13 +406,13 @@ void CullingRenderPass::CreateDepthGraphicsPipeline() {
   pipelineCreateInfo.pMultisampleState = &multisamplingCreateInfo;
   pipelineCreateInfo.pColorBlendState = &colourBlendingCreateInfo;
   pipelineCreateInfo.pDepthStencilState = &depthStencilCreateInfo;
-  pipelineCreateInfo.layout = m_graphicsPipelineLayout;  // Pipeline Laytout pipeline should use
+  pipelineCreateInfo.layout = m_graphicsPipelineLayout;  // Pipeline layout pipeline should use
   pipelineCreateInfo.renderPass = m_depthRenderPass;     // Render pass description the pipeline is compatible with
   pipelineCreateInfo.subpass = 0;                        // Subpass of render pass to use with pipeline
 
   // Pipeline Derivatives : can create multiple pipeline that derive from one another for optimization
-  pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;  // Existing pipline to derive from
-  pipelineCreateInfo.basePipelineIndex = -1;  // or index of pipeline being created to derive from (in case createing multiple at once)
+  pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;  // Existing pipeline to derive from
+  pipelineCreateInfo.basePipelineIndex = -1;  // or index of pipeline being created to derive from (in case creating multiple at once)
 
   VK_CHECK(vkCreateGraphicsPipelines(m_pDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_depthGraphicePipeline));
 
@@ -472,7 +468,7 @@ void CullingRenderPass::CreateSemaphores() {
   m_fence.resize(MAX_FRAME_DRAWS);
   m_renderAvailable.resize(MAX_FRAME_DRAWS);
 
-  // Semaphore creataion information
+  // Semaphore creation information
   VkSemaphoreCreateInfo semaphoreCreateInfo = {};
   semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
   VkFenceCreateInfo fenceCreateInfo = {};
@@ -494,7 +490,7 @@ void CullingRenderPass::CreateCommandBuffers() {
   VkCommandBufferAllocateInfo cbAllocInfo = {};
   cbAllocInfo = {};
   cbAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  cbAllocInfo.commandPool = m_pGraphicsCommandPool;  // 해당 큐 패밀리의 큐에서만 커맨드 큐 동작이 실행가능하다.
+  cbAllocInfo.commandPool = m_pGraphicsCommandPool;
   cbAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;  // VK_COMMAND_BUFFER_LEVEL_PRIMARY		: buffer you submit directly to
                                                         // queue. cant be called by other buffers
   // VK_COMMAND_BUFFER_LEVEL_SECONDARY	: buffer can't be called directly. Can be called from other buffers via 'vkCmdExecuteCommands'
@@ -542,7 +538,7 @@ void CullingRenderPass::RecordCommands(uint32_t currentImage) {
 
     // Begin Render Pass
     vkCmdBeginRenderPass(m_commandBuffers[currentImage], &depthOnlyRenderPassBeginInfo,
-                         VK_SUBPASS_CONTENTS_INLINE);  // 렌더 패스의 내용을 직접 명령 버퍼에 기록하는 것을 의미
+                         VK_SUBPASS_CONTENTS_INLINE);
 
     RecordOcclusionCullingCommands(currentImage);
 

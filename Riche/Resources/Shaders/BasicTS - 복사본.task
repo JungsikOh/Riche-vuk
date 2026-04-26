@@ -37,14 +37,10 @@ layout(set = 1, binding = 4) readonly buffer MeshletBoundsBuffer
 	vec4 meshletBounds[]; // (xyz = center, w = radius)
 };
 
-/* ---------- 프러스텀 컬링 함수 ---------- */
 bool SphereInFrustum(vec3 c, float r)
 {
-    // view-공간으로 변환
     vec4 cv = uCam.view * vec4(c, 1.0);
-    // 간단한 6-평면 테스트 (좌·우·상·하·근·원)
     vec4 cp = uCam.projection * cv;      // clip-space
-    // 동차 좌표 -> 평면식: ±x ≤ w-r, ±y ≤ w-r,   z ≥ -w + r, z ≤ w-r
     float w = cp.w;
     if ( cp.x >  w + r) return false;    // left
     if (-cp.x >  w + r) return false;    // right

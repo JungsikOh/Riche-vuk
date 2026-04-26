@@ -140,19 +140,16 @@ class BatchManager : public Singleton<BatchManager> {
 
 static void AddDataToMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::ResourceManager& manager, const Mesh& mesh,
                                bool flag = false) {
-  // 현재 메쉬 데이터 크기 계산
   size_t vertexDataSize = mesh.vertexCount * sizeof(BasicVertex);
   size_t indexDataSize = mesh.indexCount * sizeof(uint32_t);
   size_t totalDataSize = vertexDataSize + indexDataSize;
 
-  // 만약 miniBatches가 비어 있으면 하나 생성
   if (s_accumulatedVertexSize == 0 && s_accumulatedIndexSize == 0) {
     miniBatches.emplace_back();
   }
 
   MiniBatch* currentBatch = &miniBatches.back();
 
-  // Draw Command 생성 및 추가
   VkDrawIndexedIndirectCommand drawCommand{};
   drawCommand.indexCount = mesh.indexCount;
   drawCommand.instanceCount = 1;
@@ -162,7 +159,6 @@ static void AddDataToMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::Res
 
   currentBatch->m_drawIndexedCommands.push_back(drawCommand);
 
-  // 누적된 데이터에 현재 메쉬 추가
   s_accumulatedVertices.insert(s_accumulatedVertices.end(), mesh.vertices.begin(), mesh.vertices.end());
   s_accumulatedIndices.insert(s_accumulatedIndices.end(), mesh.indices.begin(), mesh.indices.end());
   std::cout << mesh.indices.size() << std::endl;
@@ -170,9 +166,7 @@ static void AddDataToMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::Res
   s_accumulatedVertexSize += vertexDataSize;
   s_accumulatedIndexSize += indexDataSize;
 
-  // 누적된 크기가 3MB를 초과하면 새로운 mini-batch 생성 또는 현재까지 아무것도 생성하지 않았을 경우, 마지막에 생성
   if (s_accumulatedVertexSize + s_accumulatedIndexSize > MAX_BATCH_SIZE || flag) {
-    // 새로운 mini-batch 생성
     manager.CreateVertexBuffer(s_accumulatedVertexSize, &currentBatch->m_vertexBufferMemory, &currentBatch->m_vertexBuffer,
                                s_accumulatedVertices.data());
     manager.CreateIndexBuffer(s_accumulatedIndexSize, &currentBatch->m_indexBufferMemory, &currentBatch->m_indexBuffer,
@@ -188,7 +182,6 @@ static void AddDataToMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::Res
 
     std::cout << "New mini-batch created with size: " << currentBatch->m_currentBatchSize << " bytes." << std::endl;
 
-    // 누적된 데이터 초기화
     s_accumulatedVertices.clear();
     s_accumulatedIndices.clear();
     s_accumulatedVertexSize = 0;
@@ -218,9 +211,8 @@ static void FlushMiniBatch(std::vector<MiniBatch>& miniBatches, VkUtils::Resourc
   currentBatch->m_indirectCommandsOffset = s_accumulatedIndirectOffset;
 
   std::cout << "Flushed mini-batch with size: " << currentBatch->m_currentBatchSize << " bytes." << std::endl;
-  std::cout << "Flushed mini-batch with fefefe: " << currentBatch->m_indirectCommandsOffset << " bytes." << std::endl;
+  std::cout << "Flushed mini-batch indirect offset: " << currentBatch->m_indirectCommandsOffset << " bytes." << std::endl;
 
-  // 누적된 데이터 초기화
   s_accumulatedVertices.clear();
   s_accumulatedIndices.clear();
   s_accumulatedVertexSize = 0;

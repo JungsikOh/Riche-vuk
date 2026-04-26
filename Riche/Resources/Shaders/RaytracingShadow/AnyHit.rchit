@@ -75,9 +75,7 @@ void main()
 
     float alpha = texture(alphaTestTexture, /* uv */).a;
 
-    // 예: 알파가 특정 임계값(threshold)보다 작으면 레이를 통과시킴
     if(alpha < 0.5) {
-        // 아무것도 안 맞은 것으로 취급
         ignoreIntersectionEXT();
         return;
     }

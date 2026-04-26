@@ -39,7 +39,7 @@ layout(set = 1, binding = 2) buffer readonly SSBO_BoundingBoxBuffer {
 };
 
 layout(set = 2, binding = 0) uniform FrustumPlanes {
-    vec4 planes[6];  // View Frustum의 6개 평면
+    vec4 planes[6];
 };
 
 bool IsAABBInFrustum(AABB aabb, uint index) 
@@ -51,28 +51,24 @@ bool IsAABBInFrustum(AABB aabb, uint index)
     {
         vec3 positiveVertex = newMinPos.xyz;
 
-        // 양수 방향 꼭짓점 선택
         if (planes[i].x >= 0) positiveVertex.x = newMaxPos.x;
         if (planes[i].y >= 0) positiveVertex.y = newMaxPos.y;
         if (planes[i].z >= 0) positiveVertex.z = newMaxPos.z;
 
-        // 평면과 꼭짓점 사이의 거리 계산
         float distance = dot(planes[i].xyz, positiveVertex) + planes[i].w;
 
-        // AABB의 한 좌표라도 평면 안에 있는 경우
         if (distance < 0) 
         {
             return false;
         }
     }
 
-    return true; // 프러스텀 밖
+    return true;
 }
 
 void main() {
     uint idx = gl_GlobalInvocationID.x;
     
-    // 각 AABB를 Frustum에 대해 검사하고, 포함된 경우 Indirect Draw 명령을 설정
     if (IsAABBInFrustum(boundingBoxList[idx], idx)) 
     {
         ssbo_DrawIndexedCommands.drawIndexedCommands[idx].instanceCount = 1;

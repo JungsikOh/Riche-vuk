@@ -11,13 +11,12 @@ class RenderSetting : public Singleton<RenderSetting> {
   bool isRenderBoundingBox = false;
   bool isMultiThreading = false;
   bool UseMeshShader = false;
-  bool UseBasicPass = true;
+  bool UseBasicPass = false;
+  bool ForceGpuBatchRendering = true;
 
   int beforeCullingRenderingNum = 0;
   int afterViewCullingRenderingNum = 0;
   int afterOcclusionCullingRenderingNum = 0;
-
-
 
   bool changeFlag = false;
 };

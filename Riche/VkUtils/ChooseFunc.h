@@ -30,7 +30,6 @@ static VkDeviceAddress getVkDeviceAddress(VkDevice device, VkBuffer buffer) {
 }
 
 static uint32_t alignedSize(uint32_t size, uint32_t alignment) {
-  // alignment보다 큰 값으로 크기를 정렬
   return (size + alignment - 1) & ~(alignment - 1);
 }
 

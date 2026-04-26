@@ -6,7 +6,6 @@
 
 namespace VkUtils {
 
-// TransferQueue를 이용해서 만들어야하는 Vulkan Object에 대해서 생성하는 클래스
 class ResourceManager : public Singleton<ResourceManager> {
   friend class Singleton<ResourceManager>;
 
@@ -129,9 +128,9 @@ static void CopyBuffer(VkDevice device, VkQueue transferQueue, VkCommandPool tra
   VkCommandBufferBeginInfo beginInfo = {};
   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   beginInfo.flags =
-      VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;  // We're only using the command bufer once, so set up for one time submit.
+      VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;  // We're only using the command buffer once, so set up for one time submit.
 
-  // Begine recording transfer commands
+  // Begin recording transfer commands
   vkBeginCommandBuffer(transferCommandBuffer, &beginInfo);
 
   // Region of data to copy from and to
@@ -153,7 +152,7 @@ static void CopyBuffer(VkDevice device, VkQueue transferQueue, VkCommandPool tra
 
   // Submit Transfer command to transfer queue and wait until it finishes
   vkQueueSubmit(transferQueue, 1, &submitInfo, VK_NULL_HANDLE);
-  vkQueueWaitIdle(transferQueue);  // 큐가 Idle 상태가 될 때까지 기다린다. 여기서 Idle 상태란, 대기 상태에 있는 것을 이야기한다.
+  vkQueueWaitIdle(transferQueue);
 
   // Free Temporary command buffer back to pool
   vkFreeCommandBuffers(device, transferCommandPool, 1, &transferCommandBuffer);
@@ -179,18 +178,18 @@ static void CopyImage(VkDevice device, VkQueue transferQueue, VkCommandPool tran
   VkCommandBufferBeginInfo beginInfo = {};
   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   beginInfo.flags =
-      VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;  // We're only using the command bufer once, so set up for one time submit.
+      VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;  // We're only using the command buffer once, so set up for one time submit.
 
-  // Begine recording transfer commands
+  // Begin recording transfer commands
   vkBeginCommandBuffer(transferCommandBuffer, &beginInfo);
 
   VkBufferImageCopy imageRegion = {};
   imageRegion.bufferOffset = 0;                                         // Offset into data
-  imageRegion.bufferRowLength = 0;                                      // Row length of data to caclulate data spacing
-  imageRegion.bufferImageHeight = 0;                                    // Image height to caclulate data spacing
+  imageRegion.bufferRowLength = 0;                                      // Row length of data to calculate data spacing
+  imageRegion.bufferImageHeight = 0;                                    // Image height to calculate data spacing
   imageRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;  // Which aspect of image to copy
   imageRegion.imageSubresource.mipLevel = 0;                            // Mipmap level to copy
-  imageRegion.imageSubresource.baseArrayLayer = 0;                      // Staring array layer (if array)
+  imageRegion.imageSubresource.baseArrayLayer = 0;                      // Starting array layer (if array)
   imageRegion.imageSubresource.layerCount = 1;                          // Number of layers to copy starting at baseArrayLayer
   imageRegion.imageOffset = {0, 0, 0};                                  // Offset into image (as opposed to raw data in bufferOffset)
   imageRegion.imageExtent = {width, height, 1};                         // Size of region to copy as (x, y, z) values
@@ -208,7 +207,7 @@ static void CopyImage(VkDevice device, VkQueue transferQueue, VkCommandPool tran
 
   // Submit Transfer command to transfer queue and wait until it finishes
   vkQueueSubmit(transferQueue, 1, &submitInfo, VK_NULL_HANDLE);
-  vkQueueWaitIdle(transferQueue);  // 큐가 Idle 상태가 될 때까지 기다린다. 여기서 Idle 상태란, 대기 상태에 있는 것을 이야기한다.
+  vkQueueWaitIdle(transferQueue);
 
   // Free Temporary command buffer back to pool
   vkFreeCommandBuffers(device, transferCommandPool, 1, &transferCommandBuffer);
@@ -229,7 +228,7 @@ static VkResult CreateImage2D(VkDevice device, VkPhysicalDevice physicalDevice, 
   imageCreateInfo.arrayLayers = 1;                            // Number of levels in image array
   imageCreateInfo.format = format;                            // Format type of image
   imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;           // How image data should be "tiled" (arranged for optimal reading)
-  imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;  // Layout of image data on creation (프레임버퍼에 맞게 변형됨)
+  imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   imageCreateInfo.usage = usage;                              // Bit flags defining what image will be used for
   imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;            // Number of samples for multi-sampling
   imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;    // Whether image can be shared between queues
@@ -302,9 +301,9 @@ static void TransitionImageLayout(VkDevice device, VkQueue transferQueue, VkComm
   VkCommandBufferBeginInfo beginInfo = {};
   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   beginInfo.flags =
-      VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;  // We're only using the command bufer once, so set up for one time submit.
+      VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;  // We're only using the command buffer once, so set up for one time submit.
 
-  // Begine recording transfer commands
+  // Begin recording transfer commands
   vkBeginCommandBuffer(transferCommandBuffer, &beginInfo);
 
   VkImageMemoryBarrier imageMemBarrier = {};
@@ -313,7 +312,7 @@ static void TransitionImageLayout(VkDevice device, VkQueue transferQueue, VkComm
   imageMemBarrier.newLayout = newLayout;                          // Layout to transition to
   imageMemBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;  // Queue family to transition from
   imageMemBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;  // Queue family to transition to
-  imageMemBarrier.image = image;                                  // image being aceesed and modified as part of barrier
+  imageMemBarrier.image = image;                                  // image being accessed and modified as part of barrier
   imageMemBarrier.subresourceRange.aspectMask = aspectFlag;       // Aspect of Image being altered
   imageMemBarrier.subresourceRange.baseMipLevel = 0;              // First mip level to start alterations on
   imageMemBarrier.subresourceRange.levelCount = 1;                // number of mip levels to alter starting from base mip level
@@ -339,24 +338,16 @@ static void TransitionImageLayout(VkDevice device, VkQueue transferQueue, VkComm
     srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
     dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
   } else if (oldLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
-    // Depth attachment로 쓰일 때 접근 권한: Depth attachment에 대한 읽기 및 쓰기 접근이 필요합니다.
     imageMemBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    // Shader read-only 레이아웃으로 전환 후에는 셰이더 단계에서 읽기만 필요합니다.
     imageMemBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-    // srcStage: 이미지가 depth/stencil attachment로 사용될 때 최종 프래그먼트 테스트 후에 접근 가능하도록 설정합니다.
     srcStage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-    // dstStage: 셰이더 단계에서 읽어야 하므로 프래그먼트 셰이더에 맞추어 설정합니다.
     dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
   } else if (oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
-    // Depth attachment로 쓰일 때 접근 권한: Depth attachment에 대한 읽기 및 쓰기 접근이 필요합니다.
     imageMemBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    // Shader read-only 레이아웃으로 전환 후에는 셰이더 단계에서 읽기만 필요합니다.
     imageMemBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-    // srcStage: Color attachment에 쓰는 단계인 color attachment output 단계에서 접근할 수 있도록 설정합니다.
     srcStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    // dstStage: 프래그먼트 셰이더에서 읽기 위해 프래그먼트 셰이더 단계로 설정합니다.
     dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
   }
 
@@ -378,7 +369,7 @@ static void TransitionImageLayout(VkDevice device, VkQueue transferQueue, VkComm
 
   // Submit Transfer command to transfer queue and wait until it finishes
   vkQueueSubmit(transferQueue, 1, &submitInfo, VK_NULL_HANDLE);
-  vkQueueWaitIdle(transferQueue);  // 큐가 Idle 상태가 될 때까지 기다린다. 여기서 Idle 상태란, 대기 상태에 있는 것을 이야기한다.
+  vkQueueWaitIdle(transferQueue);
 
   // Free Temporary command buffer back to pool
   vkFreeCommandBuffers(device, transferCommandPool, 1, &transferCommandBuffer);
@@ -392,7 +383,7 @@ static void CmdImageBarrier(VkCommandBuffer commandBuffer, VkImage image, VkImag
   imageMemBarrier.newLayout = newLayout;                          // Layout to transition to
   imageMemBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;  // Queue family to transition from
   imageMemBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;  // Queue family to transition to
-  imageMemBarrier.image = image;                                  // image being aceesed and modified as part of barrier
+  imageMemBarrier.image = image;                                  // image being accessed and modified as part of barrier
   imageMemBarrier.subresourceRange.aspectMask = aspectFlag;       // Aspect of Image being altered
   imageMemBarrier.subresourceRange.baseMipLevel = 0;              // First mip level to start alterations on
   imageMemBarrier.subresourceRange.levelCount = 1;                // number of mip levels to alter starting from base mip level
@@ -418,23 +409,16 @@ static void CmdImageBarrier(VkCommandBuffer commandBuffer, VkImage image, VkImag
     srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
     dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
   } else if (oldLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
-    // Depth attachment로 쓰일 때 접근 권한: Depth attachment에 대한 읽기 및 쓰기 접근이 필요합니다.
     imageMemBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    // Shader read-only 레이아웃으로 전환 후에는 셰이더 단계에서 읽기만 필요합니다.
     imageMemBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-    // srcStage: 이미지가 depth/stencil attachment로 사용될 때 최종 프래그먼트 테스트 후에 접근 가능하도록 설정합니다.
     srcStage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-    // dstStage: 셰이더 단계에서 읽어야 하므로 프래그먼트 셰이더에 맞추어 설정합니다.
     dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
   } else if (oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL || oldLayout == VK_IMAGE_LAYOUT_GENERAL) {
-    // Depth attachment로 쓰일 때 접근 권한: Depth attachment에 대한 읽기 및 쓰기 접근이 필요합니다.
     imageMemBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     imageMemBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-    // srcStage: Color attachment에 쓰는 단계인 color attachment output 단계에서 접근할 수 있도록 설정합니다.
     srcStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    // dstStage: 프래그먼트 셰이더에서 읽기 위해 프래그먼트 셰이더 단계로 설정합니다.
     dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
   }
 
@@ -455,7 +439,7 @@ static void CmdImageBarrier(VkCommandBuffer commandBuffer, VkImage image, VkImag
   imageMemBarrier.newLayout = newLayout;                          // Layout to transition to
   imageMemBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;  // Queue family to transition from
   imageMemBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;  // Queue family to transition to
-  imageMemBarrier.image = image;                                  // image being aceesed and modified as part of barrier
+  imageMemBarrier.image = image;                                  // image being accessed and modified as part of barrier
   imageMemBarrier.subresourceRange.aspectMask = aspectFlag;       // Aspect of Image being altered
   imageMemBarrier.subresourceRange.baseMipLevel = 0;              // First mip level to start alterations on
   imageMemBarrier.subresourceRange.levelCount = 1;                // number of mip levels to alter starting from base mip level
@@ -463,7 +447,6 @@ static void CmdImageBarrier(VkCommandBuffer commandBuffer, VkImage image, VkImag
   imageMemBarrier.subresourceRange.layerCount = 1;                // number of layers to alter starting from base array layer
 
   imageMemBarrier.srcAccessMask = srcAccessFlag;
-  // Shader read-only 레이아웃으로 전환 후에는 셰이더 단계에서 읽기만 필요합니다.
   imageMemBarrier.dstAccessMask = dstAccessFlag;
 
   vkCmdPipelineBarrier(commandBuffer, srcStage, dstStage,  // Pipeline Stages (match to src and dst AccessMasks)

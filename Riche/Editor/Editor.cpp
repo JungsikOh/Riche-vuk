@@ -31,7 +31,6 @@ std::string ShowOpenFileDialog() {
 }
 
 bool IsAllowedExtension(const std::filesystem::path& path) {
-  // 폴더는 항상 표시
   if (std::filesystem::is_directory(path)) return true;
 
   std::string ext = path.extension().string();
@@ -79,7 +78,6 @@ void Editor::ShowFileBrowserUI(const std::string& filter) {
           s_currentDir = entry.path().string();
         }
       } else {
-        // Click File → Execute 'loadGltfModel()' → Exit Browser
         if (ImGui::Selectable(name.c_str(), false)) {
           g_SelectedFilePath = entry.path().string();
 
@@ -241,10 +239,9 @@ void Editor::Initialize(GLFWwindow* window, VkInstance instance, VkDevice device
   depthStencilAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
   // REFERENCES
-  // FrameBuffer를 만들 때 사용하였던, attachment 배열을 참조한다고 보면 된다.
   // Attachment reference uses an attachment index that refers to index in the attachment list passed to renderPassCreateInfo
   VkAttachmentReference swapChainColourAttachmentRef = {};
-  swapChainColourAttachmentRef.attachment = 0;  // 얼마나 많은 attachment가 있는지 정의X, 몇번째 attachment를 참조하냐의 느낌.
+  swapChainColourAttachmentRef.attachment = 0;
   swapChainColourAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
   VkAttachmentReference depthStencilAttachmentRef = {};
@@ -267,7 +264,7 @@ void Editor::Initialize(GLFWwindow* window, VkInstance instance, VkDevice device
   // Conversion from VK_IMAGE_LAYER-UNDEFINED to VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
   // Transition must happen after ..
   subpassDependencies[0].srcSubpass =
-      VK_SUBPASS_EXTERNAL;  // 외부에서 들어오므로, Subpass index(VK_SUBPASS_EXTERNAL = Special value meaning outside of renderpass)
+      VK_SUBPASS_EXTERNAL;
   subpassDependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;  // Pipeline stage
   subpassDependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;            // Stage access mask (memory access)
   // But most happen before ..
@@ -304,15 +301,12 @@ void Editor::Initialize(GLFWwindow* window, VkInstance instance, VkDevice device
 
   VK_CHECK(vkCreateRenderPass(mainDevice.logicalDevice, &renderPassCreateInfo, nullptr, &renderPass));
 
-  // 1. ImGui Context 생성
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGuiIO& io = ImGui::GetIO();
 
-  // 2. ImGui 스타일 설정
   ImGui::StyleColorsDark();
 
-  // 3. ImGui Vulkan 초기화 정보 설정
   ImGui_ImplGlfw_InitForVulkan(window, true);
   ImGui_ImplVulkan_InitInfo init_info = {};
   init_info.Instance = m_Instance;
@@ -321,7 +315,7 @@ void Editor::Initialize(GLFWwindow* window, VkInstance instance, VkDevice device
   init_info.QueueFamily = m_queueFamilyIndices.graphicsFamily;
   init_info.Queue = m_graphicsQueue;
   init_info.PipelineCache = VK_NULL_HANDLE;
-  init_info.DescriptorPool = m_ImguiDescriptorPool;  // ImGui 전용 descriptor pool 생성 필요
+  init_info.DescriptorPool = m_ImguiDescriptorPool;
   init_info.MinImageCount = MAX_FRAME_DRAWS;
   init_info.ImageCount = MAX_FRAME_DRAWS;
   init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
@@ -329,7 +323,6 @@ void Editor::Initialize(GLFWwindow* window, VkInstance instance, VkDevice device
 
   ImGui_ImplVulkan_Init(&init_info);
   ImGui_ImplVulkan_CreateFontsTexture();
-  // Font texture 생성 후 cleanup
   ImGui_ImplVulkan_DestroyFontsTexture();
 }
 
@@ -355,28 +348,27 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
   static float totalFps = 0.0f;
   static int frameCount = 0;
 
-  static float timeSinceStart = 0.0f;  // 실행 후 누적 시간
-  static float secondAcc = 0.0f;       // 1초 누적용 타이머
-  static int framesInSec = 0;          // 1초 동안 렌더링된 프레임 수
+  static float timeSinceStart = 0.0f;
+  static float secondAcc = 0.0f;
+  static int framesInSec = 0;
 
-  constexpr int MAX_SAVED = 5000;                    // 최대 1000개 저장 (필요에 따라 조정)
-  static std::array<float, MAX_SAVED> fpsHistory{};  // 1 초 단위 FPS 저장
-  static int savedIdx = 0;                           // fpsHistory 에 저장된 개수
+  constexpr int MAX_SAVED = 5000;
+  static std::array<float, MAX_SAVED> fpsHistory{};
+  static int savedIdx = 0;
 
-  static float timeSinceLastUpdate = 0.0f;   // 마지막 FPS 갱신 시점
-  static const float updateInterval = 0.08f;  // FPS 갱신 간격 (0.5초마다 갱신)
+  static float timeSinceLastUpdate = 0.0f;
+  static const float updateInterval = 0.08f;
 
   auto currentTime = std::chrono::high_resolution_clock::now();
   std::chrono::duration<float> elapsedTime = currentTime - lastTime;
   lastTime = currentTime;
   float deltaTime = elapsedTime.count();
 
-  timeSinceStart += deltaTime;  // 전체 경과 시간
-  secondAcc += deltaTime;       // 1초 누적용
+  timeSinceStart += deltaTime;
+  secondAcc += deltaTime;
 
-  timeSinceLastUpdate += deltaTime;  // 시간 누적
+  timeSinceLastUpdate += deltaTime;
 
-  // FPS 계산
   if (deltaTime > 0.0f) {
     fps = 1.0f / deltaTime;
     frameCount++;
@@ -385,65 +377,31 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
     minFps = std::min(minFps, fps);
   }
 
-  //// 1초 단위 FPS 기록
-  //if (secondAcc >= 1.0f) {
-  //  float fpsThisSecond = framesInSec / secondAcc;  // 더 정확한 1초 평균 FPS
-  //  secondAcc -= 1.0f;                              // 남은 시간(1초 초과분) 유지
-  //  framesInSec = 0;                                // 1초 동안 렌더링된 프레임 수 초기화
-
-  //  // fpsHistory에 기록
-  //  if (savedIdx < MAX_SAVED) {
-  //    fpsHistory[savedIdx++] = fps;
-
-  //    // 1초마다 기록을 텍스트 파일로 내보내기 (CSV 형식으로 저장)
-  //    std::ofstream out("fps_log.csv", std::ios::app);  // append 모드로 열기
-  //    if (out.is_open()) {
-  //      // 헤더가 없으면 첫 번째 기록 시 헤더를 추가
-  //      if (savedIdx == 1) {
-  //        out << "Frame, FPS\n";  // CSV 파일에 헤더 추가
-  //      }
-
-  //      // CSV 형식으로 FPS 기록 (콤마로 구분)
-  //      out << savedIdx << "," << std::fixed << std::setprecision(2) << fps << '\n';
-  //      out.close();
-  //    }
-  //  }
-  //}
-
-  // 1초 단위 FPS 기록
   if (secondAcc >= 1.0f) {
-    float fpsThisSecond = framesInSec / secondAcc;  // 더 정확한 1초 평균 FPS
-    secondAcc -= 1.0f;                              // 남은 시간(1초 초과분) 유지
-    framesInSec = 0;                                // 1초 동안 렌더링된 프레임 수 초기화
+    secondAcc -= 1.0f;
+    framesInSec = 0;
 
-    // fpsHistory에 기록
-    if (savedIdx < MAX_SAVED && timeSinceLastUpdate >= updateInterval) {  // updateInterval 시간마다 갱신
+    if (savedIdx < MAX_SAVED && timeSinceLastUpdate >= updateInterval) {
       fpsHistory[savedIdx++] = fps;
 
-      // 1초마다 기록을 텍스트 파일로 내보내기 (CSV 형식으로 저장)
-      std::ofstream out("fps_log.csv", std::ios::app);  // append 모드로 열기
+      std::ofstream out("fps_log.csv", std::ios::app);
       if (out.is_open()) {
-        // 헤더가 없으면 첫 번째 기록 시 헤더를 추가
         if (savedIdx == 1) {
-          out << "Frame, FPS\n";  // CSV 파일에 헤더 추가
+          out << "Frame, FPS\n";
         }
 
-        // CSV 형식으로 FPS 기록 (콤마로 구분)
         out << savedIdx << "," << std::fixed << std::setprecision(2) << fps << '\n';
         out.close();
       }
 
-      timeSinceLastUpdate = 0.0f;  // 갱신 후 타이머 리셋
+      timeSinceLastUpdate = 0.0f;
     }
   }
 
-  // 매 프레임마다 framesInSec를 증가시킴 (1초마다 증가)
   framesInSec++;
 
-  // 평균 FPS 계산
   float averageFps = (frameCount > 0) ? totalFps / frameCount : 0.0f;
 
-  // 새로운 ImGui 프레임 시작
   ImGui_ImplVulkan_NewFrame();
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
@@ -454,7 +412,7 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
   if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("File")) {
       if (ImGui::MenuItem("Load Model")) {
-        g_ShowFileBrowser = true;  // 파일 브라우저 열기
+        g_ShowFileBrowser = true;
       }
       ImGui::EndMenu();
     }
@@ -472,7 +430,6 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
   ImGui::Text("Current FPS: %.1f", fps);
   ImGui::Text("Max FPS: %.1f | Average FPS: %.1f", maxFps, averageFps);
 
-  // 실행된 시간 표시 (초단위)
   int minutes = static_cast<int>(timeSinceStart) / 60;
   int seconds = static_cast<int>(timeSinceStart) % 60;
   ImGui::Text("Elapsed Time: %02d:%02d", minutes, seconds);
@@ -489,18 +446,49 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
 
   ImGui::Begin("Rendering");
   ImGui::Checkbox("Multi Threading Culling", &(g_RenderSetting.isMultiThreading));
-  ImGui::Checkbox("Use Mesh Shader", &(g_RenderSetting.UseMeshShader));
-  
-  bool meshletRendering = (g_ShaderSetting.isMeshletRender != 0);
-  if (g_RenderSetting.UseMeshShader) {
+
+  enum class RenderPath {
+    GpuBatch,
+    Basic,
+    MeshShader,
+  };
+
+  RenderPath renderPath = RenderPath::GpuBatch;
+  if (g_RenderSetting.ForceGpuBatchRendering) {
+    renderPath = RenderPath::GpuBatch;
+  } else if (g_RenderSetting.UseMeshShader) {
+    renderPath = RenderPath::MeshShader;
+  } else if (g_RenderSetting.UseBasicPass) {
+    renderPath = RenderPath::Basic;
+  }
+
+  ImGui::TextUnformatted("Render Path");
+  if (ImGui::RadioButton("GPU Batch Rendering", renderPath == RenderPath::GpuBatch)) {
+    renderPath = RenderPath::GpuBatch;
+  }
+  if (ImGui::RadioButton("Basic Rendering", renderPath == RenderPath::Basic)) {
+    renderPath = RenderPath::Basic;
+  }
+  if (ImGui::RadioButton("Mesh Shader", renderPath == RenderPath::MeshShader)) {
+    renderPath = RenderPath::MeshShader;
+  }
+
+  g_RenderSetting.ForceGpuBatchRendering = (renderPath == RenderPath::GpuBatch);
+  g_RenderSetting.UseBasicPass = (renderPath == RenderPath::Basic);
+  g_RenderSetting.UseMeshShader = (renderPath == RenderPath::MeshShader);
+
+  if (g_RenderSetting.ForceGpuBatchRendering || g_RenderSetting.UseBasicPass) {
+    g_ShaderSetting.isMeshletRender = 0;
+  }
+
+  if (g_RenderSetting.ForceGpuBatchRendering) {
+    ImGui::Checkbox("Wire Frame", &(g_RenderSetting.isWireRendering));
+  } else if (g_RenderSetting.UseMeshShader) {
+    bool meshletRendering = (g_ShaderSetting.isMeshletRender != 0);
     if (ImGui::Checkbox("Meshlet Rendering", &meshletRendering)) {
-      // Checkbox 값이 바뀌면 int 필드에도 반영
       g_ShaderSetting.isMeshletRender = meshletRendering ? 1 : 0;
     }
-  } else {
-    ImGui::Checkbox("Wire Frame", &(g_RenderSetting.isWireRendering));
   }
-  ImGui::Checkbox("Use Basic Rendering", &g_RenderSetting.UseBasicPass);
 
   //ImGui::Checkbox("Use Bloom", reinterpret_cast<bool*>(&g_ShaderSetting.isBloom));
   ImGui::Checkbox("Use ToneMapping", reinterpret_cast<bool*>(&g_ShaderSetting.isTonemapping));
@@ -519,7 +507,7 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
 
   if (m_selectedIndex >= 0 && m_selectedIndex < (int)g_BatchManager.m_transforms[currentImage].size() && m_gizmoType != -1) {
     g_RenderSetting.changeFlag = true;
-    ImGuizmo::SetOrthographic(false);  // Persp / Ortho 설정
+    ImGuizmo::SetOrthographic(false);
     ImGuizmo::Enable(true);
 
     float width = ImGui::GetIO().DisplaySize.x;
@@ -536,9 +524,9 @@ void Editor::RenderImGui(VkCommandBuffer commandBuffer, uint32_t currentImage) {
       glm::mat4& tc = g_BatchManager.m_transforms[currentImage][m_selectedIndex].currentTransform;
       glm::mat4 transform = glm::translate(tc, aabbCenter);
       ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(proj),
-                           (ImGuizmo::OPERATION)m_gizmoType,  // 또는 필요한 조작 종류 (ROTATE, SCALE 등)
-                           ImGuizmo::MODE::LOCAL,             // 월드 좌표계 또는 로컬 좌표계 선택
-                           glm::value_ptr(transform));        // gizmo 행렬
+                           (ImGuizmo::OPERATION)m_gizmoType,
+                           ImGuizmo::MODE::LOCAL,
+                           glm::value_ptr(transform));
 
       if (ImGuizmo::IsUsing()) {
         tc = transform * glm::translate(glm::mat4(1.0f), -aabbCenter);

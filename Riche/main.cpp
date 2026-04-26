@@ -9,23 +9,26 @@ GLFWwindow* window;
 VulkanRenderer vulkanRenderer;
 Camera g_camera;
 
+extern "C" {
+__declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
+__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+
 static double deltaTime = 0.0;
 static float smoothedDeltaTime = 0.016f;
 
-double lastX = 0.0, lastY = 0.0;  // 이전 프레임의 마우스 좌표
-bool firstMouse = true;           // 초기 마우스 위치 확인을 위한 플래그
+double lastX = 0.0, lastY = 0.0;
+bool firstMouse = true;
 bool rightButtonPressed = false;
 bool leftButtonPressed = false;
 bool hasLeftButtonPressed = false;
 
-void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) { /*g_camera.OnKeyInput(deltaTime, key);*/ }
-
 void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
-  if (button == GLFW_MOUSE_BUTTON_RIGHT) {  // 마우스 오른쪽 버튼일 경우
-    if (action == GLFW_PRESS) {             // 누를 때
+  if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+    if (action == GLFW_PRESS) {
       rightButtonPressed = true;
-      firstMouse = true;                  // 마우스를 누를 때마다 초기화
-    } else if (action == GLFW_RELEASE) {  // 뗄 때
+      firstMouse = true;
+    } else if (action == GLFW_RELEASE) {
       rightButtonPressed = false;
     }
   }
@@ -45,7 +48,7 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 
   } else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
     leftButtonPressed = false;
-    hasLeftButtonPressed = false;  // 다음 드래그를 위해 풀어줌
+    hasLeftButtonPressed = false;
     g_camera.isMousePressed = false;
   }
 }
@@ -53,17 +56,14 @@ void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 void CursorPositionCallback(GLFWwindow* window, double xpos, double ypos) {
   if (rightButtonPressed) {
     if (firstMouse) {
-      // 처음엔 이전 위치가 없기 때문에 초기 위치 설정
       lastX = xpos;
       lastY = ypos;
       firstMouse = false;
     }
 
-    // DeltaX, DeltaY 계산
     double deltaX = (xpos - lastX);
     double deltaY = (ypos - lastY);
 
-    // 현재 위치를 이전 위치로 갱신
     lastX = xpos;
     lastY = ypos;
 
@@ -84,9 +84,8 @@ void InitWindow(std::string wName = "Test Window", const int w = 800, const int 
 
 int main() {
   // Create Window
-  InitWindow("Test Widnow", 1920, 1080);
+  InitWindow("Test Window", 1920, 1080);
 
-  //glfwSetKeyCallback(window, KeyCallback);
   glfwSetMouseButtonCallback(window, MouseButtonCallback);
   glfwSetCursorPosCallback(window, CursorPositionCallback);
 

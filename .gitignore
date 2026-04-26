@@ -18,6 +18,7 @@
 mono_crash.*
 
 # Build results
+build/
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
@@ -28,6 +29,7 @@ x86/
 [Aa][Rr][Mm]/
 [Aa][Rr][Mm]64/
 bld/
+[Bb]uild/
 [Bb]in/
 [Oo]bj/
 [Ll]og/
@@ -401,3 +403,4 @@ FodyWeavers.xsd
 /Riche/extern/tiny-stable-diffusion/outputs/
 /Riche/extern/tiny-stable-diffusion/logs/
 
+AGENTS.md

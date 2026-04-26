@@ -64,7 +64,6 @@ void main() {
 //    vec3 halfwayDir = normalize(lightDir + viewDir);
 //    float spec = pow(max(dot(normal, halfwayDir), 0.0), 5.0);
 //
-//    // diff가 0이면 spec도 0이 되도록!
 //    spec *= diff;
 //    vec3 specular = spec * u_ShaderSetting.lightColor.rgb;
 //

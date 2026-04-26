@@ -295,14 +295,6 @@ bool DescriptorBuilder::Build(VkDescriptorSet& set, VkDescriptorSetLayout& layou
   VkDescriptorSetLayoutBindingFlagsCreateInfoEXT flagsCreateInfo{};
   std::vector<VkDescriptorBindingFlags> bindingFlags;
   if (isBindless) {
-    // VkDescriptorBindingFlagsEXT bindlessFlags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT |
-    //                                             VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT |
-    //                                             VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT;
-
-    // flagsCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT;
-    // flagsCreateInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-    // flagsCreateInfo.pBindingFlags = &bindlessFlags;
-
     bindingFlags.resize(bindings.size(), VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
                                              VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |
                                              VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT);

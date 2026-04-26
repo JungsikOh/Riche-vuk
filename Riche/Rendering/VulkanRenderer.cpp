@@ -23,7 +23,38 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
     func(instance, debugMessenger, pAllocator);
   }
 }
-};  // namespace
+
+const char* PhysicalDeviceTypeName(VkPhysicalDeviceType type) {
+  switch (type) {
+    case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+      return "Discrete GPU";
+    case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+      return "Integrated GPU";
+    case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+      return "Virtual GPU";
+    case VK_PHYSICAL_DEVICE_TYPE_CPU:
+      return "CPU";
+    default:
+      return "Other";
+  }
+}
+
+int PhysicalDevicePreferenceScore(const VkPhysicalDeviceProperties& properties) {
+  switch (properties.deviceType) {
+    case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+      return 3000;
+    case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+      return 2000;
+    case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+      return 1000;
+    case VK_PHYSICAL_DEVICE_TYPE_OTHER:
+      return 500;
+    case VK_PHYSICAL_DEVICE_TYPE_CPU:
+    default:
+      return -1;
+  }
+}
+}  // namespace
 
 void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
   window = newWindow;
@@ -51,29 +82,22 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
     m_pEditor->Initialize(window, instance, mainDevice.logicalDevice, mainDevice.physicalDevice, m_queueFamilyIndices, m_graphicsQueue,
                           m_camera);
 
-    // 물체 배치를 위한 파라미터 설정
     const int numColumns = 1;
-    const int numRows = 15;          // 5 * 4 = 20 개의 물체
-    const float spacingX = 200.0f;  // X축 간격
-    const float spacingZ = 200.0f;  // Z축 간격
-    const float baseHeight = 0.0f;  // 모든 물체의 높이
+    const int numRows = 15;
+    const float spacingX = 200.0f;
+    const float spacingZ = 200.0f;
+    const float baseHeight = 0.0f;
 
-    // Mesh들을 저장할 벡터 (기존 코드와 동일)
     std::vector<Mesh>& outMeshes = g_BatchManager.m_meshes;
 
-    // 각 그리드 위치에 대해 물체를 로드합니다.
+    // Load a repeated Sponza scene to stress batching and culling paths.
     for (int row = 0; row < numRows; ++row) {
       for (int col = 0; col < numColumns; ++col) {
-        // 계산된 위치: x와 z는 격자에 따라, y는 고정
         glm::vec3 pos(col * spacingX, baseHeight, row * spacingZ);
         loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f, pos);
-        // loadGltfModel(mainDevice.logicalDevice, "Resources/Models/DamagedHelmet/", "DamagedHelmet.gltf", outMeshes, 5.0f, pos);
       }
     }
-    //loadGltfModel(mainDevice.logicalDevice, "Resources/Models/Sponza/glTF/", "sponza.gltf", outMeshes, 0.1f);
-    // loadGltfModel(mainDevice.logicalDevice, "Resources/Models/DamagedHelmet/", "DamagedHelmet.gltf", outMeshes, 0.1f);
 
-    // 이후 기존 코드에 따라 BatchManager의 데이터를 flush하거나 추가 작업 진행
     g_BatchManager.FlushMiniBatch(g_BatchManager.m_miniBatchList, g_ResourceManager);
 
     int rayCount = 0, count = 0;
@@ -199,7 +223,6 @@ void VulkanRenderer::Initialize(GLFWwindow* newWindow, Camera* camera) {
       count += mesh.vertices.size();
     }
 
-    // 물체가 추가되면, 여기에 함수가 추가되는 것과 같은 효과를 보이게 하고 싶어
 
     std::cout << "Ray : " << rayCount << " Non : " << count << std::endl;
 
@@ -272,7 +295,7 @@ void VulkanRenderer::Draw() {
   vkResetFences(mainDevice.logicalDevice, 1, &drawFences[currentFrame]);
 
   // -- Get Next Image --, Get index of next image to be drawn to, and signal semaphore when ready to be drawn to
-  uint32_t imageIndex;  // swapchain의 이미지 버퍼에서 index 값을 갖고온다.
+  uint32_t imageIndex;
   vkAcquireNextImageKHR(mainDevice.logicalDevice, m_swapchain, (std::numeric_limits<uint32_t>::max)(), imageAvailable[currentFrame],
                         VK_NULL_HANDLE, &imageIndex);
 
@@ -290,15 +313,13 @@ void VulkanRenderer::Draw() {
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submitInfo.waitSemaphoreCount = 1;  // Number of semaphores to wait on
   submitInfo.pWaitSemaphores = &m_pLightingRenderPass->GetSemaphore(
-      imageIndex);  // List of semaphores to wait on, Command buffer가 실행하기전 대기해야하는 semaphores
-  // 즉, 이 semphore가 signaled 상태가 될 때까지 대기하고, 그 후에 Command buffer를 실행한다.
+      imageIndex);
   VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
   submitInfo.pWaitDstStageMask = waitStages;                            // Stages to check semaphores at
   submitInfo.commandBufferCount = 1;                                    // Number of command buffers to submit
   submitInfo.pCommandBuffers = &m_swapchainCommandBuffers[imageIndex];  // Command buffer to submit
   submitInfo.signalSemaphoreCount = 1;                                  // Number of semaphores to signal
   submitInfo.pSignalSemaphores = &renderFinished[currentFrame];         // Semaphores to signal when command buffer finishes
-  // Command buffer가 실행을 완료하면, Signaled 상태가 될 semaphore 배열.
 
   // Submit command buffer to queue
   VkResult result = vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, drawFences[currentFrame]);
@@ -317,7 +338,7 @@ void VulkanRenderer::Draw() {
   presentInfo.pImageIndices = &imageIndex;                      // Index of images in swapchain to present
 
   result = vkQueuePresentKHR(m_presentationQueue,
-                             &presentInfo);  // 렌더링 완료된 Graphics큐를 present 하는 함수. 즉, presentQueue로 전송한다고 볼 수 있음.
+                             &presentInfo);
   if (result != VK_SUCCESS) {
     throw std::runtime_error("Failed to Present swapchain!");
   }
@@ -363,8 +384,6 @@ void VulkanRenderer::Cleanup() {
     vkDestroyFramebuffer(mainDevice.logicalDevice, framebuffer, nullptr);
   }
   for (auto& image : m_swapchainImages) {
-    // VkImageView는 VkImage를 직접 참조해서 뷰를 생성한 것이므로, 호출해서 파괴해야한다.
-    // 반면, VkImage는 스왑체인이 생성될 때 할당된 메모리 내에서 관리되므로 파괴할 필요가 없다.
     vkDestroyImageView(mainDevice.logicalDevice, image.imageView, nullptr);
   }
   for (int i = 0; i < m_swapchainDepthStencilImages.size(); ++i) {
@@ -521,8 +540,8 @@ void VulkanRenderer::CreateLogicalDevice() {
 
   VkPhysicalDeviceDescriptorIndexingFeaturesEXT indexingFeatures = {};
   indexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
-  indexingFeatures.runtimeDescriptorArray = VK_TRUE;                     // 배열 크기 동적
-  indexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;  // 동적 인덱싱
+  indexingFeatures.runtimeDescriptorArray = VK_TRUE;
+  indexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
   indexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
   indexingFeatures.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
   indexingFeatures.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE;
@@ -538,26 +557,15 @@ void VulkanRenderer::CreateLogicalDevice() {
   deviceFeatures2.features.wideLines = VK_TRUE;
   deviceFeatures2.pNext = &indexingFeatures;
 
-  // Information to create logical device (someties called device)
+  // Information to create logical device (sometimes called device)
   VkDeviceCreateInfo deviceCreateInfo = {};
   deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
   deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());  // Number of queue create Infos
-  deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();  // List of Queue Create Infos so device can craete required queues
+  deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();  // List of Queue Create Infos so device can create required queues
   deviceCreateInfo.enabledExtensionCount =
       static_cast<uint32_t>(deviceExtensions.size());                  // Number of enabled logical device extensions
-  deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();  // List of enabled logical device extentions
+  deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();  // List of enabled logical device extensions
   deviceCreateInfo.pNext = &deviceFeatures2;
-
-  //// Pyhsical Device Features the logical device will be using
-  // VkPhysicalDeviceFeatures deviceFeatures = {};
-  // deviceFeatures.depthBiasClamp = VK_FALSE;  // Rasterizer에서 해당 기능을 지원할 것인지에 대한 여부
-  // deviceFeatures.samplerAnisotropy = VK_TRUE;
-  // deviceFeatures.multiDrawIndirect = VK_TRUE;
-  // deviceFeatures.drawIndirectFirstInstance = VK_TRUE;
-  // deviceFeatures.fillModeNonSolid = VK_TRUE;
-
-  // deviceCreateInfo.pEnabledFeatures = nullptr;  // Physical device features logical device will use
-  // deviceCreateInfo.pNext = &deviceFeatures2;
 
   // Create the logical device for the given physical device
   VkResult result = vkCreateDevice(mainDevice.physicalDevice, &deviceCreateInfo, nullptr, &mainDevice.logicalDevice);
@@ -566,7 +574,7 @@ void VulkanRenderer::CreateLogicalDevice() {
   }
 
   // Queues are created at the same time as the device..
-  // So we want heandle to queues
+  // So we want handle to queues
   // From given logical device, of given Queue Family, of given Queue Index (0 since only one queue), place reference in given
   // VkQueue
   vkGetDeviceQueue(mainDevice.logicalDevice, m_queueFamilyIndices.transferFamily, 0, &m_transferQueue);
@@ -630,7 +638,7 @@ void VulkanRenderer::CreateSwapChain() {
       VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;  // How to handle blending images with external graphics (e.g. other windows)
   swapChainCreateInfo.clipped = VK_TRUE;  // Whether to clip parts of image not in view (e.g. behind another window, off screen, etc)
 
-  // If graphics and presentation familes are different, then swapchain must let images be shared between familes.
+  // If graphics and presentation families are different, then swapchain must let images be shared between families.
   if (m_queueFamilyIndices.graphicsFamily != m_queueFamilyIndices.presentationFamily) {
     // Queues to share between
     uint32_t queueFamilyIndices[] = {(uint32_t)m_queueFamilyIndices.graphicsFamily, (uint32_t)m_queueFamilyIndices.presentationFamily};
@@ -744,10 +752,9 @@ void VulkanRenderer::CreateOffScreenRenderPass() {
   depthStencilAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
   // REFERENCES
-  // FrameBuffer를 만들 때 사용하였던, attachment 배열을 참조한다고 보면 된다.
   // Attachment reference uses an attachment index that refers to index in the attachment list passed to renderPassCreateInfo
   VkAttachmentReference swapChainColourAttachmentRef = {};
-  swapChainColourAttachmentRef.attachment = 0;  // 얼마나 많은 attachment가 있는지 정의X, 몇번째 attachment를 참조하냐의 느낌.
+  swapChainColourAttachmentRef.attachment = 0;
   swapChainColourAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
   VkAttachmentReference depthStencilAttachmentRef = {};
@@ -770,7 +777,7 @@ void VulkanRenderer::CreateOffScreenRenderPass() {
   // Conversion from VK_IMAGE_LAYER-UNDEFINED to VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
   // Transition must happen after ..
   subpassDependencies[0].srcSubpass =
-      VK_SUBPASS_EXTERNAL;  // 외부에서 들어오므로, Subpass index(VK_SUBPASS_EXTERNAL = Special value meaning outside of renderpass)
+      VK_SUBPASS_EXTERNAL;
   subpassDependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;  // Pipeline stage
   subpassDependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;            // Stage access mask (memory access)
   // But most happen before ..
@@ -897,13 +904,13 @@ void VulkanRenderer::CreatePipelines() {
   VkPipelineShaderStageCreateInfo vertexShaderCreateInfo = {};
   vertexShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   vertexShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;  // Shader stage name
-  vertexShaderCreateInfo.module = vertexShaderModule;         // Shader moudle to be used by stage
+  vertexShaderCreateInfo.module = vertexShaderModule;         // Shader module to be used by stage
   vertexShaderCreateInfo.pName = "main";                      // Entry point in to shader
   // Fragment Stage Creation information
   VkPipelineShaderStageCreateInfo fragmentShaderCreateInfo = {};
   fragmentShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   fragmentShaderCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;  // Shader stage name
-  fragmentShaderCreateInfo.module = fragmentShaderModule;         // Shader moudle to be used by stage
+  fragmentShaderCreateInfo.module = fragmentShaderModule;         // Shader module to be used by stage
   fragmentShaderCreateInfo.pName = "main";                        // Entry point in to shader
 
   VkPipelineShaderStageCreateInfo shaderStages[] = {vertexShaderCreateInfo, fragmentShaderCreateInfo};
@@ -920,7 +927,6 @@ void VulkanRenderer::CreatePipelines() {
   // -- INPUT ASSEMBLY --
   VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
   inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-  // List versus Strip: 연속된 점(Strip), 딱 딱 끊어서 (List)
   inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;  // Primitive type to assemble vertices
   inputAssembly.primitiveRestartEnable = VK_FALSE;               // Allow overriding of "strip" topology to start new primitives
 
@@ -953,7 +959,7 @@ void VulkanRenderer::CreatePipelines() {
       VK_FALSE;  // Change if fragments beyond near/far planes are clipped (default) or clamped to
                  // plane, you can only use this to accept depthBiasClamp of physical device VK_TRUE
   rasterizerCreateInfo.rasterizerDiscardEnable = VK_FALSE;  // Whether tp discard data and skip rasterizer. Never creates fragments
-                                                            // only suitable for pipline without framebuffer output.
+                                                            // only suitable for pipeline without framebuffer output.
   rasterizerCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;  // How to handle filling points between vertices.
   rasterizerCreateInfo.lineWidth = 1.0f;                    // How thick lines should be when drawn
   rasterizerCreateInfo.cullMode = VK_CULL_MODE_NONE;        // Which face of a tri to cull
@@ -969,7 +975,7 @@ void VulkanRenderer::CreatePipelines() {
 
   // -- BLENDING --
   // Blending decides how to blend a new colour being written to a fragment, with the old value
-  // Blend Attacment State (how blending is handled)
+  // Blend Attachment State (how blending is handled)
   VkPipelineColorBlendAttachmentState colourState = {};
   colourState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
                                VK_COLOR_COMPONENT_A_BIT;  // Colours to apply blending to
@@ -1010,11 +1016,10 @@ void VulkanRenderer::CreatePipelines() {
   // -- DEPTH STENCIL TESTING --
   VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo = {};
   depthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-  depthStencilCreateInfo.depthTestEnable = VK_TRUE;            // Enable checking depth to determine fragment wrtie
+  depthStencilCreateInfo.depthTestEnable = VK_TRUE;            // Enable checking depth to determine fragment write
   depthStencilCreateInfo.depthWriteEnable = VK_FALSE;          // Enable writing to depth buffer (to replace old values)
   depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;  // Comparison operation that allows an overwrite (is in front)
-  depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;     // Depth Bounds Test: Does the depth value exist between two bounds, 즉
-                                                            // 픽셀의 깊이 값이 특정 범위 안에 있는지를 체크하는 검사
+  depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;
   depthStencilCreateInfo.stencilTestEnable = VK_FALSE;  // Enable Stencil Test
 
   // -- GRAPHICS PIPELINE CREATION --
@@ -1030,13 +1035,13 @@ void VulkanRenderer::CreatePipelines() {
   pipelineCreateInfo.pMultisampleState = &multisamplingCreateInfo;
   pipelineCreateInfo.pColorBlendState = &colourBlendingCreateInfo;
   pipelineCreateInfo.pDepthStencilState = &depthStencilCreateInfo;
-  pipelineCreateInfo.layout = m_offScreenPipelineLayout;  // Pipeline Laytout pipeline should use
+  pipelineCreateInfo.layout = m_offScreenPipelineLayout;  // Pipeline layout pipeline should use
   pipelineCreateInfo.renderPass = m_offScreenRenderPass;  // Render pass description the pipeline is compatible with
   pipelineCreateInfo.subpass = 0;                         // Subpass of render pass to use with pipeline
 
   // Pipeline Derivatives : can create multiple pipeline that derive from one another for optimization
-  pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;  // Existing pipline to derive from
-  pipelineCreateInfo.basePipelineIndex = -1;  // or index of pipeline being created to derive from (in case createing multiple at once)
+  pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;  // Existing pipeline to derive from
+  pipelineCreateInfo.basePipelineIndex = -1;  // or index of pipeline being created to derive from (in case creating multiple at once)
 
   VK_CHECK(vkCreateGraphicsPipelines(mainDevice.logicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_offScreenPipeline));
 
@@ -1063,7 +1068,7 @@ void VulkanRenderer::CreateCommandBuffers() {
 
   VkCommandBufferAllocateInfo cbAllocInfo = {};
   cbAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  cbAllocInfo.commandPool = m_graphicsCommandPool;  // 해당 큐 패밀리의 큐에서만 커맨드 큐 동작이 실행가능하다.
+  cbAllocInfo.commandPool = m_graphicsCommandPool;
   cbAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;  // VK_COMMAND_BUFFER_LEVEL_PRIMARY		: buffer you submit directly to
                                                         // queue. cant be called by other buffers
   // VK_COMMAND_BUFFER_LEVEL_SECONDARY	: buffer can't be called directly. Can be called from other buffers via
@@ -1079,10 +1084,10 @@ void VulkanRenderer::CreateSynchronisation() {
   renderFinished.resize(MAX_FRAME_DRAWS);
   drawFences.resize(MAX_FRAME_DRAWS);
 
-  // Semaphore creataion information
+  // Semaphore creation information
   VkSemaphoreCreateInfo semaphoreCreateInfo = {};
   semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-  // Fence creataion information
+  // Fence creation information
   VkFenceCreateInfo fenceCreateInfo = {};
   fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
   fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
@@ -1113,7 +1118,7 @@ void VulkanRenderer::FillOffScreenCommands(uint32_t currentImage) {
   renderPassBeginInfo.renderArea.extent = swapChainExtent;  // Size of region to run render pass on (starting at offset)
 
   std::array<VkClearValue, 2> clearValues = {};
-  clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.0f};  // 투명한 (검은)색
+  clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.0f};
   clearValues[0].depthStencil.depth = 0.0f;
 
   clearValues[1].depthStencil.depth = 1.0f;
@@ -1128,7 +1133,7 @@ void VulkanRenderer::FillOffScreenCommands(uint32_t currentImage) {
 
   // Begin Render Pass
   vkCmdBeginRenderPass(m_swapchainCommandBuffers[currentImage], &renderPassBeginInfo,
-                       VK_SUBPASS_CONTENTS_INLINE);  // 렌더 패스의 내용을 직접 명령 버퍼에 기록하는 것을 의미
+                       VK_SUBPASS_CONTENTS_INLINE);
 
   vkCmdBindPipeline(m_swapchainCommandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, m_offScreenPipeline);
 
@@ -1157,7 +1162,7 @@ void VulkanRenderer::GetPhysicalDevice() {
   uint32_t deviceCount = 0;
   vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
 
-  // If no devices avilable, then none suppotr Vulkan!
+  // If no devices available, then none support Vulkan!
   if (deviceCount == 0) {
     throw std::runtime_error("Can't find GPUs that support Vulkan Instance!");
   }
@@ -1166,30 +1171,47 @@ void VulkanRenderer::GetPhysicalDevice() {
   std::vector<VkPhysicalDevice> deviceList(deviceCount);
   vkEnumeratePhysicalDevices(instance, &deviceCount, deviceList.data());
 
+  struct PhysicalDeviceCandidate {
+    VkPhysicalDevice device = VK_NULL_HANDLE;
+    VkPhysicalDeviceProperties properties = {};
+    int score = -1;
+  };
+
+  std::vector<PhysicalDeviceCandidate> candidates;
+  candidates.reserve(deviceList.size());
+
   for (const auto& device : deviceList) {
-    if (CheckDeviceSuitable(device)) {
-      mainDevice.physicalDevice = device;
-      break;
+    if (!CheckDeviceSuitable(device)) {
+      continue;
     }
+
+    VkPhysicalDeviceProperties properties = {};
+    vkGetPhysicalDeviceProperties(device, &properties);
+
+    const int score = PhysicalDevicePreferenceScore(properties);
+    if (score < 0) {
+      continue;
+    }
+
+    candidates.push_back({device, properties, score});
   }
 
-  if (mainDevice.physicalDevice == VK_NULL_HANDLE) {
+  if (candidates.empty()) {
     throw std::runtime_error("Failed to find a suitable GPU!");
   }
 
-  //// Get properties of our new device
-  // VkPhysicalDeviceProperties deviceProperties;
-  // vkGetPhysicalDeviceProperties(mainDevice.physicalDevice, &deviceProperties);
+  std::sort(candidates.begin(), candidates.end(), [](const auto& lhs, const auto& rhs) {
+    return lhs.score > rhs.score;
+  });
 
-  // minUniformBufferOffset = deviceProperties.limits.minUniformBufferOffsetAlignment;
+  mainDevice.physicalDevice = candidates.front().device;
+  m_queueFamilyIndices = VkUtils::GetQueueFamilies(mainDevice.physicalDevice, m_swapchainSurface);
+
+  std::cout << "Selected GPU: " << candidates.front().properties.deviceName << " ("
+            << PhysicalDeviceTypeName(candidates.front().properties.deviceType) << ")" << std::endl;
 }
 
 void VulkanRenderer::AllocateDynamicBufferTransferSpace() {
-  //// Calculate alignment of model data
-  // modelUniformAligment = (sizeof(Model) + minUniformBufferOffset - 1) & ~(minUniformBufferOffset - 1);
-
-  //// Create space in memory to hold dynamic buffer that is aligend to our required alignment and holds MAX_OBJECTS
-  // modelTransferSpace = (Model*)_aligned_malloc(modelUniformAligment * MAX_OBJECTS, modelUniformAligment);
 }
 
 bool VulkanRenderer::CheckInstanceExtensionSupport(std::vector<const char*>* checkExtensions) {
@@ -1201,17 +1223,11 @@ bool VulkanRenderer::CheckInstanceExtensionSupport(std::vector<const char*>* che
   std::vector<VkExtensionProperties> extensions(extensionCount);
   vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
 
-  // you can see outputs are VK_KHR_surface -> VK_KHR_win32_surface
-  // VK_KHR_surface는 플랫폼에 독립적인 surface 생성 기능을 제공함으로써 플랫폼에 구애받지 않는 일반적인 인터페이스를 제공
-  // VK_KHR_win32_surface는 Windows에서 Vulkan이 사용할 수 있는 surface를 생성. 즉, 첫번째는 공통적으로 사용할 수 있는 기능을
-  // 제공하고 두번째는 해당 플랫폼에 맞게 상호작용을 담당
-
   // Check if given extensions are in list of available extensions
   for (const auto& checkExtensions : *checkExtensions) {
     bool hasExtension = false;
     for (const auto& extension : extensions) {
       if (strcmp(checkExtensions, extension.extensionName) == 0) {
-        // std::cout << checkExtensions << std::endl;
         hasExtension = true;
         break;
       }
@@ -1298,8 +1314,8 @@ bool VulkanRenderer::CheckDeviceSuitable(VkPhysicalDevice device) {
 
   VkPhysicalDeviceDescriptorIndexingFeaturesEXT indexingFeatures = {};
   indexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
-  indexingFeatures.runtimeDescriptorArray = VK_TRUE;                     // 배열 크기 동적
-  indexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;  // 동적 인덱싱
+  indexingFeatures.runtimeDescriptorArray = VK_TRUE;
+  indexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
   indexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
   indexingFeatures.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
   indexingFeatures.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE;
@@ -1319,6 +1335,20 @@ bool VulkanRenderer::CheckDeviceSuitable(VkPhysicalDevice device) {
   /*vkGetPhysicalDeviceFeatures(device, &deviceFeatures);*/
   vkGetPhysicalDeviceFeatures2(device, &deviceFeatures2);
 
+  const bool requiredDeviceFeatures = deviceFeatures2.features.samplerAnisotropy && deviceFeatures2.features.multiDrawIndirect &&
+                                      deviceFeatures2.features.drawIndirectFirstInstance &&
+                                      deviceFeatures2.features.fillModeNonSolid;
+  const bool requiredIndexingFeatures = indexingFeatures.runtimeDescriptorArray &&
+                                        indexingFeatures.shaderSampledImageArrayNonUniformIndexing &&
+                                        indexingFeatures.descriptorBindingPartiallyBound &&
+                                        indexingFeatures.descriptorBindingUniformBufferUpdateAfterBind &&
+                                        indexingFeatures.descriptorBindingStorageBufferUpdateAfterBind &&
+                                        indexingFeatures.descriptorBindingSampledImageUpdateAfterBind &&
+                                        indexingFeatures.descriptorBindingVariableDescriptorCount;
+  const bool requiredRaytracingFeatures =
+      raytracingFeatures.rayTracingPipeline && accelerationStructureFeatures.accelerationStructure &&
+      accelerationStructureFeatures.descriptorBindingAccelerationStructureUpdateAfterBind;
+
   bool extensionSupported = CheckDeviceExtensionSupport(device);
 
   bool swapChainValid = false;
@@ -1330,7 +1360,8 @@ bool VulkanRenderer::CheckDeviceSuitable(VkPhysicalDevice device) {
   // Get the Queue family indices for the chosen physical device
   m_queueFamilyIndices = VkUtils::GetQueueFamilies(device, m_swapchainSurface);
 
-  return m_queueFamilyIndices.isVaild() && extensionSupported && swapChainValid && deviceFeatures2.features.samplerAnisotropy;
+  return m_queueFamilyIndices.isVaild() && extensionSupported && swapChainValid && requiredDeviceFeatures &&
+         requiredIndexingFeatures && requiredRaytracingFeatures;
 }
 
 SwapChainDetails VulkanRenderer::GetSwapChainDetails(VkPhysicalDevice device) {
@@ -1370,7 +1401,7 @@ VkSurfaceFormatKHR VulkanRenderer::ChooseBestSurfaceFormat(const std::vector<VkS
     return {VK_FORMAT_R8G8B8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
   }
 
-  // If restriceted, search for optimal format
+  // If restricted, search for optimal format
   for (const auto& format : formats) {
     if ((format.format == VK_FORMAT_R8G8B8A8_UNORM /* || format.format == VK_FORMAT_B8G8R8A8_UNORM*/) &&
         format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
@@ -1419,12 +1450,10 @@ VkExtent2D VulkanRenderer::ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& surf
 
 void VulkanRenderer::PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo) {
   createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-  // messageSeverity filed allows 어떤 심각도에 대해 debug를 보여줄 것인가. 즉, 심각도 수준을 선택
   createInfo.messageSeverity = /*VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |*/
       VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-  // 어떤 유형의 디버그 메세지를 받을 것인지 설정. GENERAL_BIT / VALIDATION_BIT / PERFORMANCE_BIT
   createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                            VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-  createInfo.pfnUserCallback = debugCallback;  // 디버그 메시지를 호출할 Call back 함수 지정
+  createInfo.pfnUserCallback = debugCallback;
   createInfo.pUserData = nullptr;              // Optional
 }

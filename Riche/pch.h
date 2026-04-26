@@ -21,7 +21,7 @@
 // 3rd party
 //
 
-// pass the certain waring messeage
+// Suppress third-party encoding warnings.
 #pragma warning(push)
 #pragma warning(disable : 4819)
 

@@ -50,19 +50,16 @@ static std::array<FrustumPlane, 6> CalculateFrustumPlanes(const glm::mat4& viewP
                 viewProjectionMatrix[2][3] + viewProjectionMatrix[2][1]);
   planes[3].distance = viewProjectionMatrix[3][3] + viewProjectionMatrix[3][1];
 
-  // Near plane (Vulkan의 z = 0)
   planes[4].normal =
       glm::vec3(viewProjectionMatrix[0][3] + viewProjectionMatrix[0][2], viewProjectionMatrix[1][3] + viewProjectionMatrix[1][2],
                 viewProjectionMatrix[2][3] + viewProjectionMatrix[2][2]);
   planes[4].distance = viewProjectionMatrix[3][3] + viewProjectionMatrix[3][2];
 
-  // Far plane (Vulkan의 z = 1)
   planes[5].normal =
       glm::vec3(viewProjectionMatrix[0][3] - viewProjectionMatrix[0][2], viewProjectionMatrix[1][3] - viewProjectionMatrix[1][2],
                 viewProjectionMatrix[2][3] - viewProjectionMatrix[2][2]);
   planes[5].distance = viewProjectionMatrix[3][3] - viewProjectionMatrix[3][2];
 
-  // Normalize the planes (distance는 노멀의 길이로 나누지 않음)
   for (auto& plane : planes) {
     float length = glm::length(plane.normal);
     plane.normal /= length;
@@ -76,22 +73,19 @@ static bool isAABBInsideFrustum(const std::array<FrustumPlane, 6>& frustum, cons
   for (int i = 0; i < 6; i++) {
     const FrustumPlane& plane = frustum[i];
 
-    // 바운딩 박스의 "가장 먼 쪽" 점 선택
     glm::vec3 positiveVertex =
         glm::vec3(
             (plane.normal.x < 0) ? aabb.min.x : aabb.max.x, 
             (plane.normal.y < 0) ? aabb.min.y : aabb.max.y,
             (plane.normal.z < 0) ? aabb.min.z : aabb.max.z);
 
-    // 평면과 점 사이의 거리 계산
     float distance = glm::dot(plane.normal, positiveVertex) + plane.distance;
 
-    // 오브젝트가 프러스텀 밖에 있음
     if (distance >= 0) {
       return true;
     }
   }
-  return false;  // AABB가 프러스텀 안에 있음
+  return false;
 }
 
 
@@ -110,11 +104,9 @@ static AABB ComputeAABB(const std::vector<VERTEX>& vertices) {
 }
 
 static std::vector<glm::vec3> CreateAABBVertexBuffer(const AABB& aabb) {
-  // AABB 구조체의 min과 max는 glm::vec4 형식이지만, 여기서는 위치 정보로 사용합니다.
   glm::vec3 min = glm::vec3(aabb.min);
   glm::vec3 max = glm::vec3(aabb.max);
 
-  // 8개의 코너를 정의합니다.
   std::vector<glm::vec3> vertices = {
       glm::vec3(min.x, min.y, min.z),  // 0
       glm::vec3(max.x, min.y, min.z),  // 1
@@ -130,9 +122,6 @@ static std::vector<glm::vec3> CreateAABBVertexBuffer(const AABB& aabb) {
 }
 
 static std::vector<uint32_t> CreateAABBIndexBuffer() {
-  const uint32_t PRIMITIVE_RESTART = 0xFFFFFFFF;
-
-  // 정점 배열은 아래와 같이 구성되어 있다고 가정:
   // 0: bottom front left
   // 1: bottom front right
   // 2: top front right
@@ -142,48 +131,38 @@ static std::vector<uint32_t> CreateAABBIndexBuffer() {
   // 6: top back right
   // 7: top back left
   //
-  // 12개 에지(라인)는 다음과 같습니다.
   // Bottom face (y = min): edges: 0-1, 1-5, 5-4, 4-0
   // Top face (y = max):    edges: 3-2, 2-6, 6-7, 7-3
   // Vertical edges:       edges: 0-3, 1-2, 5-6, 4-7
 
-  //std::vector<uint32_t> indices = {// 밑면 (y = min): v0, v1, v5, v4
-  //                                 0, 1, 1, 5, 5, 4, 4, 0,
-  //                                 // 윗면 (y = max): v3, v2, v6, v7
-  //                                 3, 2, 2, 6, 6, 7, 7, 3,
-  //                                 // 수직선 (측면)
-  //                                 0, 3, 1, 2, 5, 6, 4, 7};
+  std::vector<uint32_t> indices = {
+      // Front (z = min)
+      0, 1, 2, 2, 3, 0,
 
-      std::vector<uint32_t> indices = {// --- Front (z=min)
-                                   0, 1, 2, 2, 3, 0,
+      // Back (z = max)
+      4, 5, 6, 6, 7, 4,
 
-                                   // --- Back (z=max)
-                                   4, 5, 6, 6, 7, 4,
+      // Bottom (y = min)
+      0, 1, 5, 5, 4, 0,
 
-                                   // --- Bottom (y=min)
-                                   0, 1, 5, 5, 4, 0,
+      // Top (y = max)
+      3, 2, 6, 6, 7, 3,
 
-                                   // --- Top (y=max)
-                                   3, 2, 6, 6, 7, 3,
+      // Left (x = min)
+      0, 4, 7, 7, 3, 0,
 
-                                   // --- Left (x=min)
-                                   0, 4, 7, 7, 3, 0,
-
-                                   // --- Right (x=max)
-                                   1, 2, 6, 6, 5, 1};
-
+      // Right (x = max)
+      1, 2, 6, 6, 5, 1};
 
   return indices;
 }
 
 static AABB TransformAABB(const AABB& aabb, const glm::mat4& modelMatrix) {
-  // AABB의 8개의 꼭짓점 계산
   glm::vec3 corners[8] = {glm::vec3(aabb.min.x, aabb.min.y, aabb.min.z), glm::vec3(aabb.min.x, aabb.min.y, aabb.max.z),
                           glm::vec3(aabb.min.x, aabb.max.y, aabb.min.z), glm::vec3(aabb.min.x, aabb.max.y, aabb.max.z),
                           glm::vec3(aabb.max.x, aabb.min.y, aabb.min.z), glm::vec3(aabb.max.x, aabb.min.y, aabb.max.z),
                           glm::vec3(aabb.max.x, aabb.max.y, aabb.min.z), glm::vec3(aabb.max.x, aabb.max.y, aabb.max.z)};
 
-  // 변환된 꼭짓점들을 사용하여 새로운 AABB 계산
   glm::vec3 newMin(std::numeric_limits<float>::max());
   glm::vec3 newMax(std::numeric_limits<float>::lowest());
 
@@ -197,14 +176,12 @@ static AABB TransformAABB(const AABB& aabb, const glm::mat4& modelMatrix) {
 }
 
 static BoundingSphere ComputeBoundingSphere(const std::vector<glm::vec3>& vertices) {
-  // 1. 모든 정점의 중심을 계산합니다.
   glm::vec3 center(0.0f);
   for (const auto& vertex : vertices) {
     center += vertex;
   }
   center /= static_cast<float>(vertices.size());
 
-  // 2. 중심점으로부터 각 정점까지의 거리 중 가장 큰 값을 반지름으로 설정합니다.
   float radius = 0.0f;
   for (const auto& vertex : vertices) {
     float distance = glm::length(vertex - center);

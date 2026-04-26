@@ -8,7 +8,6 @@ struct Transform {
     mat4 currentModel;
 };
 
-// AABB 구조체
 struct AABB
 {
     vec4 minPos;	// minimum coord
@@ -20,7 +19,6 @@ struct BoundingSphere {
     float radius;
 };
 
-// Indirect Draw 명령
 struct IndircetDrawIndexedCommand {
     uint    indexCount;
     uint    instanceCount;
